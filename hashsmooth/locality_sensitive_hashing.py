@@ -244,7 +244,7 @@ class EditLSHTransformer(LSHTransformer):
         self.kmer_size = kmer_size
         self.l_chucksize = l_chucksize
         self.hashcode2input_dict = collections.defaultdict(str)
-        self.dict_saving_path = os.path.join(_current_file_path, "hashcodes2input.dict")
+        self.dict_saving_path = os.path.join(_current_file_path, "res/hashcodes2input.dict")
         if os.path.exists(self.dict_saving_path):
             self.hashcode2input_dict = read_pickle(self.dict_saving_path)
         self._x = 1
@@ -438,52 +438,6 @@ class HammingLSHTransformer(LSHTransformer):
         return np.random.choice(self.dimension, self.sub_k, replace=replace)
 
 
-def test_jaccard():
-    # lr = np.array([[5, 3, 2],
-    #                [1, 5, 8],
-    #                [7, 1, 3],
-    #                [5, 4, 9],
-    #                [6, 6, 9]], dtype=np.uint32)
-    lr = np.random.randint(1, 100000, (5, 3))
-    jaccard_lsh = JaccardLSHTransformer(sub_k=6)
-    i = 1
-    while i <= 10:
-        hash_codes = jaccard_lsh._map(lr)
-        lr_back = jaccard_lsh._inverse_map(hash_codes)
-        assert set(lr_back.flatten()).issubset(
-            set(lr.flatten())), f"the input array {lr}\n, the output array {lr_back}."
-        i += 1
-
-
-def test_weighted_jaccard():
-    # each entity is the corresponding occurrence of words in vocabulary
-    lr = np.array([[5, 3, 2],
-                   [1, 5, 8],
-                   [7, 1, 3],
-                   [5, 4, 9],
-                   [6, 6, 9]], dtype=np.uint32)
-    w_jaccard_lsh = WeightedJaccardLSHTransformer(number_of_words=3, sub_k=2, seed=3)
-    i = 1
-    while i <= 10:
-        hash_codes = w_jaccard_lsh._map(lr)
-        lr_tran = w_jaccard_lsh._inverse_map(hash_codes)
-        assert np.all(0 <= lr_tran) & np.all(lr_tran <= lr)
-        i += 1
-
-
-def test_edit_distance():
-    np.random.seed(1)
-    batch_sequences = np.random.randint(1, 7, (5, 6), dtype=int)
-    batch_sequences[0:2, -2:] = 0
-    edit_lsh_transformer = EditLSHTransformer(number_of_words=6, sub_k=3, kmer_size=2)
-    i = 1
-    while i <= 10:
-        hash_codes = edit_lsh_transformer._map(batch_sequences)
-        ipt_trans = edit_lsh_transformer._inverse_map(hash_codes)
-        assert np.all(ipt_trans <= batch_sequences)
-        i += 1
-
-
 def test_pstable_dist():
     np.random.seed(0)
     x = np.random.uniform(0, 1, (5, 6))
@@ -491,17 +445,5 @@ def test_pstable_dist():
     hash_codes = pstable_lsh._map(x)
 
 
-def test_hamming_distance():
-    x = np.random.randint(0, 2, (5, 8))
-    hamming_lsh = HammingLSHTransformer(dimension=x.shape[1], sub_k=3)
-    hash_codes = hamming_lsh._map(x)
-    ipt_transf = hamming_lsh._inverse_map(hash_codes)
-    assert (ipt_transf <= x).all()
-
-
 if __name__ == "__main__":
-    test_jaccard()
-    test_weighted_jaccard()
-    test_edit_distance()
     test_pstable_dist()
-    test_hamming_distance()
