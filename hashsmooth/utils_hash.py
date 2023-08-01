@@ -6,6 +6,7 @@ import hashlib
 import struct
 from ast import literal_eval
 import numpy as np
+from statsmodels.stats.proportion import proportion_confint, binom_test
 
 
 def mod_inverse(x, m: int):
@@ -19,7 +20,7 @@ def mod_inverse(x, m: int):
         x = np.array(x)
     assert np.all(x > 0), "Support positive integers solely.\n"
     assert is_prime(m), f"{m} is not prime.\n"
-    g, a, b = extended_gcd(x.astype(np.int), m)
+    g, a, b = extended_gcd(x.astype(int), m)
     if isinstance(g, np.ndarray):
         if np.all(g == 1):
             return np.mod(a, m)
@@ -38,13 +39,13 @@ def extended_gcd(x, m: int):
     :param x: positive integers
     :param m: a big prime number
     """
-    assert x.dtype == np.int
+    assert x.dtype == int
     m = np.ones_like(x, dtype=np.int32) * m
     last_remainder, remainder = x, m
     a, last_a, b, last_b = np.zeros_like(x), np.ones_like(x), np.ones_like(x), np.zeros_like(x)
     flag = remainder == 0
     remainder_collector, a_collector, b_collector = \
-        np.empty(x.shape, dtype=np.int), np.empty(x.shape, dtype=np.int), np.empty(x.shape, dtype=np.int)
+        np.empty(x.shape, dtype=int), np.empty(x.shape, dtype=int), np.empty(x.shape, dtype=int)
     while not np.all(flag):
         last_remainder, (quotient, remainder) = remainder, np.divmod(last_remainder, remainder)
         a, last_a = last_a - quotient * a, a
@@ -92,6 +93,7 @@ def str_quantifying(kmer_batch):
         qutif_value = struct.unpack('<H',
                                     hashlib.sha1(ipt_str.encode('utf-8')).digest()[:2])
         return qutif_value[0]
+
     if isinstance(kmer_batch, str):
         return _hash_q(kmer_batch)
     elif isinstance(kmer_batch, np.ndarray):
@@ -101,6 +103,36 @@ def str_quantifying(kmer_batch):
         raise TypeError
 
 
+def lower_confidence_interval(n_targeted, n_estimation, alpha):
+    """
+    lower bound of confidence interval
+    :param n_targeted: number of successes
+    :param n_estimation: number of experiment trials
+    :param alpha: confidence level
+    """
+    return proportion_confint(n_targeted, n_estimation, 2 * alpha, method='beta')[0]
+
+
+def upper_confidence_interval(n_targeted, n_estimation, alpha):
+    """
+    upper bound of confidence interval
+    :param n_targeted: number of successes
+    :param n_estimation: number of experiment trials
+    :param alpha: confidence level
+    """
+    return proportion_confint(n_targeted, n_estimation, alpha=2 * alpha, method="beta")[1]
+
+
+def get_position(pos: int, shape: list) -> tuple:
+    assert pos <= np.cumprod(shape)[-1]
+    position_dim = []
+    curr_pos = pos
+    for dim in shape[::-1]:
+        next_pos = curr_pos // dim
+        curr_idx = curr_pos % dim
+        position_dim.append(curr_idx)
+        curr_pos = next_pos
+    return tuple(position_dim[::-1])
 
 
 if __name__ == "__main__":
@@ -115,7 +147,10 @@ if __name__ == "__main__":
     # # print(hv - y)
     # print((hv - y) * mod_inverse(x, 11) % 11)
     # # assert np.all((hv - y) * mod_inverse(lr, 11) % 11 == x)
-    x = np.random.randint(0, 3, (5, 6))
-    x_kmer = array2kmer(x, 2)
-    print(x_kmer)
-    print(str_quantifying(x_kmer))
+    # x = np.random.randint(0, 3, (5, 6))
+    # x_kmer = array2kmer(x, 2)
+    # print(x_kmer)
+    # print(str_quantifying(x_kmer))
+    shape = [6, 11, 7]
+    pos = 452
+    print(get_position(pos, shape))

@@ -6,6 +6,7 @@ import multiprocessing
 import collections
 import numpy as np
 from scipy import sparse as sp_sparse
+from scipy import integrate
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.exceptions import NotFittedError
 
@@ -13,8 +14,8 @@ from hashsmooth.utils_hash import mod_inverse, array2kmer, str_quantifying
 from tools.utils import read_pickle, dump_pickle
 from tools.nn_model import get_simple_fc_model, train_sample_model
 
-_mersenne_primer = np.int((1 << 31) - 1)  # https://en.wikipedia.org/wiki/Mersenne_prime
-_mersenne_primer_large = np.int((1 << 61) - 1)
+_mersenne_primer = int((1 << 31) - 1)  # https://en.wikipedia.org/wiki/Mersenne_prime
+_mersenne_primer_large = int((1 << 61) - 1)
 _current_file_path = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -57,6 +58,12 @@ class LSHTransformer(ABC):
         """
         raise NotImplementedError("Not implemented yet.\n")
 
+    def get_collision_prob(self, distance):
+        """
+        get the collision probability for a given distance used by threat models
+        """
+        raise NotImplementedError
+
 
 class JaccardLSHTransformer(LSHTransformer):
     def __init__(self, sub_k=128, null_value=0, seed=1):
@@ -74,7 +81,7 @@ class JaccardLSHTransformer(LSHTransformer):
         """
         assert isinstance(ipt, np.ndarray)
         assert len(ipt.shape) == 2, f"Expected a batch of vectors (e.g., 2D array), but got {len(ipt.shape)}.\n"
-        if ipt.dtype != np.int:
+        if ipt.dtype != int:
             warnings.warn(f"Convert the {ipt.dtype} input to be unsigned int.\n")
             ipt = ipt.astype(np.uint32)
         if np.min(ipt) == 0:
@@ -100,7 +107,7 @@ class JaccardLSHTransformer(LSHTransformer):
         assert hash_codes.dtype == np.uint32
         _x, _y = permutations
         return np.mod(
-            (hash_codes.astype(np.int) - _y.astype(np.int)) * mod_inverse(_x, _mersenne_primer),
+            (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
             _mersenne_primer) - self.offset
 
     def _init_permutations(self):
@@ -112,6 +119,10 @@ class JaccardLSHTransformer(LSHTransformer):
                          range(self.sub_k)],
                         dtype=np.uint32
                         ).T
+
+    def get_collision_prob(self, distance: float):
+        assert 0. <= distance <= 1.
+        return 1 - distance
 
 
 class WeightedJaccardLSHTransformer(LSHTransformer):
@@ -198,7 +209,7 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         """
         assert isinstance(hash_codes_mapped, list)
         assert len(hash_codes_mapped) > 0
-        input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=np.int) * self.null_value
+        input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=int) * self.null_value
         n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
         with multiprocessing.Pool(n_proc) as pool:
             for idx, input_transf in enumerate(pool.imap(_wrapper_w_jaccard, zip(hash_codes_mapped, input_rtn))):
@@ -215,6 +226,10 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         ln_ck = np.log(self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words))).astype(np.float32)
         beta_k = self.random_generator_np.uniform(0, 1, (self.sub_k, self.number_of_words)).astype(np.float32)
         return rk, ln_ck, beta_k
+
+    def get_collision_prob(self, distance):
+        assert 0. <= distance <= 1.
+        return 1 - distance
 
 
 def _wrapper_w_jaccard(args):
@@ -242,6 +257,7 @@ class EditLSHTransformer(LSHTransformer):
         if self.number_of_words >= (1 << 16) - 1:
             warnings.warn("Too much words triggers the collision.\n")
         self.kmer_size = kmer_size
+        assert self.kmer_size <= self.number_of_words
         self.l_chucksize = l_chucksize
         self.hashcode2input_dict = collections.defaultdict(str)
         self.dict_saving_path = os.path.join(_current_file_path, "res/hashcodes2input.dict")
@@ -260,7 +276,7 @@ class EditLSHTransformer(LSHTransformer):
         kmer_batch = array2kmer(ipt)
         # quantify the kmer strings
         kmer_quantification = str_quantifying(kmer_batch)
-        print("max:", np.max(kmer_quantification))
+        # print("max:", np.max(kmer_quantification))
         # record the mapping for bijection
         prev_len = len(self.hashcode2input_dict.items())
         self.hashcode2input_dict.update([(k, v) for k, v in zip(kmer_quantification.flatten(), kmer_batch.flatten())])
@@ -296,7 +312,7 @@ class EditLSHTransformer(LSHTransformer):
         assert sub_k_ == self.sub_k
         assert hash_codes.dtype == np.uint32
         kmer_encodings = np.mod(
-            (hash_codes.astype(np.int) - _y.astype(np.int)) * mod_inverse(_x, _mersenne_primer),
+            (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
             _mersenne_primer)
         kmer_decode = lambda kmer_end: literal_eval(self.hashcode2input_dict.get(kmer_end))
         kmer_decodings = np.stack(np.vectorize(kmer_decode)(kmer_encodings), axis=-1)
@@ -316,6 +332,18 @@ class EditLSHTransformer(LSHTransformer):
                          range(self.sub_k)],
                         dtype=np.uint32
                         ).T
+
+    def get_collision_prob(self, distance: float):
+        """
+        we leverage jaccard similarity upon the set of k-mers
+        :param distance: normalized edit distance
+        """
+        assert 0 <= distance <= 1
+        # number of dismatched k-mers
+        n_dissim = self.kmer_size * self.number_of_words * distance
+        total_n_kmers = self.number_of_words - self.kmer_size + 1
+        jaccard_sim = (total_n_kmers - n_dissim) / (total_n_kmers + n_dissim)
+        return jaccard_sim
 
 
 class PStableLSHTransformer(LSHTransformer):
@@ -394,12 +422,25 @@ class PStableLSHTransformer(LSHTransformer):
         hash_codes_mapped = self.scaler.transform(hash_codes_mapped)
         train_sample_model(self.decoder, hash_codes_mapped, x)
 
+    def get_collision_prob(self, distance):
+        p, err = integrate.quad(lambda t: self.pstableProb(t, distance), 0, self.r)
+        return 2 * p
+
+    def _pstable_prob(self, x, d):
+        if self.metric == 2:
+            func = self._f_gaussion
+        elif self.metric == 1:
+            func = self._f_cauchy
+        else:
+            raise TypeError
+        return func(x / d) * (1. - x / self.r) / d
+
 
 class HammingLSHTransformer(LSHTransformer):
     def __init__(self, dimension, sub_k=128, null_value=0, seed=1):
         """
         bit sampling method
-        :param dimension: number of works
+        :param dimension: number of words
         :param sub_k: a group of $sub_k$ hash codes
         :param null_value: an integer to fill the non-sampled positions
         :param seed: an integer of random seed
@@ -414,7 +455,7 @@ class HammingLSHTransformer(LSHTransformer):
         """
         assert len(ipt.shape) == 2
         if ipt.dtype != int:
-            ipt = ipt.astype(np.int)
+            ipt = ipt.astype(int)
         assert ((ipt == 0) | (ipt == 1)).all(), "Expect binary array. Exit!\n"
 
         batch_size = ipt.shape[0]
@@ -436,6 +477,10 @@ class HammingLSHTransformer(LSHTransformer):
 
     def _init_permutations(self, replace=True):
         return np.random.choice(self.dimension, self.sub_k, replace=replace)
+
+    def get_collision_prob(self, distance):
+        assert 0. <= distance <= 1., "Expected the normalized distance.\n"
+        return 1 - distance
 
 
 def test_pstable_dist():
