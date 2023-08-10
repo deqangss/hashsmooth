@@ -36,8 +36,8 @@ class LSHTransformer(ABC):
 
     def transform(self, ipt) -> np.ndarray:
         """
-        lsh transformation for a data point
-        :param ipt: an input data, e.g., a set of features or a representation vector
+        lsh transformation for data points
+        :param ipt: input data, e.g., 2D representation vectors
         :return: the transformed input that has the same feature type as that of the input
         """
         return self._inverse_map(self._map(ipt))  # it should emerge in a pair-wise fashion
@@ -58,6 +58,7 @@ class LSHTransformer(ABC):
         """
         raise NotImplementedError("Not implemented yet.\n")
 
+    @abstractmethod
     def get_collision_prob(self, distance):
         """
         get the collision probability for a given distance used by threat models
@@ -391,17 +392,15 @@ class PStableLSHTransformer(LSHTransformer):
         except NotFittedError:
             raise NotFittedError("Model needs fitting first.\n")
 
-    def _f_gaussion(self, x: np.ndarray):
+    def _f_gaussion(self, x):
         """
-        Standard gaussian noises corresponds to x
-        :param x: 2D array
+        Standard gaussian noises corresponds to parameter x
         """
         return np.e ** (-x ** 2 / 2) / np.sqrt(2 * np.pi)
 
-    def _f_cauchy(self, x: np.ndarray):
+    def _f_cauchy(self, x):
         """
-        Standard cauchy noises corresponds to x
-        :param x: 2D array
+        Standard cauchy noises corresponds to parameter x
         """
         return 1 / (np.pi * (1 + x ** 2))
 
@@ -427,13 +426,16 @@ class PStableLSHTransformer(LSHTransformer):
         return 2 * p
 
     def _pstable_prob(self, x, d):
-        if self.metric == 2:
-            func = self._f_gaussion
-        elif self.metric == 1:
-            func = self._f_cauchy
+        if self.basic_func is None:
+            if self.metric == 2:
+                self.basic_func = self._f_gaussion
+            elif self.metric == 1:
+                self.basic_func = self._f_cauchy
+            else:
+                raise TypeError
         else:
-            raise TypeError
-        return func(x / d) * (1. - x / self.r) / d
+            pass
+        return self.basic_func(x / d) * (1. - x / self.r) / d
 
 
 class HammingLSHTransformer(LSHTransformer):

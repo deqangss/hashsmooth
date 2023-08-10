@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from hashsmooth.locality_sensitive_hashing import JaccardLSHTransformer,\
+from hashsmooth.lsh_np import JaccardLSHTransformer,\
     WeightedJaccardLSHTransformer, \
     EditLSHTransformer, \
     HammingLSHTransformer
