@@ -14,9 +14,9 @@ import multiprocessing
 import numpy as np
 import torch
 
-from hrat_malscan import MalScan
+from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
 from tools import utils
-from Utils import trans2triple_rw, trans2triple
+from sec_classifiers.hrat_malscan.Utils import trans2triple_rw, trans2triple
 import myenv_withconstraints_dli
 from model import DQN
 from sec_classifiers.dataset import Dataset
