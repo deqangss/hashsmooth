@@ -68,6 +68,23 @@ def read_joblib(path):
         raise IOError("The {0} is not a file.".format(path))
 
 
+def read_txt(path, mode='r'):
+    if os.path.isfile(path):
+        with open(path, mode) as f_r:
+            lines = f_r.read().strip().splitlines()
+            return lines
+    else:
+        raise ValueError("{} does not seen like a file path.\n".format(path))
+
+
+def dump_txt(data_str, path, mode='w'):
+    if not isinstance(data_str, str):
+        raise TypeError
+
+    with open(path, mode) as f_w:
+        f_w.write(data_str)
+
+
 def mkdir(target):
     try:
         if os.path.isfile(target):
@@ -79,3 +96,12 @@ def mkdir(target):
     except IOError as e:
         sys.stderr.write(e)
         sys.exit(1)
+
+
+def guess_file_name(folder, name):
+    assert os.path.isdir(folder)
+    if not os.path.exists(folder):
+        raise FileExistsError("No such {}.\n".format(folder))
+    file_names = os.listdir(folder)
+    rtn_name = [n for n in file_names if name in n]
+    return rtn_name

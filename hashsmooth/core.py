@@ -24,7 +24,7 @@ class HashSmooth(object):
                  n_subfeatures: list,
                  k_subhashcodes: list,
                  max_radii: list,
-                 n_grid: list,
+                 n_grids: list,
                  default_mode=True,
                  ):
         """
@@ -35,7 +35,7 @@ class HashSmooth(object):
         :param n_subfeatures: a list of number of heterogeneous features
         :param k_subhashcodes: number of hash functions is utilized to compose the transformations
         :param max_radii: list of maximum radii
-        :param n_grid: number of grids to split the radius
+        :param n_grids: number of grids to split the radius
         :param default_mode: use the estimated confidence of the second class or not
         """
         self.base_classifier = base_classifier
