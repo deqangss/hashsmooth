@@ -238,7 +238,7 @@ def _main():
                                 distance,
                                 max(test_mal_triple.shape[0], cur_graph.shape[0])))
                     break
-                if count > max_iterations:
+                if count >= max_iterations:
                     break
                 s = state_
                 count += 1
