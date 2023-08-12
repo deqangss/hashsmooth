@@ -1,1 +1,0 @@
-from sec_classifiers.hrat_malscan import MalScan
