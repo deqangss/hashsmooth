@@ -186,7 +186,7 @@ class CFGModifierEnvConstraints(object):
                 last_graph_v = 0.
             else:
                 last_graph_v = last_graph_dict[pos]
-            assert graph_v == 0. and last_graph_v == 0.
+            assert graph_v != 0. or last_graph_v != 0.
             sum_min += min(graph_v, last_graph_v)
             sum_max += max(graph_v, last_graph_v)
         sum_max = 1e-6 if sum_max == 0 else sum_max

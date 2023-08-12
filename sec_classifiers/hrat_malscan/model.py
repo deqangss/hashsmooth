@@ -16,7 +16,9 @@ class Net(nn.Module):
         self.out = nn.Linear(50, actions_num)
         self.out.weight.data.normal_(0, 0.1)  # initialization
         self.act = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
+        # self.prelu = nn.PReLU()
+        self.logsoftmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
         x = self.fc1(x)
@@ -24,7 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        return self.softmax(actions_value)
+        # return self.softmax(actions_value)
+        return self.logsoftmax(actions_value)
 
 
 class DQN(object):

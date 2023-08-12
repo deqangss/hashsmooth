@@ -23,6 +23,10 @@ from sec_classifiers.dataset import Dataset
 
 ACTION_NUM = 4
 
+torch.manual_seed(23456)
+torch.cuda.manual_seed(23456)
+np.random.seed(23456)
+
 cmd_md = argparse.ArgumentParser(description='arguments for hrat attack')
 
 cmd_md.add_argument('--memory_cap', type=int, default=16,
@@ -51,9 +55,6 @@ cmd_md.add_argument('--save_path', type=str, default='./results',
 
 def _main():
     args = cmd_md.parse_args()
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed(args.seed)
-    np.random.seed(args.seed)
     if not os.path.exists(args.save_path):
         utils.mkdir(args.save_path)
     logging.basicConfig(level=logging.INFO,
@@ -122,10 +123,9 @@ def _main():
     print("==== loading test adjacent matrix ====")
     test_adj = [test_dict[sha]["adjacent_matrix"] for sha in tqdm(attack_id)]
     print("==== loading test sensitive api index ====")
-    test_sensi_idx = [test_dict[sha]["sensitive_api_list"] for sha in tqdm(attack_id)]
+    test_sensi_indices = [test_dict[sha]["sensitive_api_list"] for sha in tqdm(attack_id)]
     print("==== loading test constraints ====")
     test_constraints = [test_dict[sha]["constraints"] for sha in tqdm(attack_id)]
-    print(attack_id)
 
     dqn = DQN(states_dim=train_x.shape[1],
               actions_num=ACTION_NUM,
@@ -136,7 +136,7 @@ def _main():
     for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
         test_mal_adj = test_adj[idx]
-        test_sensi_idx = test_sensi_idx[idx]
+        test_sensi_idx = test_sensi_indices[idx]
         triple_path = os.path.join(args.save_path, 'triple_set')
         utils.mkdir(triple_path)
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
@@ -204,12 +204,10 @@ def _main():
                     if count < episode_stop:
                         flag = 1
                     if best_modifications >= count:
-                        distance = env.getWeightedJaccard(cur_graph, test_mal_triple)
-
                         best_modifications = count
                         res_save_path = os.path.join(args.save_path, 'actionseq')
                         utils.mkdir(res_save_path)
-                        action_path = res_save_path + "/" + attack_id + "action_list" + ".txt"
+                        action_path = res_save_path + "/" + test_mal_id + "action_list" + ".txt"
                         file = open(action_path, 'w')
                         for az in actions_store:
                             file.write(str(az))
@@ -218,16 +216,17 @@ def _main():
                         file.write('\n')
                         file.close()
 
-                        graph_path = res_save_path + "/" + attack_id + "graph" + ".npy"
+                        graph_path = res_save_path + "/" + test_mal_id + "graph" + ".npy"
                         np.save(graph_path, cur_graph)
 
-                        feature_file_name = res_save_path + "/" + attack_id + "feature_epi" + ".txt"
+                        feature_file_name = res_save_path + "/" + test_mal_id + "feature_epi" + ".txt"
                         file_feature = open(feature_file_name, 'w')
                         file_feature.write(str(state_.tolist()))
                         file_feature.write('\n')
                         file_feature.write(str(state.tolist()))
                         file_feature.write('\n')
                         file_feature.close()
+                        distance = env.getWeightedJaccard(cur_graph, test_mal_triple)
                         logging.info(
                             "{}: predict as {}, Attack {} with episode {}, count {}, modification reward {}, jacard distance {}/{}.".format(
                                 test_mal_id,
@@ -248,7 +247,7 @@ def _main():
                 break
         else:
             logging.info(
-                "{}: predict as {}, Attack {}".format(attack_id, pred_y, 0))  # Attack failed
+                "{}: predict as {}, Attack {}".format(test_mal_id, pred_y, 0))  # Attack failed
 
 
 def get_feature_rpst(file_pkl):
