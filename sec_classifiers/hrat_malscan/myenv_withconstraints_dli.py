@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -64,7 +65,7 @@ class CFGModifierEnvConstraints(object):
 
         last_graph = self.cur_graph.copy()
         if action == 0:  # add dege
-            self.cur_graph, node_info = self.add_edge(self.cur_graph, X_train)
+            self.cur_graph, node_info = self.add_edge2(self.cur_graph, X_train)
 
         elif action == 1:  # rewiring
             self.cur_graph, node_info = self.rewiring(self.cur_graph, X_train)
@@ -77,18 +78,13 @@ class CFGModifierEnvConstraints(object):
         else:
             raise ValueError("No action {}.\n".format(action))
 
-        # self.state = self.getDegreeCentrality(self.cur_graph, self.sen_api_idx)
-        # katz_fea = self.katz_feature_torch(self.to_adjmatrix(self.cur_graph), self.sen_api_idx)
-        # self.state = torch.cat((self.state, torch.squeeze(katz_fea)), 0)
         self.state = self.malware_detector.get_extra_feature(self.cur_graph,
                                                              self.sen_api_idx,
                                                              adj_size=self.adj_size,
                                                              device=self.device)
-        # cur_label, min_dist = self.getlabel(self.state, X_train, y_train, k)
         cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
 
         done = (cur_label != self.label)
-        # print("\t\t if done:", cur_label.detach().item(), self.label)
 
         if done:
             reward = 10
@@ -111,7 +107,8 @@ class CFGModifierEnvConstraints(object):
         self.cur_graph = self.adj_sparse.copy()
         self.sen_api_idx = self.sen_api_idx_ori.copy()
         self.constraints = self.constraints_ori.copy()
-        self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size, device=self.device)
+        self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size,
+                                                             device=self.device)
         # self.state = self.getDegreeCentrality(self.adj_sparse, self.sen_api_idx)
         # katz_fea = self.katz_feature_torch(self.to_adjmatrix(self.adj_sparse), self.sen_api_idx)
         # self.state = torch.cat((self.state, np.squeeze(katz_fea)), 0)
@@ -195,8 +192,10 @@ class CFGModifierEnvConstraints(object):
 
     def del_node(self, graph, X_train):
         # cal grad of all edges
-        grad = self.get_gradient(graph, X_train)
-        # tmp_grad = self.to_adjmatrix(grad)
+        start_time = time.time()
+        grad = self.get_gradient2(graph, X_train)
+        total_time = time.time() - start_time
+        print("cost time: secondes {:.4}.".format(total_time))
         tmp_grad = torch.sparse_coo_tensor(grad[:, :2].T, grad[:, 2],
                                            size=(self.adj_size, self.adj_size)
                                            ).to_dense()
@@ -298,7 +297,7 @@ class CFGModifierEnvConstraints(object):
         tmp_col = [a, ii * (self.adj_size - 1), (ii - 1)]
         tmp_col = np.array(tmp_col).transpose()
         tmpz = np.concatenate((triple_copy, tmp_col, tmp_row), axis=0)
-        grad = self.get_gradient(tmpz, X_train)
+        grad = self.get_gradient2(tmpz, X_train)
 
         # find the edge with max graient and add the edge
         idx = np.where(grad[:, 1] == self.adj_size - 1)
@@ -335,7 +334,7 @@ class CFGModifierEnvConstraints(object):
         triple_copy = graph.copy()
         tmpz = torch.from_numpy(triple_copy).float()
         triple_torch = Variable(tmpz, requires_grad=True)
-        grad = self.get_gradient(graph, X_train)
+        grad = self.get_gradient2(graph, X_train)
         # get the add edge with max grad
         add_edge_index = np.where(triple_torch[:, -1] == 0.)
         grad_add = grad[add_edge_index, :]
@@ -347,11 +346,38 @@ class CFGModifierEnvConstraints(object):
         for zi in a:
             if self.constraints[int(zi[0])] == 0 or self.constraints[
                 int(zi[1])] == 0 or zi[-1] >= 0:  # caller cannot be contained in constraints
-
                 continue
             else:
                 edge = zi[:2].astype(np.int64)
                 break
+        if edge == []:
+            print("zkf no edge to add")
+            return graph, [-1, -1, -1]
+        ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
+        graph[ii, 2] = 1
+        # self.cur_graph = graph
+        print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
+              str(max(graph[:, 1])),
+              ', sen_api_idx:', str(np.max(self.sen_api_idx)))
+        self.constraints[edge[1]] = -1
+
+        return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]
+
+    def add_edge2(self, graph, X_train):
+        grad = self.get_gradient2(graph, X_train)
+        a = grad[grad[:, 2].argsort()]
+        edge = []
+        for zi in a:
+            if self.constraints[int(zi[0])] == 0 or self.constraints[
+                int(zi[1])] == 0 or zi[-1] >= 0:  # caller cannot be contained in constraints
+                continue
+            else:
+                pos_idc = np.all(graph[:, :2] == zi[:2].astype(np.int64), axis=-1)
+                if np.any(pos_idc) and np.squeeze(graph[pos_idc])[-1] == 0.:
+                    edge = zi[:2].astype(np.int64)
+                    break
+                else:
+                    pass
         if edge == []:
             print("zkf no edge to add")
             return graph, [-1, -1, -1]
@@ -477,6 +503,7 @@ class CFGModifierEnvConstraints(object):
         triple_copy = graph.copy()
         tmpz = torch.from_numpy(triple_copy).float().to(self.device)
         triple_torch = Variable(tmpz, requires_grad=True)
+        start_time = time.time()
         feature = self.malware_detector.get_extra_feature(triple_torch,
                                                           self.sen_api_idx,
                                                           adj_size=self.adj_size,
@@ -488,6 +515,8 @@ class CFGModifierEnvConstraints(object):
         # feature = torch.cat((feature, np.squeeze(feature_katz)), 0)
 
         feature = torch.reshape(feature, (1, -1))
+        total_time = time.time() - start_time
+        print("cost time 2: secondes {:.4}.".format(total_time))
         # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
         if isinstance(X_train, torch.Tensor):
             X_train = torch.split(torch.squeeze(X_train.to('cpu').float()), self.spliter)
@@ -501,6 +530,39 @@ class CFGModifierEnvConstraints(object):
         tmp = triple_torch.grad.data.cpu().numpy()
         grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp[:, 2:]), 1)
         return grad
+
+    def get_gradient2(self, graph, X_train):
+        # calculate the grade of each edge
+        triple_copy = graph.copy()
+        graph_dense = torch.sparse_coo_tensor(triple_copy[:, :2].T,
+                                              triple_copy[:, 2],
+                                              size=(self.adj_size, self.adj_size)
+                                              ).to(self.device).to_dense().float()
+        graph_dense.requires_grad = True
+        start_time = time.time()
+        feature = self.malware_detector.get_extra_feature(graph_dense,
+                                                          self.sen_api_idx,
+                                                          adj_size=self.adj_size,
+                                                          is_sp2dense=False,
+                                                          device=self.device)
+
+        feature = torch.reshape(feature, (1, -1))
+        total_time = time.time() - start_time
+        print("cost time 2: secondes {:.4}.".format(total_time))
+        if isinstance(X_train, torch.Tensor):
+            X_train = torch.split(torch.squeeze(X_train.to('cpu').float()), self.spliter)
+        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
+        loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
+        loss = torch.reshape(loss, (1, -1)).contiguous()
+        loss.backward()
+
+        print("Debug: distance loss is ", loss.detach().cpu().item())
+
+        tmp = graph_dense.grad.data.cpu().to_sparse()
+        triple = torch.hstack([tmp.indices().t(), tmp.values()[:, None]])
+        diag_indicator = triple[:, 0] == triple[:, 1]
+        triple = triple[~diag_indicator]
+        return triple.numpy()
 
     def check_state_exist(self, state):
         if state not in self.q_table.index:

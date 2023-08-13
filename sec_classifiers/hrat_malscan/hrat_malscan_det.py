@@ -59,13 +59,20 @@ class MalScan(BasicClassifier):
     def get_extra_feature(x: (np.ndarray, torch.Tensor),
                           x_sensitive_dix: np.ndarray,
                           adj_size: int,
+                          is_sp2dense=True,
                           device='cpu'
                           ) -> torch.Tensor:
-        adj = torch.sparse_coo_tensor(x[:, :2].T,
-                                      x[:, 2],
-                                      size=(adj_size, adj_size)
-                                      ).to(device)
-        adj_dense = adj.to_dense()
+        if is_sp2dense:
+            adj = torch.sparse_coo_tensor(x[:, :2].T,
+                                          x[:, 2],
+                                          size=(adj_size, adj_size)
+                                          ).to(device)
+            start_time = time.time()
+            adj_dense = adj.to_dense()
+            total_time = time.time() - start_time
+            print("cost time 2-1: secondes {:.4}.".format(total_time))
+        else:
+            adj_dense = x
         degree_fea = MalScan._degree_centrality_torch(adj_dense, x_sensitive_dix, adj_size)
         katz_fea = MalScan._katz_feature_torch(adj_dense, x_sensitive_dix, adj_size)
         return torch.cat((degree_fea, torch.squeeze(katz_fea)), 0)
