@@ -115,7 +115,7 @@ def _main():
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "train_id.list")
     if not os.path.exists(attack_id_path):
-        max_attack_num = 500
+        max_attack_num = 200
         mal_indicator = (test_y == 0)
         mal_test_sha256 = [sha256 for i, sha256 in enumerate(test_sha256) if mal_indicator[i]]
         # remove unattackable instance
