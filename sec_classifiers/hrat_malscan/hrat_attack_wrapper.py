@@ -147,6 +147,7 @@ def _main():
               )
     for idx in tqdm(range(3, len(attack_id))):
         test_mal_id = attack_id[idx]
+        print("Attacking: ", test_mal_id)
         test_mal_adj = test_adj[idx]
         test_sensi_idx = test_sensi_indices[idx]
         triple_path = os.path.join(args.save_path, 'triple_set')
@@ -179,7 +180,7 @@ def _main():
         flag = 0
         episode_stop, max_iterations = 5, 100
         best_modifications = 100
-        for i_episode in range(30):
+        for i_episode in range(20):
             actions_store = []
             state = env.reset()
             ep_r = 0
