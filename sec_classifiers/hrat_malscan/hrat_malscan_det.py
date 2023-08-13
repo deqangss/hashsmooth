@@ -67,10 +67,7 @@ class MalScan(BasicClassifier):
                                           x[:, 2],
                                           size=(adj_size, adj_size)
                                           ).to(device)
-            start_time = time.time()
             adj_dense = adj.to_dense()
-            total_time = time.time() - start_time
-            print("cost time 2-1: secondes {:.4}.".format(total_time))
         else:
             adj_dense = x
         degree_fea = MalScan._degree_centrality_torch(adj_dense, x_sensitive_dix, adj_size)
