@@ -30,7 +30,7 @@ class MalScan(BasicClassifier):
         else:
             malscan_feature = MalScan.get_extra_feature(x, x_sensitive_dix,
                                                         adj_size,
-                                                        device).to(device)
+                                                        device)
 
         dist = torch.cat(
             [torch.sum((torch.squeeze(x_batch).to(device) - torch.squeeze(malscan_feature)).pow(2.), 1)
