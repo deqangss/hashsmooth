@@ -97,11 +97,12 @@ class CFGModifierEnvConstraints(object):
             reward = self.getReward(self.cur_graph, last_graph)
             if action == 1:
                 if reward == 0:
-                    reward = -2
+                    reward = -2.0
                 else:
-                    reward = -3
+                    reward = -3.0
             else:
-                pass
+                if reward == 0 and node_info == [-1, -1, -1]:
+                    reward = -3.0
 
         return self.state, reward, done, node_info, self.cur_graph
 
