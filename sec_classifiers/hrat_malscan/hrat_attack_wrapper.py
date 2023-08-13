@@ -89,7 +89,7 @@ def _main():
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
     train_x_producer = dataset.get_dataloader(train_x)
-    malscan = MalScan(train_x_producer, torch.from_numpy(train_y))
+    malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device))
 
     # test
     _1, _2, test_pkl = dataset.load()
@@ -101,7 +101,10 @@ def _main():
             adj_sp = test_dict[sha256]['adjacent_matrix']
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
             triple = trans2triple(adj_sp)
+            start_time = time.time()
             pred_y[i] = malscan.predict(triple, adj_sp.shape[0], x_sensitive_dix=senstive_node_idx, device='cpu')
+            total_time = time.time() - start_time
+            print("prediction time: secondes {:.4}.".format(total_time))
 
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
@@ -114,9 +117,17 @@ def _main():
     if not os.path.exists(attack_id_path):
         max_attack_num = 1000
         mal_indicator = (test_y == 0)
-        mal_test_sha256 = np.array([sha256 for i, sha256 in enumerate(test_sha256) if mal_indicator[i]])
+        mal_test_sha256 = [sha256 for i, sha256 in enumerate(test_sha256) if mal_indicator[i]]
+        # remove unattackable instance
+        remove_mal_list = []
+        for i in range(len(mal_test_sha256)):
+            test_sensti_indix = test_dict[mal_test_sha256[i]]["sensitive_api_list"]
+            if np.all(test_sensti_indix == -1):  # no sensitive apis
+                remove_mal_list.append(mal_test_sha256[i])
+        for sha in remove_mal_list:
+            mal_test_sha256.remove(sha)
         np.random.shuffle(mal_test_sha256)
-        attack_id = mal_test_sha256[:max_attack_num].tolist()
+        attack_id = mal_test_sha256[:max_attack_num]
         utils.dump_txt('\n'.join(attack_id), attack_id_path)
     else:
         attack_id = utils.read_txt(attack_id_path)
@@ -134,7 +145,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(0, len(attack_id))):
+    for idx in tqdm(range(3, len(attack_id))):
         test_mal_id = attack_id[idx]
         test_mal_adj = test_adj[idx]
         test_sensi_idx = test_sensi_indices[idx]

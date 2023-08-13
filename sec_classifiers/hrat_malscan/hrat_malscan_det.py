@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 import warnings
@@ -60,9 +61,11 @@ class MalScan(BasicClassifier):
                           adj_size: int,
                           device='cpu'
                           ) -> torch.Tensor:
-        adj_dense = torch.sparse_coo_tensor(x[:, :2].T, x[:, 2],
-                                            size=(adj_size, adj_size)
-                                            ).to_dense().to(device)
+        adj = torch.sparse_coo_tensor(x[:, :2].T,
+                                      x[:, 2],
+                                      size=(adj_size, adj_size)
+                                      ).to(device)
+        adj_dense = adj.to_dense()
         degree_fea = MalScan._degree_centrality_torch(adj_dense, x_sensitive_dix, adj_size)
         katz_fea = MalScan._katz_feature_torch(adj_dense, x_sensitive_dix, adj_size)
         return torch.cat((degree_fea, torch.squeeze(katz_fea)), 0)
@@ -80,6 +83,7 @@ class MalScan(BasicClassifier):
             for za in range(_sub):
                 idx_matrix.append[0]
 
+        adj_dense = torch.squeeze(adj_dense)
         all_degree = torch.div((torch.sum(adj_dense, 0) + torch.sum(adj_dense, 1)).float(),
                                float(adj_dense.shape[0] - 1))
         degree_centrality = torch.matmul(idx_matrix, all_degree.type_as(idx_matrix))
@@ -88,12 +92,12 @@ class MalScan(BasicClassifier):
     @staticmethod
     def _katz_feature_torch(adj_dense: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
                             alpha=0.1, beta=1.0, normalized=True):
+        # if not adj_dense.is_sparse:
+        adj_dense = torch.squeeze(adj_dense)
         graph = adj_dense.T
-        b = torch.ones((adj_size, 1)) * float(beta)
-        b = b.to(graph.device)
-        graph = graph.to(graph.device)
+        b = torch.ones((adj_size, 1), device=graph.device) * float(beta)
         A = torch.eye(adj_size, adj_size).to(graph.device).float() - (alpha * graph.float())
-        L, U = torch.solve(b, A)
+        L = torch.linalg.solve(A, b)
         if normalized:
             norm = torch.sign(sum(L)) * torch.norm(L)
         else:
