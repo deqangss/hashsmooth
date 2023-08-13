@@ -103,8 +103,8 @@ def _main():
             pred_y[i] = malscan.predict(triple, adj_sp.shape[0], x_sensitive_dix=senstive_node_idx, device='cpu')
 
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
-        print("The mean accuracy is {:4f}.\n".format(mean_acc))
-        logging.info("The mean accuracy is {:4f}.\n".format(mean_acc))
+        print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
+        logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
 
