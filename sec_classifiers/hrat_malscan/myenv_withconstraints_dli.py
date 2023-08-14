@@ -105,7 +105,7 @@ class CFGModifierEnvConstraints(object):
         else:
             # todo ADD THE DISTANCE OF CUR_GRAPH TO NEWAREST BENIGH
             start_time = time.time()
-            reward = self.getReward(self.cur_graph.astype(int), last_graph.astype(int))
+            reward = self.getReward(self.cur_graph.astype(int))
             total_time = time.time() - start_time
             print("cost time 3: secondes {:.4}.".format(total_time))
             if action == 1:
@@ -116,9 +116,6 @@ class CFGModifierEnvConstraints(object):
             else:
                 if reward == 0 and node_info == [-1, -1, -1]:
                     reward = -3.0
-
-
-
         return self.state, reward, done, node_info, self.cur_graph
 
     def reset(self):
@@ -128,26 +125,23 @@ class CFGModifierEnvConstraints(object):
         self.constraints = self.constraints_ori.copy()
         self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size, True,
                                                              device=self.device)
+        self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
+        self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
         return self.state
 
-    def getReward(self, graph, last_graph, budget_node=1, budget_edge=1):
+    def getReward(self, graph, budget_node=1, budget_edge=1):
         n_edge = np.where(graph[:, -1] != 0)[0].shape[0]
-        last_n_edge = np.where(last_graph[:, -1] != 0)[0].shape[0]
-        start_time = time.time()
         n_node = max(np.unique(graph[:, 0]).shape[0], np.unique(graph[:, 1]).shape[0])
-        last_n_node = max(np.unique(last_graph[:, 0]).shape[0], np.unique(last_graph[:, 1]).shape[0])
-        total_time = time.time() - start_time
-        print("cost time 3-2: secondes {:.4}.".format(total_time))
 
-        if n_edge == last_n_edge:
+        if n_edge == self.last_n_edge:
             edge_r = 0
         else:
-            edge_r = 1 / budget_edge * (last_n_edge - n_edge)
+            edge_r = 1 / budget_edge * (self.last_n_edge - n_edge)
 
-        if n_node == last_n_node:
+        if n_node == self.last_n_node:
             node_r = 0
         else:
-            node_r = 1 / budget_node * (last_n_node - n_node)
+            node_r = 1 / budget_node * (self.last_n_node - n_node)
 
         reward = -(abs(edge_r) + abs(node_r))
         return reward
