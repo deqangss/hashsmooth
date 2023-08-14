@@ -494,7 +494,7 @@ class CFGModifierEnvConstraints(object):
         feature = torch.reshape(feature, (1, -1))
         # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
         if isinstance(X_train, torch.Tensor):
-            X_train = torch.split(torch.squeeze(X_train.to('cpu').float()), self.spliter)
+            X_train = torch.split(torch.squeeze(X_train), self.spliter)
         dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
