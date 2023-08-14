@@ -526,7 +526,7 @@ class CFGModifierEnvConstraints(object):
         # if isinstance(X_train, torch.Tensor):
         #     X_train = torch.split(torch.squeeze(X_train.float()), self.spliter)
         # dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
-        dist = torch.sum((torch.squeeze(X_train) - torch.squeeze(feature.float())).pow(2.), 1)
+        dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
 
