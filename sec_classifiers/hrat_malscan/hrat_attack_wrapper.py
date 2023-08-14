@@ -180,7 +180,8 @@ def _main():
                                                                   constraints=test_constraints[idx],
                                                                   malware_detector=malscan,
                                                                   X_train=train_x_producer,
-                                                                  device=device
+                                                                  device=device,
+                                                                  batch_size=args.batch_size
                                                                   )
         print('\t ==== Attacking...collecting experience ... ====')
         flag = 0

@@ -44,7 +44,7 @@ class CFGModifierEnvConstraints(object):
                  malware_detector,
                  X_train,
                  device='cpu',
-                 spliter=64):
+                 batch_size=64):
         self.adj_sparse = target_graph
         self.adj_size_ori = node_num
         self.label = label
@@ -59,9 +59,9 @@ class CFGModifierEnvConstraints(object):
         self.cur_graph = target_graph
         self.malware_detector = malware_detector
         self.device = device
-        self.spliter = spliter
+        self.batch_size = batch_size
         if isinstance(X_train, torch.Tensor):
-            self.X_train = torch.split(torch.squeeze(X_train), self.spliter)
+            self.X_train = torch.split(torch.squeeze(X_train), self.batch_size)
         elif isinstance(X_train, torch.utils.data.dataloader.DataLoader):
             self.X_train = X_train
         else:
