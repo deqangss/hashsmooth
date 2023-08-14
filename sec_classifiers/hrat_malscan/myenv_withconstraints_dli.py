@@ -179,7 +179,14 @@ class CFGModifierEnvConstraints(object):
 
     def del_node(self, graph, X_train):
         # cal grad of all edges
+
+        start_time = time.time()
+
         tmp_grad = self.get_gradient2(graph, X_train, is_dense=True)
+
+        total_time = time.time() - start_time
+        print("cost time 1-1: secondes {:.4}.".format(total_time))
+
         node_grad = (torch.sum(tmp_grad, 0) + torch.sum(tmp_grad, 1))
         node_id = list(range(node_grad.shape[0]))
         # sort node_grad
