@@ -19,12 +19,6 @@ class MalScan(BasicClassifier):
 
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, top_k=1, x_sensitive_dix=None,
                 device='cpu', verbose=False) -> torch.Tensor:
-        if isinstance(self.train_x, torch.Tensor):
-            train_x = torch.split(self.train_x, 64)
-        elif isinstance(self.train_x, torch.utils.data.dataloader.DataLoader):
-            train_x = self.train_x
-        else:
-            raise ValueError
         if x_sensitive_dix is None:
             assert isinstance(x, torch.Tensor)
             malscan_feature = x.to(device)
@@ -36,7 +30,7 @@ class MalScan(BasicClassifier):
 
         dist = torch.cat(
             [torch.sum((torch.squeeze(x_batch).to(device) - torch.squeeze(malscan_feature)).pow(2.), 1)
-             for x_batch in train_x])
+             for x_batch in self.train_x])
         # dist = torch.sum((self.train_x - malscan_feature.float()).pow(2.), 1)
         ind = torch.argsort(dist)
         label = self.train_y[ind[:top_k]]
