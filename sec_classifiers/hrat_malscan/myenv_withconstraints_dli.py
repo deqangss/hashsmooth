@@ -190,6 +190,7 @@ class CFGModifierEnvConstraints(object):
         total_time = time.time() - start_time
         print("cost time 1-1: secondes {:.4}.".format(total_time))
 
+        start_time = time.time()
         node_grad = (torch.sum(tmp_grad, 0) + torch.sum(tmp_grad, 1))
         node_id = list(range(node_grad.shape[0]))
         # sort node_grad
@@ -215,6 +216,8 @@ class CFGModifierEnvConstraints(object):
             else:
                 tar_node = int(zi[0])
                 break
+        total_time = time.time() - start_time
+        print("cost time 1-2: secondes {:.4}.".format(total_time))
         if tar_node < 0:
             print("zkf no nodes to delete")
             return graph, [-1, -1, -1]
