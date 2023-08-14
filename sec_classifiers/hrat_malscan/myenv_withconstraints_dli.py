@@ -62,6 +62,8 @@ class CFGModifierEnvConstraints(object):
         self.spliter = spliter
         if isinstance(X_train, torch.Tensor):
             self.X_train = torch.split(torch.squeeze(X_train), self.spliter)
+        else:
+            self.X_train = X_train
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
