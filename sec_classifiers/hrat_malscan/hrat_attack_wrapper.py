@@ -210,11 +210,10 @@ def _main():
                     ep_r,
                     info)
                 )
-                print("okokok")
                 if dqn.memory_counter > args.memory_cap:
                     dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
                 if done:
-                    check_label = malscan.predict(state_, test_mal_adj.shape[0], device='cpu')
+                    check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     if check_label == 0:
                         logging.warning("something went wrong: check label is {}.".format(check_label))
                         print("okok")
@@ -295,7 +294,7 @@ def get_feature_rpst(file_pkl):
 def _parallel_featurization(args):
     adj_sp, node_sens_idx = args
     triple = trans2triple(adj_sp)
-    return MalScan.get_extra_feature(triple, node_sens_idx, adj_sp.shape[0], 'cpu').cpu().numpy()
+    return MalScan.get_extra_feature(triple, node_sens_idx, adj_sp.shape[0], True, 'cpu').cpu().numpy()
 
 
 if __name__ == "__main__":

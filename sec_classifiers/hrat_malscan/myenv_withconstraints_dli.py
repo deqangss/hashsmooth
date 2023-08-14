@@ -81,6 +81,7 @@ class CFGModifierEnvConstraints(object):
         self.state = self.malware_detector.get_extra_feature(self.cur_graph,
                                                              self.sen_api_idx,
                                                              adj_size=self.adj_size,
+                                                             is_sp2dense=True,
                                                              device=self.device)
         cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
 
@@ -107,7 +108,7 @@ class CFGModifierEnvConstraints(object):
         self.cur_graph = self.adj_sparse.copy()
         self.sen_api_idx = self.sen_api_idx_ori.copy()
         self.constraints = self.constraints_ori.copy()
-        self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size,
+        self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size, True,
                                                              device=self.device)
         # self.state = self.getDegreeCentrality(self.adj_sparse, self.sen_api_idx)
         # katz_fea = self.katz_feature_torch(self.to_adjmatrix(self.adj_sparse), self.sen_api_idx)
@@ -507,6 +508,7 @@ class CFGModifierEnvConstraints(object):
         feature = self.malware_detector.get_extra_feature(triple_torch,
                                                           self.sen_api_idx,
                                                           adj_size=self.adj_size,
+                                                          is_sp2dense=True,
                                                           device=self.device)
         # feature = self.getDegreeCentrality(triple_torch, self.sen_api_idx).to(device)
         #
