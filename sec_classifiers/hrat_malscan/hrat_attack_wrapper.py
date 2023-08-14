@@ -88,8 +88,7 @@ def _main():
         val_x_y = np.load(val_x_y_path)
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
-    # train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-    train_x_producer = dataset.get_dataloader(train_x)
+    train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
     malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device), args.batch_size)
 
     # test
