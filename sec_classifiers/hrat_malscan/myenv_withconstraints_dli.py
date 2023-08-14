@@ -89,7 +89,7 @@ class CFGModifierEnvConstraints(object):
                                                              adj_size=self.adj_size,
                                                              is_sp2dense=True,
                                                              device=self.device)
-        cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device='cpu')
+        cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
 
         total_time = time.time() - start_time
         print("cost time 2: secondes {:.4}.".format(total_time))

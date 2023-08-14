@@ -102,7 +102,7 @@ def _main():
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
             triple = trans2triple(adj_sp)
             start_time = time.time()
-            pred_y[i] = malscan.predict(triple, adj_sp.shape[0], x_sensitive_dix=senstive_node_idx, device='cpu')
+            pred_y[i] = malscan.predict(triple, adj_sp.shape[0], x_sensitive_dix=senstive_node_idx, device=device)
             total_time = time.time() - start_time
             print("prediction time: secondes {:.4}.".format(total_time))
 
@@ -158,7 +158,7 @@ def _main():
             continue
 
         pred_y = malscan.predict(test_mal_triple, test_mal_adj.shape[0],
-                                 x_sensitive_dix=test_sensi_idx, device='cpu')
+                                 x_sensitive_dix=test_sensi_idx, device=device)
         if pred_y != 0:
             print('==== data cannot be correctly classified as malware ====\t')
             logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
@@ -214,7 +214,7 @@ def _main():
                 if dqn.memory_counter > args.memory_cap:
                     dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
                 if done:
-                    check_label = malscan.predict(state_, test_mal_adj.shape[0], device='cpu')
+                    check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     if check_label == 0:
                         logging.warning("something went wrong: check label is {}.".format(check_label))
                         print("okok")
