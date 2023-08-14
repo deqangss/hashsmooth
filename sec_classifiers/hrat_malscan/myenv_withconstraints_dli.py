@@ -523,10 +523,10 @@ class CFGModifierEnvConstraints(object):
         feature = torch.reshape(feature, (1, -1))
         # total_time = time.time() - start_time
         # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-        # if isinstance(X_train, torch.Tensor):
-        #     X_train = torch.split(torch.squeeze(X_train.float()), self.spliter)
-        # dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
-        dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
+        if isinstance(X_train, torch.Tensor):
+            X_train = torch.split(torch.squeeze(X_train), self.spliter)
+        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
+        # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
 
