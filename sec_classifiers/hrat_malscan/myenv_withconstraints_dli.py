@@ -62,8 +62,8 @@ class CFGModifierEnvConstraints(object):
         self.spliter = spliter
         if isinstance(X_train, torch.Tensor):
             self.X_train = torch.split(torch.squeeze(X_train), self.spliter)
-        elif isinstance(self.train_x, torch.utils.data.dataloader.DataLoader):
-            self.train_x = self.train_x
+        elif isinstance(X_train, torch.utils.data.dataloader.DataLoader):
+            self.X_train = X_train
         else:
             raise ValueError
 
