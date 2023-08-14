@@ -11,6 +11,13 @@ class MalScan(BasicClassifier):
                  batch_size=64):
         self.train_x = train_x
         self.train_y = train_y
+        if isinstance(self.train_x, torch.Tensor):
+            self.train_x = torch.split(self.train_x, batch_size)
+        elif isinstance(self.train_x, torch.utils.data.dataloader.DataLoader):
+            self.train_x = self.train_x
+        else:
+            raise ValueError
+
     def eval(self):
         pass
 
