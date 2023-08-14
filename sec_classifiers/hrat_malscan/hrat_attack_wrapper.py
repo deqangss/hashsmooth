@@ -88,7 +88,7 @@ def _main():
         val_x_y = np.load(val_x_y_path)
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
-    train_x_producer = dataset.get_dataloader(train_x)
+    train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
     malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device))
 
     # test
@@ -190,6 +190,7 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
+                action_type = 3
                 start_time = time.time()
                 state_, reward, done, info, cur_graph = env.step(action=action_type,
                                                                  X_train=train_x_producer,
