@@ -20,7 +20,7 @@ class MalScan(BasicClassifier):
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, top_k=1, x_sensitive_dix=None,
                 device='cpu', verbose=False) -> torch.Tensor:
         if isinstance(self.train_x, torch.Tensor):
-            train_x = torch.split(self.train_x, self.batch_size)
+            train_x = torch.split(self.train_x, 64)
         elif isinstance(self.train_x, torch.utils.data.dataloader.DataLoader):
             train_x = self.train_x
         else:
