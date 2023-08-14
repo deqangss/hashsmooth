@@ -113,7 +113,7 @@ def _main():
         pass
 
     # conduct attack for malware examples
-    attack_id_path = os.path.join(feature_saving_path, "train_id.list")
+    attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
     if not os.path.exists(attack_id_path):
         max_attack_num = 200
         mal_indicator = (test_y == 0)
