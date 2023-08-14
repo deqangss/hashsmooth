@@ -42,6 +42,7 @@ class CFGModifierEnvConstraints(object):
                  target_sen_api_idx, node_num,
                  w, steep, constraints,
                  malware_detector,
+                 X_train,
                  device='cpu',
                  spliter=64):
         self.adj_sparse = target_graph
@@ -59,24 +60,26 @@ class CFGModifierEnvConstraints(object):
         self.malware_detector = malware_detector
         self.device = device
         self.spliter = spliter
+        if isinstance(X_train, torch.Tensor):
+            self.X_train = torch.split(torch.squeeze(X_train), self.spliter)
 
-    def step(self, action, k=1, X_train=None, y_train=None):
+    def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
 
         start_time = time.time()
 
         last_graph = self.cur_graph.copy()
         if action == 0:  # add dege
-            self.cur_graph, node_info = self.add_edge2(self.cur_graph, X_train)
+            self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
         elif action == 1:  # rewiring
-            self.cur_graph, node_info = self.rewiring(self.cur_graph, X_train)
+            self.cur_graph, node_info = self.rewiring(self.cur_graph)
 
         elif action == 2:  # add node
-            self.cur_graph, node_info = self.add_node(self.cur_graph, X_train)
+            self.cur_graph, node_info = self.add_node(self.cur_graph)
 
         elif action == 3:  # delete node
-            self.cur_graph, node_info = self.del_node(self.cur_graph, X_train)
+            self.cur_graph, node_info = self.del_node(self.cur_graph)
         else:
             raise ValueError("No action {}.\n".format(action))
 
@@ -177,12 +180,12 @@ class CFGModifierEnvConstraints(object):
         sum_max = 1e-6 if sum_max == 0 else sum_max
         return 1 - sum_min / sum_max
 
-    def del_node(self, graph, X_train):
+    def del_node(self, graph):
         # cal grad of all edges
 
         start_time = time.time()
 
-        tmp_grad = self.get_gradient2(graph, X_train, is_dense=True)
+        tmp_grad = self.get_gradient2(graph, is_dense=True)
 
         total_time = time.time() - start_time
         print("cost time 1-1: secondes {:.4}.".format(total_time))
@@ -269,7 +272,7 @@ class CFGModifierEnvConstraints(object):
 
         return graph, [-3, -1, tar_node]
 
-    def add_node(self, graph, X_train):
+    def add_node(self, graph):
         self.adj_size += 1
         # add one nodes to the sparse adjacent matrix
         triple_copy = graph.copy()
@@ -281,7 +284,7 @@ class CFGModifierEnvConstraints(object):
         tmp_col = [a, ii * (self.adj_size - 1), (ii - 1)]
         tmp_col = np.array(tmp_col).transpose()
         tmpz = np.concatenate((triple_copy, tmp_col, tmp_row), axis=0)
-        grad = self.get_gradient2(tmpz, X_train)
+        grad = self.get_gradient2(tmpz)
 
         # find the edge with max graient and add the edge
         idx = np.where(grad[:, 1] == self.adj_size - 1)
@@ -314,11 +317,11 @@ class CFGModifierEnvConstraints(object):
 
         return tmpz, [int(np.squeeze(tmpz[ii, 0])), int(np.squeeze(tmpz[ii, 1])), self.adj_size - 1]
 
-    def add_edge(self, graph, X_train):
+    def add_edge(self, graph):
         triple_copy = graph.copy()
         tmpz = torch.from_numpy(triple_copy).float()
         triple_torch = Variable(tmpz, requires_grad=True)
-        grad = self.get_gradient2(graph, X_train)
+        grad = self.get_gradient2(graph)
         # get the add edge with max grad
         add_edge_index = np.where(triple_torch[:, -1] == 0.)
         grad_add = grad[add_edge_index, :]
@@ -347,8 +350,8 @@ class CFGModifierEnvConstraints(object):
 
         return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]
 
-    def add_edge2(self, graph, X_train):
-        grad = self.get_gradient2(graph, X_train)
+    def add_edge2(self, graph):
+        grad = self.get_gradient2(graph)
         a = grad[grad[:, 2].argsort()]
         edge = []
         for zi in a:
@@ -375,7 +378,7 @@ class CFGModifierEnvConstraints(object):
 
         return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]
 
-    def rewiring(self, graph, X_train):
+    def rewiring(self, graph):
         '''
         :param graph: spare graph
         :return: modified graph
@@ -388,7 +391,7 @@ class CFGModifierEnvConstraints(object):
         tmpz = torch.from_numpy(triple_copy).float()
         triple_torch = Variable(tmpz, requires_grad=True)
 
-        grad = self.get_gradient(graph, X_train)
+        grad = self.get_gradient(graph)
         # get the delete edge with max grad
         delete_edge_index = np.where(triple_torch[:, -1] == 1.)
         grad_add = grad[delete_edge_index, :]
@@ -482,7 +485,7 @@ class CFGModifierEnvConstraints(object):
     #     katz_centrality = torch.matmul(idx_matrix, centrality.type_as(idx_matrix))
     #     return katz_centrality
 
-    def get_gradient(self, graph, X_train):
+    def get_gradient(self, graph):
         # calculate the grade of each edge
         triple_copy = graph.copy()
         tmpz = torch.from_numpy(triple_copy).float().to(self.device)
@@ -500,9 +503,7 @@ class CFGModifierEnvConstraints(object):
 
         feature = torch.reshape(feature, (1, -1))
         # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
-        if isinstance(X_train, torch.Tensor):
-            X_train = torch.split(torch.squeeze(X_train), self.spliter)
-        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
+        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
         loss.backward()
@@ -513,7 +514,7 @@ class CFGModifierEnvConstraints(object):
         grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp[:, 2:]), 1)
         return grad
 
-    def get_gradient2(self, graph, X_train, is_dense=False):
+    def get_gradient2(self, graph, is_dense=False):
         # calculate the grade of each edge
         # start_time = time.time()
         graph_dense = torch.sparse_coo_tensor(graph[:, :2].T,
@@ -530,9 +531,7 @@ class CFGModifierEnvConstraints(object):
         feature = torch.reshape(feature, (1, -1))
         # total_time = time.time() - start_time
         # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-        if isinstance(X_train, torch.Tensor):
-            X_train = torch.split(torch.squeeze(X_train), self.spliter)
-        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in X_train])
+        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
         # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()

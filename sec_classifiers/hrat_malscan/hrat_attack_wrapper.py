@@ -177,6 +177,7 @@ def _main():
                                                                   steep=args.steep,
                                                                   constraints=test_constraints[idx],
                                                                   malware_detector=malscan,
+                                                                  X_train=train_x_producer,
                                                                   device=device
                                                                   )
         print('\t ==== Attacking...collecting experience ... ====')
@@ -195,9 +196,7 @@ def _main():
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
                 action_type = 3
                 start_time = time.time()
-                state_, reward, done, info, cur_graph = env.step(action=action_type,
-                                                                 X_train=train_x_producer,
-                                                                 y_train=torch.from_numpy(train_y))
+                state_, reward, done, info, cur_graph = env.step(action=action_type)
                 total_time = time.time() - start_time
                 print("prediction time: secondes {:.4}.".format(total_time))
                 if type(action_type) is np.ndarray:
