@@ -65,8 +65,6 @@ class CFGModifierEnvConstraints(object):
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
-
-        start_time = time.time()
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
@@ -80,32 +78,19 @@ class CFGModifierEnvConstraints(object):
             self.cur_graph, node_info = self.del_node(self.cur_graph)
         else:
             raise ValueError("No action {}.\n".format(action))
-
-        total_time = time.time() - start_time
-        print("cost time 1: secondes {:.4}.".format(total_time))
-        start_time = time.time()
-
         self.state = self.malware_detector.get_extra_feature(self.cur_graph,
                                                              self.sen_api_idx,
                                                              adj_size=self.adj_size,
                                                              is_sp2dense=True,
                                                              device=self.device)
         cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
-
-        total_time = time.time() - start_time
-        print("cost time 2: secondes {:.4}.".format(total_time))
-
-
         done = (cur_label != self.label)
 
         if done:
             reward = 10
         else:
             # todo ADD THE DISTANCE OF CUR_GRAPH TO NEWAREST BENIGH
-            start_time = time.time()
             reward = self.getReward(self.cur_graph.astype(int))
-            total_time = time.time() - start_time
-            print("cost time 3: secondes {:.4}.".format(total_time))
             if action == 1:
                 if reward == 0:
                     reward = -2.0
