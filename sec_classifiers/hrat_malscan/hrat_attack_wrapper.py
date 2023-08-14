@@ -210,12 +210,14 @@ def _main():
                     ep_r,
                     info)
                 )
+                print("okokok")
                 if dqn.memory_counter > args.memory_cap:
                     dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
                 if done:
                     check_label = malscan.predict(state_, test_mal_adj.shape[0], device='cpu')
                     if check_label == 0:
                         logging.warning("something went wrong: check label is {}.".format(check_label))
+                        print("okok")
                         exit(-1)
                     if count < episode_stop:
                         flag = 1
