@@ -7,7 +7,8 @@ from hashsmooth.classifier_template import BasicClassifier
 
 
 class MalScan(BasicClassifier):
-    def __init__(self, train_x: (torch.Tensor, torch.utils.data.dataloader), train_y: torch.Tensor):
+    def __init__(self, train_x: (torch.Tensor, torch.utils.data.dataloader), train_y: torch.Tensor,
+                 batch_size=64):
         self.train_x = train_x
         self.train_y = train_y
         if isinstance(self.train_x, torch.Tensor):
@@ -24,7 +25,7 @@ class MalScan(BasicClassifier):
         pass
 
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, top_k=1, x_sensitive_dix=None,
-                batch_size=64, device='cpu', verbose=False) -> torch.Tensor:
+                device='cpu', verbose=False) -> torch.Tensor:
         if x_sensitive_dix is None:
             assert isinstance(x, torch.Tensor)
             malscan_feature = x.to(device)

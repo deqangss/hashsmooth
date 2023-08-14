@@ -89,7 +89,7 @@ def _main():
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
     train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-    malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device))
+    malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device), args.batch_size)
 
     # test
     _1, _2, test_pkl = dataset.load()
@@ -102,7 +102,10 @@ def _main():
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
             triple = trans2triple(adj_sp)
             start_time = time.time()
-            pred_y[i] = malscan.predict(triple, adj_sp.shape[0], x_sensitive_dix=senstive_node_idx, device=device)
+            pred_y[i] = malscan.predict(triple,
+                                        adj_sp.shape[0],
+                                        x_sensitive_dix=senstive_node_idx,
+                                        device=device)
             total_time = time.time() - start_time
             print("prediction time: secondes {:.4}.".format(total_time))
 
