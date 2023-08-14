@@ -67,8 +67,6 @@ class CFGModifierEnvConstraints(object):
         assert len(self.action_space) >= action + 1
 
         start_time = time.time()
-
-        last_graph = self.cur_graph.copy()
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
