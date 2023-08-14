@@ -105,7 +105,7 @@ def _main():
             pred_y[i] = malscan.predict(triple,
                                         adj_sp.shape[0],
                                         x_sensitive_dix=senstive_node_idx,
-                                        device=device)
+                                        device='cpu')
             total_time = time.time() - start_time
             print("prediction time: secondes {:.4}.".format(total_time))
 
