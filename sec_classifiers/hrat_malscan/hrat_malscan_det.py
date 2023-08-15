@@ -42,8 +42,10 @@ class MalScan(BasicClassifier):
         if top_k > 1:
             ind = torch.argsort(dist)
             label = self.train_y[ind[:top_k]]
+            warnings.warn("Do not actually implement.\n")
         else:
             min_value = torch.min(dist)
+            print((dist == min_value).nonzero().squeeze())
             label = self.train_y[(dist == min_value).nonzero().squeeze()]
 
         print(label)
