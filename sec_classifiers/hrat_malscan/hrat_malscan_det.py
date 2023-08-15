@@ -81,8 +81,13 @@ class MalScan(BasicClassifier):
         idx_matrix = np.zeros((len(x_sensitive_dix), adj_size))
 
         ii = np.where(x_sensitive_dix != -1)
-        idx_matrix[ii, x_sensitive_dix[ii]] = 1
+        idx_matrix[ii, x_sensitive_dix[ii]] = 1.
         idx_matrix = torch.from_numpy(idx_matrix).to(adj_dense.device)
+
+        idx_matrix_t = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
+        idx_matrix_t[ii[0], x_sensitive_dix[ii]] = 1.
+
+        assert torch.all(idx_matrix == idx_matrix_t)
 
         if adj_dense.shape[0] > len(idx_matrix):
             _sub = adj_dense.shape[0] - len(idx_matrix)
