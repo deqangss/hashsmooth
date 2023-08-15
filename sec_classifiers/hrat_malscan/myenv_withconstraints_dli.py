@@ -516,6 +516,7 @@ class CFGModifierEnvConstraints(object):
         # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
         dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
         # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
+        print("Distance: ", dist)
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
 
