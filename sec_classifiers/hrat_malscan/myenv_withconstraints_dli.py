@@ -91,7 +91,7 @@ class CFGModifierEnvConstraints(object):
                                                              adj_size=self.adj_size,
                                                              is_sp2dense=True,
                                                              device=self.device)
-        cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device='cpu')
+        cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
         done = (cur_label != self.label)
         total_time = time.time() - start_time
         print("cost time 2: secondes {:.4}.".format(total_time))
@@ -120,7 +120,7 @@ class CFGModifierEnvConstraints(object):
         self.sen_api_idx = self.sen_api_idx_ori.copy()
         self.constraints = self.constraints_ori.copy()
         self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size, True,
-                                                             device='cpu')
+                                                             device=self.device)
         self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
         self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
         return self.state
