@@ -101,7 +101,7 @@ class CFGModifierEnvConstraints(object):
             reward = 10
         else:
             # todo ADD THE DISTANCE OF CUR_GRAPH TO NEWAREST BENIGH
-            reward = self.getReward(self.cur_graph.astype(int))
+            reward = self.getReward(self.cur_graph)
             if action == 1:
                 if reward == 0:
                     reward = -2.0
@@ -503,7 +503,7 @@ class CFGModifierEnvConstraints(object):
         graph_dense = torch.sparse_coo_tensor(graph[:, :2].T,
                                               graph[:, 2],
                                               size=(self.adj_size, self.adj_size)
-                                              ).to(self.device).to_dense().float()
+                                              ).to_dense().float().to(self.device)
         graph_dense.requires_grad = True
         feature = self.malware_detector.get_extra_feature(graph_dense,
                                                           self.sen_api_idx,

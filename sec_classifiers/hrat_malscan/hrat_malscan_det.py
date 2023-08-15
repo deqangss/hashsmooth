@@ -69,7 +69,7 @@ class MalScan(BasicClassifier):
             adj = torch.sparse_coo_tensor(x[:, :2].T,
                                           x[:, 2],
                                           size=(adj_size, adj_size)
-                                          ).to(device)
+                                          ).float().to(device)
             adj_dense = adj.to_dense()
         else:
             adj_dense = x
