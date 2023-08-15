@@ -45,7 +45,7 @@ class MalScan(BasicClassifier):
             warnings.warn("Do not actually implement.\n")
         else:
             min_value = torch.min(dist)
-            label = self.train_y[(dist == min_value).nonzero().squeeze(dim=0)]
+            label = self.train_y[(dist == min_value).nonzero().squeeze(dim=-1)]
 
         if verbose:
             label_total = self.train_y[ind]
