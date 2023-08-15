@@ -45,10 +45,7 @@ class MalScan(BasicClassifier):
             warnings.warn("Do not actually implement.\n")
         else:
             min_value = torch.min(dist)
-            print('index: ', (dist == min_value).nonzero().squeeze())
-            label = self.train_y[(dist == min_value).nonzero().squeeze()]
-
-        print(label)
+            label = self.train_y[(dist == min_value).nonzero().squeeze(dim=0)]
 
         if verbose:
             label_total = self.train_y[ind]
@@ -63,7 +60,10 @@ class MalScan(BasicClassifier):
         for i in label:
             count[unique_label[i.long()]] += 1
         ii = torch.argmax(torch.from_numpy(count))
-        final_label = unique_label[ii]
+        final_label2 = unique_label[ii]
+        count_t = label.bincount()
+        final_label = torch.argmax(count_t)
+        print(final_label, final_label2)
         return final_label
 
     @staticmethod
