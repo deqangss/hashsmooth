@@ -78,16 +78,9 @@ class MalScan(BasicClassifier):
 
     @staticmethod
     def _degree_centrality_torch(adj_dense: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int):
-        idx_matrix = np.zeros((len(x_sensitive_dix), adj_size))
-
+        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
         ii = np.where(x_sensitive_dix != -1)
-        idx_matrix[ii, x_sensitive_dix[ii]] = 1.
-        idx_matrix = torch.from_numpy(idx_matrix).to(adj_dense.device)
-
-        idx_matrix_t = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
-        idx_matrix_t[ii[0], x_sensitive_dix[ii]] = 1.
-
-        assert torch.all(idx_matrix == idx_matrix_t)
+        idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
 
         if adj_dense.shape[0] > len(idx_matrix):
             _sub = adj_dense.shape[0] - len(idx_matrix)
@@ -115,9 +108,9 @@ class MalScan(BasicClassifier):
             norm = 1.0
         centrality = torch.div(L, norm)
 
-        idx_matrix = np.zeros((len(x_sensitive_dix), adj_size))
+
+        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
         ii = np.where(x_sensitive_dix != -1)
-        idx_matrix[ii, x_sensitive_dix[ii]] = 1
-        idx_matrix = torch.from_numpy(idx_matrix).to(graph.device)
+        idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
         katz_centrality = torch.matmul(idx_matrix, centrality.type_as(idx_matrix))
         return katz_centrality
