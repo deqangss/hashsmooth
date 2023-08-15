@@ -69,6 +69,7 @@ class CFGModifierEnvConstraints(object):
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
+        start_time = time.time()
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
@@ -82,6 +83,9 @@ class CFGModifierEnvConstraints(object):
             self.cur_graph, node_info = self.del_node(self.cur_graph)
         else:
             raise ValueError("No action {}.\n".format(action))
+        total_time = time.time() - start_time
+        print("cost time 1: secondes {:.4}.".format(total_time))
+        start_time = time.time()
         self.state = self.malware_detector.get_extra_feature(self.cur_graph,
                                                              self.sen_api_idx,
                                                              adj_size=self.adj_size,
@@ -89,7 +93,10 @@ class CFGModifierEnvConstraints(object):
                                                              device=self.device)
         cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
         done = (cur_label != self.label)
+        total_time = time.time() - start_time
+        print("cost time 2: secondes {:.4}.".format(total_time))
 
+        start_time = time.time()
         if done:
             reward = 10
         else:
@@ -103,6 +110,8 @@ class CFGModifierEnvConstraints(object):
             else:
                 if reward == 0 and node_info == [-1, -1, -1]:
                     reward = -3.0
+        total_time = time.time() - start_time
+        print("cost time 3: secondes {:.4}.".format(total_time))
         return self.state, reward, done, node_info, self.cur_graph
 
     def reset(self):
