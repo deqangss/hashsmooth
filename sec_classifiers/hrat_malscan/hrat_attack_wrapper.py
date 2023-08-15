@@ -177,7 +177,7 @@ def _main():
             X_train = train_x_producer
         else:
             # caution: benign label is 1
-            weight = (train_y == 1).float()
+            weight = torch.ones(((train_y == 1).sum().to(torch.int), ), dtype=float, device=device)
             X_train = benign_x_producer
 
         env = myenv_withconstraints_dli.CFGModifierEnvConstraints(target_graph=test_mal_triple,
