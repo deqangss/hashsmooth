@@ -152,7 +152,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(1, len(attack_id))):
+    for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("Attacking: ", test_mal_id)
         test_mal_adj = test_adj[idx]
