@@ -167,10 +167,11 @@ class CFGModifierEnvConstraints(object):
     def del_node(self, graph):
         # cal grad of all edges
         tmp_grad = self.get_gradient2(graph, is_dense=True)
-        node_grad = (torch.sum(tmp_grad, 0) + torch.sum(tmp_grad, 1))
-        node_id = list(range(node_grad.shape[0]))
+        node_grad = (torch.sum(tmp_grad, 0) + torch.sum(tmp_grad, 1)).cpu().numpy()
+        node_id = np.arange(node_grad.shape[0])
         # sort node_grad
-        grad_tmp = np.array([node_id, node_grad.tolist()]).transpose()
+        # grad_tmp = np.array([node_id.tolist(), node_grad.tolist()]).transpose()
+        grad_tmp = np.stack([node_id, node_grad]).T
         a = grad_tmp[grad_tmp[:, -1].argsort()]
         a = a[::-1]
         tar_node = -1
@@ -189,6 +190,8 @@ class CFGModifierEnvConstraints(object):
                     break
             if flag == 1:
                 continue
+            elif zi[-1] < 0:
+                break
             else:
                 tar_node = int(zi[0])
                 break
@@ -196,29 +199,31 @@ class CFGModifierEnvConstraints(object):
             print("zkf no nodes to delete")
             return graph, [-1, -1, -1]
         # find edges to tar node
-        tmp_ind_to = np.where(graph[:, 1] == tar_node)
+        tmp_ind_to = np.where(graph[:, 1] == tar_node)[0]
         edge_to_tar_node = graph[tmp_ind_to, :]
-        edge_to_tar_node = np.squeeze(edge_to_tar_node)
-        tmp_ind = np.where(edge_to_tar_node[:, 2] == 1)
-        edge_to_tar_node = np.squeeze(edge_to_tar_node[tmp_ind, :], axis=0)
+        # edge_to_tar_node = np.squeeze(edge_to_tar_node)
+        tmp_ind = np.where(edge_to_tar_node[:, 2] == 1)[0]
+        edge_to_tar_node = edge_to_tar_node[tmp_ind, :]
 
         # find edges from tar node
-        tmp_ind_from = np.where(graph[:, 0] == tar_node)
+        tmp_ind_from = np.where(graph[:, 0] == tar_node)[0]
         edge_from_tar_node = graph[tmp_ind_from, :]
-        edge_from_tar_node = np.squeeze(edge_from_tar_node)
-        tmp_ind = np.where(edge_from_tar_node[:, 2] == 1)
-        edge_from_tar_node = np.squeeze(edge_from_tar_node[tmp_ind, :], axis=0)
+        # edge_from_tar_node = np.squeeze(edge_from_tar_node)
+        # tmp_ind = np.where(edge_from_tar_node[:, 2] == 1)[0]
+        edge_from_tar_node = edge_from_tar_node[tmp_ind, :]
+
+        # print(edge_to_tar_node, edge_from_tar_node)
 
         # 如果该节点调用了其他节点，且该节点存在调用
         if edge_from_tar_node.size != 0 and edge_to_tar_node.size != 0:
             # 对于所有调用了改节点的函数
             for zind_beg in edge_to_tar_node[:, 0]:
-                tmp_ind = np.where(graph[:, 0] == zind_beg)
+                tmp_ind = np.where(graph[:, 0] == zind_beg)[0]
                 tmp_ind = np.squeeze(tmp_ind)
-                edge_tmp = np.squeeze(graph[tmp_ind, :])
+                edge_tmp = np.squeeze(graph[graph[:, 0] == zind_beg, :])
                 # 对于所有该结点调用的结点
                 for zind_end in edge_from_tar_node[:, 1]:
-                    tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)
+                    tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)[0]
                     tmp_ind1 = np.squeeze(tmp_ind1)
                     if tmp_ind1.size != 0:
                         # edge = tmp_ind[tmp_ind1]
@@ -229,15 +234,18 @@ class CFGModifierEnvConstraints(object):
                         # graph.append([zind_beg, zind_end, 1])
                         graph = np.append(graph, np.array([zind_beg, zind_end, 1])[:, np.newaxis].transpose(), axis=0)
         # del nodes
-        tmp_ind_to = np.where(graph[:, 1] == tar_node)
+        tmp_ind_to = np.where(graph[:, 1] == tar_node)[0]
         graph = np.delete(graph, tmp_ind_to, axis=0)
-        tmp_ind_from = np.where(graph[:, 0] == tar_node)
+        tmp_ind_from = np.where(graph[:, 0] == tar_node)[0]
         graph = np.delete(graph, tmp_ind_from, axis=0)
+        # graph[np.where(graph[:, 1] > tar_node), 1] -= 1
+        # graph[np.where(graph[:, 0] > tar_node), 0] -= 1
 
-        graph[np.where(graph[:, 1] > tar_node), 1] -= 1
-        graph[np.where(graph[:, 0] > tar_node), 0] -= 1
+        graph[graph[:, 1] > tar_node, 1] -= 1
+        graph[graph[:, 0] > tar_node, 0] -= 1
 
-        self.sen_api_idx[np.where(self.sen_api_idx > tar_node)] -= 1
+        # self.sen_api_idx[np.where(self.sen_api_idx > tar_node)[0]] -= 1
+        self.sen_api_idx[self.sen_api_idx > tar_node] -= 1
 
         self.constraints = np.delete(self.constraints, tar_node)
         self.adj_size -= 1
@@ -252,31 +260,31 @@ class CFGModifierEnvConstraints(object):
     def add_node(self, graph):
         self.adj_size += 1
         # add one nodes to the sparse adjacent matrix
-        triple_copy = graph.copy()
-        a = [i for i in range(self.adj_size - 1)]
+        a = np.arange(self.adj_size - 1)  # [i for i in range(self.adj_size - 1)]
         ii = np.ones_like(a)
         # 在adj中添加新的节点
         tmp_row = [ii * (self.adj_size - 1), a, (ii - 1)]
         tmp_row = np.array(tmp_row).transpose()
         tmp_col = [a, ii * (self.adj_size - 1), (ii - 1)]
         tmp_col = np.array(tmp_col).transpose()
-        tmpz = np.concatenate((triple_copy, tmp_col, tmp_row), axis=0)
+        tmpz = np.concatenate((graph, tmp_col, tmp_row), axis=0)
         grad = self.get_gradient2(tmpz)
 
         # find the edge with max graient and add the edge
-        idx = np.where(grad[:, 1] == self.adj_size - 1)
-        grad_tmp = grad[idx, :]
-        grad_tmp = np.squeeze(grad_tmp)
+        # idx = np.where(grad[:, 1] == self.adj_size - 1)[0]
+        grad_tmp = grad[grad[:, 1] == self.adj_size - 1, :]
+        # grad_tmp = np.squeeze(grad_tmp)
 
         # sort grad_tmp
         a = grad_tmp[grad_tmp[:, 2].argsort()]
         # a = a[::-1]
-        edge = []
         for zi in a:
             # if int(zi[0]) > len(self.constraints) - 1:
             #     continue
-            if self.constraints[int(zi[0])] == 0 or zi[-1] > 0:  # caller cannot be contained in constraints
+            if self.constraints[int(zi[0])] == 0:  # caller cannot be contained in constraints
                 continue
+            elif zi[-1] > 0:
+                break
             else:
                 edge = zi[:2].astype(np.int64)
                 break
@@ -284,13 +292,13 @@ class CFGModifierEnvConstraints(object):
             self.adj_size -= 1
             return graph, [-1, -1, -1]  # cannot find a node for adding
 
-        ii = np.where(np.all((tmpz[:, :2] == edge), axis=1) == True)
+        ii = np.where(np.all((tmpz[:, :2] == edge), axis=1) == True)[0]
         tmpz[ii, 2] = 1
         # self.cur_graph = tmpz
         self.constraints = np.append(self.constraints, 1)
-        print("len con:", str(len(self.constraints)),
-              "  size graph:", str(max(tmpz[:, 0])), ',', str(max(tmpz[:, 1])),
-              ', sen_api_idx:', str(np.max(self.sen_api_idx)))
+        # print("len con:", str(len(self.constraints)),
+        #       "  size graph:", str(max(tmpz[:, 0])), ',', str(max(tmpz[:, 1])),
+        #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
 
         return tmpz, [int(np.squeeze(tmpz[ii, 0])), int(np.squeeze(tmpz[ii, 1])), self.adj_size - 1]
 
@@ -332,25 +340,27 @@ class CFGModifierEnvConstraints(object):
         a = grad[grad[:, 2].argsort()]
         edge = []
         for zi in a:
-            if self.constraints[int(zi[0])] == 0 or self.constraints[
-                int(zi[1])] == 0 or zi[-1] >= 0:  # caller cannot be contained in constraints
+            if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[1])] == 0:  # caller cannot be contained in constraints
                 continue
+            elif zi[-1] >= 0:
+                break
             else:
-                pos_idc = np.all(graph[:, :2] == zi[:2].astype(np.int64), axis=-1)
+                pos_idc = np.all(graph[:, :2] == zi[:2].astype(int), axis=-1)
                 if np.any(pos_idc) and np.squeeze(graph[pos_idc])[-1] == 0.:
-                    edge = zi[:2].astype(np.int64)
+                    edge = zi[:2].astype(int)
                     break
-                else:
-                    pass
         if edge == []:
             print("zkf no edge to add")
             return graph, [-1, -1, -1]
-        ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
-        graph[ii, 2] = 1
+        # ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
+        # graph[ii[0], 2] = 1
+
+        graph[np.all((graph[:, :2] == edge), axis=1), 2] = 1
+
         # self.cur_graph = graph
-        print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
-              str(max(graph[:, 1])),
-              ', sen_api_idx:', str(np.max(self.sen_api_idx)))
+        # print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
+        #       str(max(graph[:, 1])),
+        #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
         self.constraints[edge[1]] = -1
 
         return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]
@@ -364,44 +374,41 @@ class CFGModifierEnvConstraints(object):
             2. calculate the gradient of each edge from node v1 -- <v1, v3> and calculate the gradient of each edge to
             node v2 --<v3, v2> , find the node v3 and add the edge <v1,v3> and <v3, v2>
         '''
-        triple_copy = graph.copy()
-        tmpz = torch.from_numpy(triple_copy).float()
-        triple_torch = Variable(tmpz, requires_grad=True)
-
         grad = self.get_gradient(graph)
         # get the delete edge with max grad
-        delete_edge_index = np.where(triple_torch[:, -1] == 1.)
+        delete_edge_index = np.where(graph[:, -1] == 1.)[0]
         grad_add = grad[delete_edge_index, :]
-        grad_add = np.squeeze(grad_add)
+        # grad_add = np.squeeze(grad_add)
         # sort grad_add, find the deletable edge
         a = grad_add[grad_add[:, 2].argsort()]
         a = a[::-1]
-        del_edge = []
         for zi in a:
-            if self.constraints[int(zi[0])] == 0 or zi[-1] < 0:  # caller cannot be contained in constraints
+            if self.constraints[int(zi[0])] == 0:  # caller cannot be contained in constraints
                 continue
+            elif zi[-1] < 0:
+                break
             else:
-                del_edge = zi[:2].astype(np.int64)
+                del_edge = zi[:2].astype(int)
                 break
         else:
             return graph, [-1, -1, -1]  # cannot find a edge for removing
 
-        ii = np.where(np.all((graph[:, :2] == del_edge), axis=1) == True)
+        ii = np.where(np.all((graph[:, :2] == del_edge), axis=1) == True)[0]
         graph[ii, 2] = 0
 
         # get the add edge
         add_edge_ind = np.where(graph[:, -1] == 0.)[0]
         tmp_add = grad[add_edge_ind, :]
-        tmp_add = np.squeeze(tmp_add)
+        # tmp_add = np.squeeze(tmp_add)
         beg_node = del_edge[0]
         tar_node = del_edge[1]
 
-        beg_idx = np.where(tmp_add[:, 0] == beg_node)[0]
-        beg_grad = grad[add_edge_ind[beg_idx], :]
+        # beg_idx = np.where(tmp_add[:, 0] == beg_node)[0]
+        beg_grad = grad[add_edge_ind[tmp_add[:, 0] == beg_node], :]
         mid1 = grad[:, 1]
 
-        end_idx = np.where(tmp_add[:, 1] == tar_node)[0]
-        end_grad = grad[add_edge_ind[end_idx], :]
+        # end_idx = np.where(tmp_add[:, 1] == tar_node)[0]
+        end_grad = grad[add_edge_ind[tmp_add[:, 1] == tar_node], :]
         mid2 = grad[:, 0]
 
         inter = np.intersect1d(mid1, mid2)
@@ -410,6 +417,7 @@ class CFGModifierEnvConstraints(object):
         for za in tt:
             ibeg = np.where(beg_grad[:, 1] == za)[0]
             iend = np.where(end_grad[:, 0] == za)[0]
+            # ibeg, iend = beg_grad[:, 1] == za, end_grad[:, 0] == za
             if ibeg.size == 0 or iend.size == 0:
                 grad_tmp.append(-1)
             else:
@@ -421,46 +429,26 @@ class CFGModifierEnvConstraints(object):
         # a = a[::-1]
         mid_node = -1
         for zi in a:
-            if self.constraints[int(zi[0])] == 0 or zi[-1] >= 0 or \
+            if self.constraints[int(zi[0])] == 0 or \
                     beg_node == zi[0] or tar_node == zi[0]:  # caller cannot be contained in constraints
                 continue
-            else:
-                mid_node = zi[0].astype(np.int64)
+            elif zi[-1] >= 0:
                 break
-        ii1 = np.where(np.all((graph[:, :2] == [beg_node, mid_node]), axis=1) == True)
-        graph[ii1, 2] = 1
-        ii2 = np.where(np.all((graph[:, :2] == [mid_node, tar_node]), axis=1) == True)
-        graph[ii2, 2] = 1
+            else:
+                mid_node = zi[0].astype(int)
+                break
+        # ii1 = np.where(np.all((graph[:, :2] == [beg_node, mid_node]), axis=1) == True)[0]
+        graph[np.all((graph[:, :2] == [beg_node, mid_node]), axis=1), 2] = 1
+        # ii2 = np.where(np.all((graph[:, :2] == [mid_node, tar_node]), axis=1) == True)[0]
+        graph[np.all((graph[:, :2] == [mid_node, tar_node]), axis=1), 2] = 1
         # self.constraints[beg_node] = -1
         self.constraints[mid_node] = -1
 
-        print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
-              str(max(graph[:, 1])),
-              ' sen_api_idx:', str(np.max(self.sen_api_idx)))
+        # print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
+        #       str(max(graph[:, 1])),
+        #       ' sen_api_idx:', str(np.max(self.sen_api_idx)))
 
         return graph, [beg_node, tar_node, mid_node]
-
-    # def katz_feature_torch(self, graph, sen_api_idx, alpha=0.1, beta=1.0, normalized=True):
-    #     n = self.adj_size
-    #     graph = graph.T
-    #     b = torch.ones((n, 1)) * float(beta)
-    #     b = b.to(device)
-    #     graph = graph.to(device)
-    #     A = torch.eye(n, n).to(device).float() - (alpha * graph.float())
-    #     L, U = torch.solve(b, A)
-    #     if normalized:
-    #         norm = torch.sign(sum(L)) * torch.norm(L)
-    #     else:
-    #         norm = 1.0
-    #     centrality = torch.div(L, norm.to(device)).to(device)
-    #
-    #     idx_matrix = np.zeros((len(sen_api_idx), self.adj_size))
-    #
-    #     ii = np.where(sen_api_idx != -1)
-    #     idx_matrix[ii, sen_api_idx[ii]] = 1
-    #     idx_matrix = torch.from_numpy(idx_matrix).to(device)
-    #     katz_centrality = torch.matmul(idx_matrix, centrality.type_as(idx_matrix))
-    #     return katz_centrality
 
     def get_gradient(self, graph):
         # calculate the grade of each edge
