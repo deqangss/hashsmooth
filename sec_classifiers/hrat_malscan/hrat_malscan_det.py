@@ -39,9 +39,14 @@ class MalScan(BasicClassifier):
             [torch.sum((torch.squeeze(x_batch).to(device) - torch.squeeze(malscan_feature)).pow(2.), 1)
              for x_batch in self.train_x])
         # dist = torch.sum((self.train_x - malscan_feature.float()).pow(2.), 1)
-        print(torch.sort(dist)[-100:])
-        ind = torch.argsort(dist)
-        label = self.train_y[ind[:top_k]]
+        if top_k > 1:
+            ind = torch.argsort(dist)
+            label = self.train_y[ind[:top_k]]
+        else:
+            min_value = torch.min(dist)
+            label = self.train_y[(dist == min_value).nonzero().squeeze()]
+
+        print(label)
 
         if verbose:
             label_total = self.train_y[ind]
