@@ -38,7 +38,6 @@ class MalScan(BasicClassifier):
         dist = torch.cat(
             [torch.sum((torch.squeeze(x_batch).to(device) - torch.squeeze(malscan_feature)).pow(2.), 1)
              for x_batch in self.train_x])
-        # dist = torch.sum((self.train_x - malscan_feature.float()).pow(2.), 1)
         if top_k > 1:
             ind = torch.argsort(dist)
             label = self.train_y[ind[:top_k]]
@@ -54,15 +53,7 @@ class MalScan(BasicClassifier):
             min_dist = dist[ind[benign_idx[0][0]]]
             print("Debug: the minimum distance to a benign file is {:.4}.".format(min_dist))
 
-        unique_label = torch.unique(self.train_y)
-        unique_label = unique_label.long()
-        count = np.zeros(unique_label.shape[0])
-        for i in label:
-            count[unique_label[i.long()]] += 1
-        ii = torch.argmax(torch.from_numpy(count))
-        final_label2 = unique_label[ii]
         count_t = label.bincount()
-        print(count, count_t)
         final_label = torch.argmax(count_t)
         return final_label
 
