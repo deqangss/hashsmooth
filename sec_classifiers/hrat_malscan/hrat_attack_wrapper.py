@@ -49,6 +49,8 @@ cmd_md.add_argument('--batch_size', type=int, default=64,
                     help='computation upon a batch of data instances for saving RAM')
 cmd_md.add_argument('--test', action='store_true', default=False,
                     help='Predict labels for all test data instances.')
+cmd_md.add_argument('--is_benign', action='store_true', default=True,
+                    help='Just use benign instances to optimize perturbations.')
 cmd_md.add_argument('--save_path', type=str, default='./results',
                     help='Folder path to save results.')
 
@@ -88,9 +90,10 @@ def _main():
         val_x_y = np.load(val_x_y_path)
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
-    train_x_producer = torch.from_numpy(train_x)  #
-    # train_x_producer = dataset.get_dataloader(train_x)
-    malscan = MalScan(train_x_producer, torch.from_numpy(train_y).to(device), args.batch_size)
+    train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
+    benign_x_producer = torch.from_numpy(train_x[train_y == 1]) # beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
+    train_y = torch.from_numpy(train_y).to(device)
+    malscan = MalScan(train_x_producer, train_y, args.batch_size)
 
     # test
     _1, _2, test_pkl = dataset.load()
@@ -169,7 +172,14 @@ def _main():
             continue
 
         print('\t ==== get the nearest neighbors for optimization ====')
-        weight = (2 * (torch.from_numpy(train_y) != 0).int() - 1).float().to(device)
+        if not args.is_benign:
+            weight = (2 * (train_y != 0) - 1).float()
+            X_train = train_x_producer
+        else:
+            # caution: benign label is 1
+            weight = (train_y == 1).float()
+            X_train = benign_x_producer
+
         env = myenv_withconstraints_dli.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                   label=0,
                                                                   target_sen_api_idx=test_sensi_idx,
@@ -178,7 +188,7 @@ def _main():
                                                                   steep=args.steep,
                                                                   constraints=test_constraints[idx],
                                                                   malware_detector=malscan,
-                                                                  X_train=train_x_producer,
+                                                                  X_train=X_train,
                                                                   device=device,
                                                                   batch_size=args.batch_size
                                                                   )
