@@ -162,7 +162,7 @@ def _main():
             continue
 
         pred_y = malscan.predict(test_mal_triple, test_mal_adj.shape[0],
-                                 x_sensitive_dix=test_sensi_idx, device='cpu')
+                                 x_sensitive_dix=test_sensi_idx, device=device)
         if pred_y != 0:
             print('==== data cannot be correctly classified as malware ====\t')
             logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
