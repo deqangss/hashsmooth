@@ -230,7 +230,6 @@ def _main():
                     check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     if check_label == 0:
                         logging.warning("something went wrong: check label is {}.".format(check_label))
-                        print("okok")
                         exit(-1)
                     if count < episode_stop:
                         flag = 1
