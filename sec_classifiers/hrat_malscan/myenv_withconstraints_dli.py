@@ -278,6 +278,7 @@ class CFGModifierEnvConstraints(object):
         # sort grad_tmp
         a = grad_tmp[grad_tmp[:, 2].argsort()]
         # a = a[::-1]
+        edge = []
         for zi in a:
             # if int(zi[0]) > len(self.constraints) - 1:
             #     continue
@@ -288,7 +289,7 @@ class CFGModifierEnvConstraints(object):
             else:
                 edge = zi[:2].astype(np.int64)
                 break
-        else:
+        if edge == []:
             self.adj_size -= 1
             return graph, [-1, -1, -1]  # cannot find a node for adding
 
@@ -382,6 +383,7 @@ class CFGModifierEnvConstraints(object):
         # sort grad_add, find the deletable edge
         a = grad_add[grad_add[:, 2].argsort()]
         a = a[::-1]
+        del_edge = []
         for zi in a:
             if self.constraints[int(zi[0])] == 0:  # caller cannot be contained in constraints
                 continue
@@ -390,7 +392,7 @@ class CFGModifierEnvConstraints(object):
             else:
                 del_edge = zi[:2].astype(int)
                 break
-        else:
+        if del_edge == []:
             return graph, [-1, -1, -1]  # cannot find a edge for removing
 
         ii = np.where(np.all((graph[:, :2] == del_edge), axis=1) == True)[0]
