@@ -209,7 +209,7 @@ def _main():
                 start_time = time.time()
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 total_time = time.time() - start_time
-                print("prediction time: secondes {:.4}.".format(total_time))
+                print("prediction time: seconds {:.4}.".format(total_time))
                 if type(action_type) is np.ndarray:
                     action_type = action_type[0]
                 action = np.array([action_type] + info)
