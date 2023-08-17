@@ -8,8 +8,8 @@ class BasicClassifier(ABC):
     classification model template
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, batch_size=64):
+        self.batch_size =batch_size
 
     @abstractmethod
     def eval(self):
