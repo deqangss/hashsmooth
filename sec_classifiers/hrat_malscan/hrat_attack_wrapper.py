@@ -111,7 +111,7 @@ def _main():
                                         x_sensitive_dix=senstive_node_idx,
                                         device=device)
             total_time = time.time() - start_time
-            print("prediction time: secondes {:.4}.".format(total_time))
+            print("prediction time: seconds {:.4}.".format(total_time))
 
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
@@ -154,7 +154,7 @@ def _main():
               )
     for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
-        print("Attacking: ", test_mal_id)
+        print("\nAttacking: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
         test_sensi_idx = test_sensi_indices[idx]
         triple_path = os.path.join(args.save_path, 'triple_set')
@@ -164,8 +164,10 @@ def _main():
             logging.info("{}: preprocessing failed.".format(test_mal_id))
             continue
 
-        pred_y = malscan.predict(test_mal_triple, test_mal_adj.shape[0],
-                                 x_sensitive_dix=test_sensi_idx, device=device)
+        pred_y = malscan.predict(test_mal_triple,
+                                 test_mal_adj.shape[0],
+                                 x_sensitive_dix=test_sensi_idx,
+                                 device=device)
         if pred_y != 0:
             print('==== data cannot be correctly classified as malware ====\t')
             logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))

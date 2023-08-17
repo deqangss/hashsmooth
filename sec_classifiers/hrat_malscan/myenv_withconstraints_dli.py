@@ -85,12 +85,13 @@ class CFGModifierEnvConstraints(object):
             raise ValueError("No action {}.\n".format(action))
         total_time = time.time() - start_time
         print("cost time 1: secondes {:.4}.".format(total_time))
-        self.state = self.malware_detector.get_extra_feature(self.cur_graph,
-                                                             self.sen_api_idx,
-                                                             adj_size=self.adj_size,
-                                                             is_sp2dense=True,
-                                                             device=self.device)
-        cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
+        with torch.no_grad():
+            self.state = self.malware_detector.get_extra_feature(self.cur_graph,
+                                                                 self.sen_api_idx,
+                                                                 adj_size=self.adj_size,
+                                                                 is_sp2dense=True,
+                                                                 device=self.device)
+            cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
         done = (cur_label != self.label)
 
         if done:
@@ -109,14 +110,17 @@ class CFGModifierEnvConstraints(object):
         return self.state, reward, done, node_info, self.cur_graph
 
     def reset(self):
-        self.adj_size = self.adj_size_ori
-        self.cur_graph = self.adj_sparse.copy()
-        self.sen_api_idx = self.sen_api_idx_ori.copy()
-        self.constraints = self.constraints_ori.copy()
-        self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx, self.adj_size, True,
-                                                             device=self.device)
-        self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
-        self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
+        with torch.no_grad():
+            self.adj_size = self.adj_size_ori
+            self.cur_graph = self.adj_sparse.copy()
+            self.sen_api_idx = self.sen_api_idx_ori.copy()
+            self.constraints = self.constraints_ori.copy()
+            self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx,
+                                                                 self.adj_size,
+                                                                 True,
+                                                                 device=self.device)
+            self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
+            self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
         return self.state
 
     def getReward(self, graph, budget_node=1, budget_edge=1):
@@ -304,12 +308,12 @@ class CFGModifierEnvConstraints(object):
         return tmpz, [int(np.squeeze(tmpz[ii, 0])), int(np.squeeze(tmpz[ii, 1])), self.adj_size - 1]
 
     def add_edge(self, graph):
-        triple_copy = graph.copy()
-        tmpz = torch.from_numpy(triple_copy).float()
-        triple_torch = Variable(tmpz, requires_grad=True)
+        # triple_copy = graph.copy()
+        # tmpz = torch.from_numpy(triple_copy).float()
+        # triple_torch = Variable(tmpz, requires_grad=True)
         grad = self.get_gradient2(graph)
         # get the add edge with max grad
-        add_edge_index = np.where(triple_torch[:, -1] == 0.)
+        add_edge_index = np.where(graph[:, -1] == 0.)
         grad_add = grad[add_edge_index, :]
         grad_add = np.squeeze(grad_add)
         # sort grad_add
