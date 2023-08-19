@@ -93,11 +93,11 @@ class CFGModifierEnvConstraints(object):
         total_time = time.time() - start_time
         print("cost time 1: secondes {:.4}.".format(total_time))
         with torch.no_grad():
-            self.state = self.malware_detector.get_extra_feature(self.cur_graph,
-                                                                 self.sen_api_idx,
-                                                                 adj_size=self.adj_size,
-                                                                 is_sp2dense=True,
-                                                                 device=self.device)
+            self.state = MalScan.get_extra_feature(self.cur_graph,
+                                                   self.sen_api_idx,
+                                                   adj_size=self.adj_size,
+                                                   is_sp2dense=True,
+                                                   device=self.device)
             if isinstance(self.malware_detector, HashSmooth4MalScan):
                 cur_label = self.malware_detector.predict(self.cur_graph, self.n_sampling, self.alpha,
                                                           self.adj_size, top_k=k,
@@ -131,10 +131,10 @@ class CFGModifierEnvConstraints(object):
             self.cur_graph = self.adj_sparse.copy()
             self.sen_api_idx = self.sen_api_idx_ori.copy()
             self.constraints = self.constraints_ori.copy()
-            self.state = self.malware_detector.get_extra_feature(self.adj_sparse, self.sen_api_idx,
-                                                                 self.adj_size,
-                                                                 True,
-                                                                 device=self.device)
+            self.state = MalScan.get_extra_feature(self.adj_sparse, self.sen_api_idx,
+                                                   self.adj_size,
+                                                   True,
+                                                   device=self.device)
             self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
             self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
         return self.state
@@ -197,7 +197,8 @@ class CFGModifierEnvConstraints(object):
         tar_node = -1
         for zi in a:
             flag = 0
-            if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[0])] == -1 or zi[-1] < 0:  # caller cannot be contained in constraints; -1为新constraints
+            if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[0])] == -1 or zi[
+                -1] < 0:  # caller cannot be contained in constraints; -1为新constraints
                 flag = 1
             # find functions that call target nodes
             ind_caller = np.where(graph[:, 0] == int(zi[0]))  # 应该是graph[:,1]吧
@@ -361,7 +362,8 @@ class CFGModifierEnvConstraints(object):
         a = grad[grad[:, 2].argsort()]
         edge = []
         for zi in a:
-            if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[1])] == 0:  # caller cannot be contained in constraints
+            if self.constraints[int(zi[0])] == 0 or self.constraints[
+                int(zi[1])] == 0:  # caller cannot be contained in constraints
                 continue
             elif zi[-1] >= 0:
                 break
@@ -477,11 +479,11 @@ class CFGModifierEnvConstraints(object):
         triple_copy = graph.copy()
         tmpz = torch.from_numpy(triple_copy).float().to(self.device)
         triple_torch = Variable(tmpz, requires_grad=True)
-        feature = self.malware_detector.get_extra_feature(triple_torch,
-                                                          self.sen_api_idx,
-                                                          adj_size=self.adj_size,
-                                                          is_sp2dense=True,
-                                                          device=self.device)
+        feature = MalScan.get_extra_feature(triple_torch,
+                                            self.sen_api_idx,
+                                            adj_size=self.adj_size,
+                                            is_sp2dense=True,
+                                            device=self.device)
         # feature = self.getDegreeCentrality(triple_torch, self.sen_api_idx).to(device)
         #
         # densegraph = self.to_adjmatrix(triple_torch)
@@ -490,7 +492,8 @@ class CFGModifierEnvConstraints(object):
 
         feature = torch.reshape(feature, (1, -1))
         # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
-        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
+        dist = torch.cat(
+            [torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()
         loss.backward()
@@ -509,16 +512,17 @@ class CFGModifierEnvConstraints(object):
                                               size=(self.adj_size, self.adj_size)
                                               ).to_dense().float().to(self.device)
         graph_dense.requires_grad = True
-        feature = self.malware_detector.get_extra_feature(graph_dense,
-                                                          self.sen_api_idx,
-                                                          adj_size=self.adj_size,
-                                                          is_sp2dense=False,
-                                                          device=self.device)
+        feature = MalScan.get_extra_feature(graph_dense,
+                                            self.sen_api_idx,
+                                            adj_size=self.adj_size,
+                                            is_sp2dense=False,
+                                            device=self.device)
 
         feature = torch.reshape(feature, (1, -1))
         # total_time = time.time() - start_time
         # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-        dist = torch.cat([torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
+        dist = torch.cat(
+            [torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
         # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
         loss = torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
         loss = torch.reshape(loss, (1, -1)).contiguous()

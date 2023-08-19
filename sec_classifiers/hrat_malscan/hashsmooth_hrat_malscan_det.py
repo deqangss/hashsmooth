@@ -38,11 +38,11 @@ class HashSmooth4MalScan(HashSmooth):
                 adj_size: int, top_k=1, x_sensitive_dix=None,
                 n_subfeatures=[], device='cpu', verbose=False):
         # hash-based transformations
-        with torch.no_grad():
+        # with torch.no_grad():
             # if isinstance(x, np.ndarray):
             #     x = torch.from_numpy(x).to(device)
-            counts = self.sample_lsh_funcs_a_point(x, n, adj_size, top_k, x_sensitive_dix,
-                                                   n_subfeatures, device, verbose)
+        counts = self.sample_lsh_funcs_a_point(x, n, adj_size, top_k, x_sensitive_dix,
+                                               n_subfeatures, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -56,26 +56,25 @@ class HashSmooth4MalScan(HashSmooth):
                                  n_subfeatures=[], device='cpu', verbose=False):
         assert n > 0
         self.base_classifier.eval()
-        # counts = np.zeros(self.num_of_classes, dtype=int)
         values = x[:, 2].astype(int)
-        nonzero_idx = values.nonzero()[0]
-        n_subfeatures = [len(nonzero_idx)]
+        nonzero_idx = values.nonzero()[0].copy()
+        if len(n_subfeatures) == 0:
+            n_subfeatures = [len(nonzero_idx)]
         preds = []
-        for _ in range(int(n)):
-            nonzero_idx_sel = self.transform_wrapper(nonzero_idx[None, ...], n_subfeatures).squeeze()
-            new_values = np.zeros_like(values)
-            new_values[nonzero_idx_sel] = values[nonzero_idx_sel]
-            x[:, 2] = new_values
+        for idx in range(int(n)):
+            nonzero_idx_sel = self.transform_wrapper(nonzero_idx.copy()[None, ...], n_subfeatures).squeeze()
+            x[:, 2] = 0
+            x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
             pred = self.base_classifier.predict(x,
-                                                 adj_size,
-                                                 top_k,
-                                                 x_sensitive_dix,
-                                                 device,
-                                                 verbose
-                                                 )
-            assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
-            preds.append(pred.astype(int))
-        print("debug: ", np.array(preds).squeeze())
+                                                adj_size,
+                                                top_k,
+                                                x_sensitive_dix,
+                                                device,
+                                                verbose
+                                                )
+            # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
+            preds.append(pred)
+        print(np.array(preds).squeeze())
         return np.bincount(np.array(preds).squeeze(), minlength=self.num_of_classes)
 
     @staticmethod

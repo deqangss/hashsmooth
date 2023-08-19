@@ -62,12 +62,15 @@ class MalScan(BasicClassifier):
                 min_value, _ = torch.min(dist, dim=-1)
                 # label = self.train_y[(dist.isclose(min_value)).nonzero().squeeze(dim=-1)]
                 min_v_indices = dist.isclose(min_value).nonzero()
-                final_label = []
-                for idx in range(malscan_feature.shape[0]):
-                    l = self.train_y[min_v_indices[min_v_indices[:, 0] == idx][:, 1]]
-                    pred_l = l.bincount().argmax().data.item()
-                    final_label.append(pred_l)
-                final_label = np.array(final_label)
+                if dist.shape[0] == 1:
+                    final_label = self.train_y[min_v_indices.squeeze()].bincount(minlength=self.n_class).argmax().data.item()
+                else:
+                    final_label = []
+                    for idx in range(malscan_feature.shape[0]):
+                        l = self.train_y[min_v_indices[min_v_indices[:, 0] == idx][:, 1]]
+                        pred_l = l.bincount(minlength=self.n_class).argmax().data.item()
+                        final_label.append(pred_l)
+                    final_label = np.array(final_label)
             return final_label
 
     @staticmethod

@@ -110,13 +110,11 @@ class HashSmooth(BasicClassifier):
             counts_selection = self.sample_lsh_funcs_a_point(x,
                                                              n_selection,
                                                              self.base_classifier.batch_size,
-                                                             hash_methods,
                                                              n_subfeatures)
         else:
             counts_selection = self.sample_lsh_funcs(x,
                                                      n_data,
                                                      n_selection,
-                                                     hash_methods,
                                                      n_subfeatures)
         c_pred = counts_selection.argmax(axis=1)
 
