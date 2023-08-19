@@ -139,6 +139,7 @@ def _main():
     test_dict, test_y, test_sha256 = test_pkl
     if args.test:
         pred_y = np.empty(shape=(len(test_y, )), dtype=int)
+        correct_count = 0
         for i, sha256 in enumerate(test_sha256[:100]):
             adj_sp = test_dict[sha256]['adjacent_matrix']
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
@@ -150,14 +151,15 @@ def _main():
                                      device=device)
             total_time = time.time() - start_time
             print("prediction time: seconds {:.4}.".format(total_time))
-
-        mean_acc = np.sum(test_y[:100] == pred_y) / len(test_y[:100])
+            if pred_y[i] == test_y[i]:
+                correct_count += 1
+        print('correct number: ', correct_count)
+        exit(-1)
+        mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
         logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
-
-    exit(1)
 
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
