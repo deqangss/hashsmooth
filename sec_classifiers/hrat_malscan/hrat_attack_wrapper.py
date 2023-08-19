@@ -8,13 +8,16 @@ import os
 import warnings
 import argparse
 import logging
+import math
 from tqdm import tqdm
 import multiprocessing
 
 import numpy as np
 import torch
 
+from hashsmooth import JaccardLSHTransformer, WeightedJaccardLSHTransformer, WeightedJaccardLSHTransformerTorch
 from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
+from sec_classifiers.hrat_malscan.hashsmooth_hrat_malscan_det import HashSmooth4MalScan
 from tools import utils
 from sec_classifiers.hrat_malscan.Utils import trans2triple_rw, trans2triple
 from sec_classifiers.hrat_malscan import myenv_withconstraints_dli
@@ -51,8 +54,17 @@ cmd_md.add_argument('--test', action='store_true', default=False,
                     help='Predict labels for all test data instances.')
 cmd_md.add_argument('--is_benign', action='store_true', default=True,
                     help='Just use benign instances to optimize perturbations.')
+cmd_md.add_argument('--sub_k', type=int, default=32,
+                    help='Number of hash functions.')
+cmd_md.add_argument('--alpha', type=float, default=0.05,
+                    help='Significance level of hypotheses testing.')
+cmd_md.add_argument('--n_sampling', type=int, default=100,
+                    help='Number of sampling times for estimating the predictive label.')
 cmd_md.add_argument('--save_path', type=str, default='./results',
                     help='Folder path to save results.')
+cmd_md.add_argument('--model', type=str, default='malscan',
+                    choices=['malscan', 'smooth_malscan'],
+                    help="model type, choose from 'malscan', 'smooth_malscan'\n")
 
 
 def _main():
@@ -91,33 +103,71 @@ def _main():
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
     train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-    benign_x_producer = torch.from_numpy(train_x[train_y == 1]) # beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
+    benign_x_producer = torch.from_numpy(
+        train_x[train_y == 1])   # beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
     train_y = torch.from_numpy(train_y).to(device)
-    malscan = MalScan(train_x_producer, train_y, args.batch_size)
+    if args.model == 'malscan':
+        malscan = MalScan(train_x_producer, train_y, args.batch_size)
+    elif args.model == 'smooth_malscan':
+        input_transfermor = JaccardLSHTransformer(sub_k=args.sub_k,
+                                                  null_value=0,
+                                                  seed=args.seed)
+        # reconstruct features
+        train_x_tran_path = os.path.join(feature_saving_path, "train_x_{}.npz".format(args.sub_k))
+        if not os.path.exists(train_x_tran_path):
+            train_pkl, _1, _2 = dataset.load()
+            train_x_tran = get_feature_rpst_tran(train_pkl, input_transfermor.transform)
+            np.save(train_x_tran_path, train_x_tran)
+        else:
+            train_x_tran = np.load(train_x_tran_path)
+        malscan = MalScan(torch.from_numpy(train_x_tran), train_y, args.batch_size)
+
+        malscan = HashSmooth4MalScan(malscan, num_of_classes=2,
+                                     hash_methods=[input_transfermor],
+                                     n_subfeatures=[],
+                                     k_subhashcodes=[],
+                                     max_radii=[],
+                                     n_grids=[],
+                                     default_mode=True
+                                     )
+    else:
+        raise ValueError("Choose either of 'malscan' and 'smooth_malscan'.\n")
 
     # test
     _1, _2, test_pkl = dataset.load()
     test_dict, test_y, test_sha256 = test_pkl
     if args.test:
-        pred_y = np.empty(shape=(len(test_y, )))
-        for i, sha256 in enumerate(test_sha256):
-            print("predict: ", sha256)
+        pred_y = np.empty(shape=(len(test_y, )), dtype=int)
+        for i, sha256 in enumerate(test_sha256[:100]):
             adj_sp = test_dict[sha256]['adjacent_matrix']
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
             triple = trans2triple(adj_sp)
             start_time = time.time()
-            pred_y[i] = malscan.predict(triple,
-                                        adj_sp.shape[0],
-                                        x_sensitive_dix=senstive_node_idx,
-                                        device=device)
+            if args.model == 'malscan':
+                pred_y[i] = malscan.predict(triple,
+                                            adj_sp.shape[0],
+                                            x_sensitive_dix=senstive_node_idx,
+                                            device=device)
+            elif args.model == 'smooth_malscan':
+                pred_y[i] = malscan.predict(triple,
+                                            args.n_sampling,
+                                            args.alpha,
+                                            adj_sp.shape[0],
+                                            x_sensitive_dix=senstive_node_idx,
+                                            n_subfeatures=[],
+                                            device=device)
+            else:
+                pass
             total_time = time.time() - start_time
             print("prediction time: seconds {:.4}.".format(total_time))
 
-        mean_acc = np.sum(test_y == pred_y) / len(test_y)
+        mean_acc = np.sum(test_y[:100] == pred_y) / len(test_y[:100])
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
         logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
+
+    exit(-1)
 
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
@@ -160,14 +210,25 @@ def _main():
         triple_path = os.path.join(args.save_path, 'triple_set')
         utils.mkdir(triple_path)
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
+        n_subfeatures = [test_mal_triple.shape[0]]
         if test_mal_triple is None:
             logging.info("{}: preprocessing failed.".format(test_mal_id))
             continue
-
-        pred_y = malscan.predict(test_mal_triple,
-                                 test_mal_adj.shape[0],
-                                 x_sensitive_dix=test_sensi_idx,
-                                 device=device)
+        if args.model == 'malscan':
+            pred_y = malscan.predict(test_mal_triple,
+                                     test_mal_adj.shape[0],
+                                     x_sensitive_dix=test_sensi_idx,
+                                     device=device)
+        elif args.model == 'smooth_malscan':
+            pred_y = malscan.predict(test_mal_triple,
+                                     args.n_sampling,
+                                     args.alpha,
+                                     test_mal_adj.shape[0],
+                                     x_sensitive_dix=test_sensi_idx,
+                                     n_subfeatures=n_subfeatures,
+                                     device=device)
+        else:
+            raise TypeError("Cannot get the corresponding classifier")
         if pred_y != 0:
             print('==== data cannot be correctly classified as malware ====\t')
             logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
@@ -179,7 +240,7 @@ def _main():
             X_train = train_x_producer
         else:
             # caution: benign label is 1
-            weight = torch.ones(((train_y == 1).sum().to(torch.int), ), dtype=float, device=device)
+            weight = torch.ones(((train_y == 1).sum().to(torch.int),), dtype=float, device=device)
             X_train = benign_x_producer
 
         env = myenv_withconstraints_dli.CFGModifierEnvConstraints(target_graph=test_mal_triple,
@@ -229,10 +290,9 @@ def _main():
                 if dqn.memory_counter > args.memory_cap:
                     dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
                 if done:
-                    check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
-                    if check_label == 0:
-                        logging.warning("something went wrong: check label is {}.".format(check_label))
-                        exit(-1)
+                    # check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
+                    # if check_label == 0:
+                    #     logging.warning("something went wrong: check label is {}.".format(check_label))
                     if count < episode_stop:
                         flag = 1
                     if best_modifications >= count:
@@ -310,6 +370,29 @@ def _parallel_featurization(args):
     adj_sp, node_sens_idx = args
     triple = trans2triple(adj_sp)
     return MalScan.get_extra_feature(triple, node_sens_idx, adj_sp.shape[0], True, 'cpu').cpu().numpy()
+
+
+def get_feature_rpst_tran(file_pkl, tran_func):
+    feature_dict, _1, sha256s = file_pkl
+    feature_x = []
+    for sha256 in sha256s:
+        print("Doing: ", sha256)
+        adj_sp = feature_dict[sha256]['adjacent_matrix']
+        node_idx = feature_dict[sha256]['sensitive_api_list']
+        triple = trans2triple(adj_sp)
+        train_x_v = triple[:, 2].copy()
+        nonzero_idx = train_x_v.nonzero()[0]
+        print(len(nonzero_idx))
+        nonzero_idx_sel = tran_func(nonzero_idx[None, ...])
+        triple[:, 2] = 0.
+        triple[:, 2][nonzero_idx_sel] = train_x_v[nonzero_idx_sel]
+        print('check: ', len(triple[:, 2].nonzero()[0]))
+        feature_x.append(MalScan.get_extra_feature(triple,
+                                                   node_idx,
+                                                   adj_sp.shape[0],
+                                                   True, 'cpu').numpy())
+    return np.array(feature_x)
+
 
 
 if __name__ == "__main__":

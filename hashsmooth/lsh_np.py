@@ -34,7 +34,7 @@ class LSHTransformer(ABC):
         self.seed = seed
         self.random_generator_np = np.random.RandomState(seed=self.seed)
 
-    def transform(self, ipt) -> np.ndarray:
+    def transform(self, ipt: np.ndarray) -> np.ndarray:
         """
         lsh transformation for data points
         :param ipt: input data, e.g., 2D representation vectors
@@ -90,13 +90,18 @@ class JaccardLSHTransformer(LSHTransformer):
         ipt += self.offset
         _x, _y = self._init_permutations()  # keep the same data format
         r, c = ipt.shape
-        hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
-        # In case of long sentence, we split a batch of sentence element-wisely
-        for idx_c in range(c):
-            ipt_columnwise = ipt[:, idx_c:idx_c + 1]
-            hash_code_tmp = (ipt_columnwise.astype(np.uint64) * np.tile(_x, (r, 1)).astype(
-                np.uint64) + _y) % _mersenne_primer
-            hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
+        # hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
+        # # In case of long sentence, we split a batch of sentence element-wisely
+        # for idx_c in range(c):
+        #     ipt_columnwise = ipt[:, idx_c:idx_c + 1]
+        #     hash_code_tmp = (ipt_columnwise.astype(np.uint64) * np.tile(_x, (r, 1)).astype(
+        #         np.uint64) + _y) % _mersenne_primer
+        #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
+
+        ipt_ext = ipt[:, None, :]  # shape: r, 1, c
+        hash_code_tmp = (ipt_ext.astype(np.uint64) * np.tile(_x, (r, 1))[..., None].astype(np.uint64) + _y[None, :,
+                                                                                                        None]) % _mersenne_primer
+        hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
         return hash_codes, (_x, _y)
 
     def _inverse_map(self, hash_codes_mapped):
@@ -223,9 +228,9 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         """
         generate random numbers for compositing hash functions
         """
-        rk = self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words)).astype(np.float32)
-        ln_ck = np.log(self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words))).astype(np.float32)
-        beta_k = self.random_generator_np.uniform(0, 1, (self.sub_k, self.number_of_words)).astype(np.float32)
+        rk = self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words)).astype(float)
+        ln_ck = np.log(self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words))).astype(float)
+        beta_k = self.random_generator_np.uniform(0, 1, (self.sub_k, self.number_of_words)).astype(float)
         return rk, ln_ck, beta_k
 
     def get_collision_prob(self, distance):
@@ -492,5 +497,17 @@ def test_pstable_dist():
     hash_codes = pstable_lsh._map(x)
 
 
+def test_jaccard_dist():
+    input_array = np.random.randint(1, 10000, (2, 100))
+    jaccard_lsh = JaccardLSHTransformer(sub_k=3, null_value=0, seed=2345)
+    i: int = 1
+    while i <= 10:
+        input_transf = jaccard_lsh.transform(input_array)
+        print(input_transf)
+        assert set(input_transf.flatten()).issubset(set(input_array.flatten()))
+        i += 1
+
+
 if __name__ == "__main__":
-    test_pstable_dist()
+    # test_pstable_dist()
+    test_jaccard_dist()

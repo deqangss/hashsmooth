@@ -9,7 +9,7 @@ class BasicClassifier(ABC):
     """
 
     def __init__(self, batch_size=64):
-        self.batch_size =batch_size
+        self.batch_size = batch_size
 
     @abstractmethod
     def eval(self):

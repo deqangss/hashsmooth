@@ -4,6 +4,9 @@ import torch
 from torch.autograd import Variable
 import pandas as pd
 
+from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
+from sec_classifiers.hrat_malscan.hashsmooth_hrat_malscan_det import HashSmooth4MalScan
+
 
 class CFGModifierEnvConstraints(object):
     """
@@ -43,8 +46,10 @@ class CFGModifierEnvConstraints(object):
                  w, steep, constraints,
                  malware_detector,
                  X_train,
-                 device='cpu',
-                 batch_size=64):
+                 batch_size=64,
+                 n_sampling=1000,
+                 alpha=0.05,
+                 device='cpu'):
         self.adj_sparse = target_graph
         self.adj_size_ori = node_num
         self.label = label
@@ -66,6 +71,8 @@ class CFGModifierEnvConstraints(object):
             self.X_train = X_train
         else:
             raise ValueError
+        self.n_sampling = n_sampling
+        self.alpha = alpha
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
@@ -91,7 +98,16 @@ class CFGModifierEnvConstraints(object):
                                                                  adj_size=self.adj_size,
                                                                  is_sp2dense=True,
                                                                  device=self.device)
-            cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k, device=self.device)
+            if isinstance(self.malware_detector, HashSmooth4MalScan):
+                cur_label = self.malware_detector.predict(self.cur_graph, self.n_sampling, self.alpha,
+                                                          self.adj_size, top_k=k,
+                                                          x_sensitive_dix=self.sen_api_idx,
+                                                          device=self.device)
+            elif isinstance(self.malware_detector, MalScan):
+                cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k,
+                                                          device=self.device)
+            else:
+                raise TypeError
         done = (cur_label != self.label)
 
         if done:
@@ -333,9 +349,9 @@ class CFGModifierEnvConstraints(object):
         ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
         graph[ii, 2] = 1
         # self.cur_graph = graph
-        print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
-              str(max(graph[:, 1])),
-              ', sen_api_idx:', str(np.max(self.sen_api_idx)))
+        # print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
+        #       str(max(graph[:, 1])),
+        #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
         self.constraints[edge[1]] = -1
 
         return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]

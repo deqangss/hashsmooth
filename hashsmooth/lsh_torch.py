@@ -57,12 +57,13 @@ class JaccardLSHTransformerTorch(LSHTransformerTorch):
         self.lsh_np = JaccardLSHTransformer(sub_k, null_value, seed)
 
     def transform(self, ipt: torch.Tensor) -> torch.Tensor:
-        ipt_np = ipt.cpu().detach().numpy()
-        ipt_tran = self.lsh_np.transform(ipt_np)
-        elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
-        elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
-        null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
-        null_value_torch[elem_indicator] = 0.
+        with torch.no_grad():
+            ipt_np = ipt.cpu().numpy()
+            ipt_tran = self.lsh_np.transform(ipt_np)
+            elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
+            elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
+            null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
+            null_value_torch[elem_indicator] = 0.
         return ipt * elem_indicator_torch + null_value_torch
 
     def get_collision_prob(self, distance):
@@ -83,14 +84,15 @@ class WeightedJaccardLSHTransformerTorch(LSHTransformerTorch):
                                                     )
 
     def transform(self, ipt: torch.Tensor) -> torch.Tensor:
-        ipt_np = ipt.cpu().detach().numpy()
-        ipt_tran = self.lsh_np.transform(ipt_np)
-        elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
-        weights = np.copy(elem_indicator)
-        weights[elem_indicator] = ipt_tran[elem_indicator] / ipt_np[elem_indicator]
-        weights_torch = torch.from_numpy(weights).to(ipt.device(), dtype=ipt.dtype)
-        null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
-        null_value_torch[elem_indicator] = 0.
+        with torch.no_grad():
+            ipt_np = ipt.cpu().numpy()
+            ipt_tran = self.lsh_np.transform(ipt_np)
+            elem_indicator = (ipt_tran != self.null_value)
+            weights = np.copy(elem_indicator)
+            weights[elem_indicator] = ipt_tran[elem_indicator] / ipt_np[elem_indicator]
+            weights_torch = torch.from_numpy(weights).to(device=ipt.device, dtype=ipt.dtype)
+            null_value_torch = torch.ones_like(ipt, device=ipt.device) * self.null_value
+            null_value_torch[torch.from_numpy(elem_indicator)] = 0.
         return ipt * weights_torch + null_value_torch
 
     def get_collision_prob(self, distance):
@@ -112,12 +114,13 @@ class EditLSHTransformerTorch(LSHTransformerTorch):
                                          )
 
     def transform(self, ipt: torch.Tensor) -> torch.Tensor:
-        ipt_np = ipt.cpu().detach().numpy()
-        ipt_tran = self.lsh_np.transform(ipt_np)
-        elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
-        elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
-        null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
-        null_value_torch[elem_indicator] = 0.
+        with torch.no_grad():
+            ipt_np = ipt.cpu().numpy()
+            ipt_tran = self.lsh_np.transform(ipt_np)
+            elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
+            elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
+            null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
+            null_value_torch[elem_indicator] = 0.
         return ipt * elem_indicator_torch + null_value_torch
 
     def get_collision_prob(self, distance):
@@ -208,12 +211,13 @@ class HammingLSHTransformerTorch(LSHTransformerTorch):
         self.lsh_np = HammingLSHTransformer(dimension, sub_k, null_value, seed)
 
     def transform(self, ipt: torch.Tensor) -> torch.Tensor:
-        ipt_np = ipt.cpu().detach().numpy()
-        ipt_tran = self.lsh_np.transform(ipt_np)
-        elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
-        elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
-        null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
-        null_value_torch[elem_indicator] = 0.
+        with torch.no_grad():
+            ipt_np = ipt.cpu().numpy()
+            ipt_tran = self.lsh_np.transform(ipt_np)
+            elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
+            elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
+            null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
+            null_value_torch[elem_indicator] = 0.
         return ipt * elem_indicator_torch + null_value_torch
 
     def get_collision_prob(self, distance):
