@@ -153,7 +153,7 @@ def _main():
             print("prediction time: seconds {:.4}.".format(total_time))
             if pred_y[i] == test_y[i]:
                 correct_count += 1
-        print('correct number: ', correct_count)
+            print('correct number: ', correct_count, i+ 1)
         exit(-1)
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
