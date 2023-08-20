@@ -153,14 +153,13 @@ def _main():
             print("prediction time: seconds {:.4}.".format(total_time))
             if pred_y[i] == test_y[i]:
                 correct_count += 1
-            print('correct number: ', correct_count, i+ 1)
-        exit(-1)
+            print('correct number: ', correct_count, i + 1)
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
         logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
-
+    exit(-1)
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
     if not os.path.exists(attack_id_path):

@@ -63,6 +63,7 @@ class MalScan(BasicClassifier):
                 # label = self.train_y[(dist.isclose(min_value)).nonzero().squeeze(dim=-1)]
                 min_v_indices = dist.isclose(min_value).nonzero()
                 if dist.shape[0] == 1:
+
                     final_label = self.train_y[min_v_indices.squeeze()].bincount(minlength=self.n_class).argmax().data.item()
                 else:
                     final_label = []
