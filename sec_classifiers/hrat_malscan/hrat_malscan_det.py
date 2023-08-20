@@ -59,7 +59,7 @@ class MalScan(BasicClassifier):
                 count_t = np.apply_along_axis(lambda xx: np.bincount(xx, minlength=self.n_class), axis=-1, arr=label)
                 final_label = np.argmax(count_t, axis=-1)
             else:
-                min_value, _ = torch.min(dist, dim=-1)
+                min_value, _ = torch.min(dist, dim=-1, keepdim=True)
                 # label = self.train_y[(dist.isclose(min_value)).nonzero().squeeze(dim=-1)]
                 min_v_indices = dist.isclose(min_value).nonzero()
                 final_label = []

@@ -39,10 +39,10 @@ class HashSmooth4MalScan(HashSmooth):
                 n_subfeatures=[], device='cpu', verbose=False):
         # hash-based transformations
         # with torch.no_grad():
-            # if isinstance(x, np.ndarray):
-            #     x = torch.from_numpy(x).to(device)
+        # if isinstance(x, np.ndarray):
+        #     x = torch.from_numpy(x).to(device)
         counts = self.sample_lsh_funcs_a_point(x, n, adj_size, top_k, x_sensitive_dix,
-                                               n_subfeatures, device, verbose)
+                                               n_subfeatures, self.base_classifier.batch_size, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -53,7 +53,7 @@ class HashSmooth4MalScan(HashSmooth):
             return top2[0]
 
     def sample_lsh_funcs_a_point(self, x, n, adj_size: int, top_k=1, x_sensitive_dix=None,
-                                 n_subfeatures=[], device='cpu', verbose=False):
+                                 n_subfeatures=[], batch_size=64, device='cpu', verbose=False):
         assert n > 0
         self.base_classifier.eval()
         values = x[:, 2].astype(int)
@@ -61,20 +61,32 @@ class HashSmooth4MalScan(HashSmooth):
         if len(n_subfeatures) == 0:
             n_subfeatures = [len(nonzero_idx)]
         preds = []
-        for idx in range(int(n)):
-            nonzero_idx_sel = self.transform_wrapper(nonzero_idx.copy()[None, ...], n_subfeatures).squeeze()
-            x[:, 2] = 0
-            x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
-            pred = self.base_classifier.predict(x,
-                                                adj_size,
-                                                top_k,
-                                                x_sensitive_dix,
-                                                device,
-                                                verbose
-                                                )
+        for idx in range(n // batch_size):
+            current_batch_size = min(batch_size, n)
+            n -= current_batch_size
+
+            nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
+                                                     n_subfeatures).squeeze()
+            with torch.no_grad():
+                # malscan_features = self.get_extra_feature2(x[:, :2], nonzero_idx_sel, x_sensitive_dix, adj_size, device)
+                pred_batch = self.base_classifier.predict(x[nonzero_idx_sel],
+                                                          adj_size,
+                                                          top_k,
+                                                          x_sensitive_dix,
+                                                          device,
+                                                          verbose)
+            # x[:, 2] = 0
+            # x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
+            # pred = self.base_classifier.predict(x,
+            #                                     adj_size,
+            #                                     top_k,
+            #                                     x_sensitive_dix,
+            #                                     device,
+            #                                     verbose
+            #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
-            preds.append(pred)
-        print(np.array(preds).squeeze())
+            preds.append(pred_batch)
+        print(np.concatenate(preds).squeeze())
         return np.bincount(np.array(preds).squeeze(), minlength=self.num_of_classes)
 
     @staticmethod

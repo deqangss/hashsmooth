@@ -88,8 +88,8 @@ class JaccardLSHTransformer(LSHTransformer):
         if np.min(ipt) == 0:
             self.offset = 1
         ipt += self.offset
-        _x, _y = self._init_permutations()  # keep the same data format
         r, c = ipt.shape
+        _x, _y = self._init_permutations(r)  # keep the same data format
         # hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
         # # In case of long sentence, we split a batch of sentence element-wisely
         # for idx_c in range(c):
@@ -99,8 +99,7 @@ class JaccardLSHTransformer(LSHTransformer):
         #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
 
         ipt_ext = ipt[:, None, :]  # shape: r, 1, c
-        hash_code_tmp = (ipt_ext.astype(np.uint64) * np.tile(_x, (r, 1))[..., None].astype(np.uint64) + _y[None, :,
-                                                                                                        None]) % _mersenne_primer
+        hash_code_tmp = (ipt_ext.astype(np.uint64) * _x[..., None].astype(np.uint64) + _y[..., None]) % _mersenne_primer
         hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
         return hash_codes, (_x, _y)
 
@@ -116,15 +115,15 @@ class JaccardLSHTransformer(LSHTransformer):
             (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
             _mersenne_primer) - self.offset
 
-    def _init_permutations(self):
+    def _init_permutations(self, r:int):
         """
         generate random numbers for compositing hash functions
         """
-        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, dtype=np.uint32),
-                          self.random_generator_np.randint(0, _mersenne_primer, dtype=np.uint32)) for _ in
+        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, (r, ), dtype=np.uint32),
+                          self.random_generator_np.randint(0, _mersenne_primer, (r, ), dtype=np.uint32)) for _ in
                          range(self.sub_k)],
                         dtype=np.uint32
-                        ).T
+                        ).transpose([1, 2, 0])
 
     def get_collision_prob(self, distance: float):
         assert 0. <= distance <= 1.
