@@ -140,7 +140,7 @@ def _main():
     if args.test:
         pred_y = np.empty(shape=(len(test_y, )), dtype=int)
         correct_count = 0
-        for i, sha256 in enumerate(test_sha256[:100]):
+        for i, sha256 in enumerate(test_sha256):
             adj_sp = test_dict[sha256]['adjacent_matrix']
             senstive_node_idx = test_dict[sha256]['sensitive_api_list']
             triple = trans2triple(adj_sp)
