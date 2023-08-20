@@ -62,8 +62,9 @@ class MalScan(BasicClassifier):
                 min_value, _ = torch.min(dist, dim=-1)
                 # label = self.train_y[(dist.isclose(min_value)).nonzero().squeeze(dim=-1)]
                 min_v_indices = dist.isclose(min_value).nonzero()
+                print("min_value:", min_value)
+                print(dist.shape)
                 if dist.shape[0] == 1:
-                    print(self.train_y)
                     print(min_v_indices.squeeze())
                     print(self.train_y[min_v_indices.squeeze()])
                     final_label = self.train_y[min_v_indices.squeeze()].bincount(minlength=self.n_class).argmax().data.item()
