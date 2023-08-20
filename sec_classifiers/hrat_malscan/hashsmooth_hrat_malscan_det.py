@@ -89,8 +89,7 @@ class HashSmooth4MalScan(HashSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
-        print(np.concatenate(preds).squeeze())
-        return np.bincount(np.array(preds).squeeze(), minlength=self.num_of_classes)
+        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes)
 
     @staticmethod
     def get_extra_feature2(x_position: np.ndarray,
