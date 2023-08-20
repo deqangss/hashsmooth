@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import torch
+from torch_sparse_solve import solve
 import warnings
 
 from hashsmooth.classifier_template import BasicClassifier
@@ -27,7 +28,7 @@ class MalScan(BasicClassifier):
         pass
 
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, top_k=1, x_sensitive_dix=None,
-                      device='cpu', verbose=False) -> np.ndarray:
+                device='cpu', verbose=False) -> np.ndarray:
         """
         prediction for a batch of representaions from an instance
         :param x: a batch of representaions from an instance
@@ -86,11 +87,8 @@ class MalScan(BasicClassifier):
             adj_dense = torch.stack(adjs)
         else:
             adj_dense = x_batch if len(x_batch.shape) == 3 else x_batch[None, ...]
-        print("test1, test2")
         degree_fea = MalScan._degree_centrality(adj_dense, x_sensitive_dix, adj_size)
-        print("test2, test3")
         katz_fea = MalScan._katz_feature(adj_dense, x_sensitive_dix, adj_size)
-        print("test3, test4")
         return torch.cat([degree_fea, katz_fea], -1).squeeze()
 
     @staticmethod
@@ -107,12 +105,13 @@ class MalScan(BasicClassifier):
         # adj_dense = torch.squeeze(adj_dense)
         all_degree = torch.div((torch.sum(adj_dense, -2) + torch.sum(adj_dense, -1)).float(),
                                float(adj_size - 1))
+
         degree_centrality = (idx_matrix @ all_degree[..., None].type_as(idx_matrix)).squeeze(-1)
         return degree_centrality
 
     @staticmethod
     def _katz_feature(adj_dense: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
-                            alpha=0.1, beta=1.0, normalized=True):
+                      alpha=0.1, beta=1.0, normalized=True):
         # if not adj_dense.is_sparse:
         # adj_dense = torch.squeeze(adj_dense)
         graph = adj_dense.permute([0, 2, 1])
@@ -120,6 +119,65 @@ class MalScan(BasicClassifier):
         b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
         A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
         L = torch.linalg.solve(A, b).squeeze(-1)
+        if normalized:
+            norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
+        else:
+            norm = 1.0
+        centrality = torch.div(L, norm)
+
+        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
+        ii = np.where(x_sensitive_dix != -1)
+        idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
+        katz_centrality = (idx_matrix @ centrality[..., None].type_as(idx_matrix)).squeeze(-1)
+        return katz_centrality
+
+    @staticmethod
+    def get_extra_feature_sp(x_batch: (np.ndarray, torch.Tensor),
+                             x_sensitive_dix: np.ndarray,
+                             adj_size: int,
+                             device='cpu'
+                             ) -> torch.Tensor:
+        adjs_sp = torch.stack([torch.sparse_coo_tensor(x[:, :2].T,
+                                                       x[:, 2],
+                                                       size=(adj_size, adj_size)
+                                                       ).float().to(device) for x in x_batch])
+
+        degree_fea = MalScan._degree_centrality_sp(adjs_sp, x_sensitive_dix, adj_size)
+        katz_fea = MalScan._katz_feature_sp(adjs_sp, x_sensitive_dix, adj_size)
+        exit(-1)
+        return torch.cat([degree_fea, katz_fea], -1).squeeze()
+
+    @staticmethod
+    def _degree_centrality_sp(adj_sp: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int):
+        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_sp.device)
+        ii = np.where(x_sensitive_dix != -1)
+        idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
+
+        if adj_sp.shape[0] > len(idx_matrix):
+            _sub = adj_sp.shape[0] - len(idx_matrix)
+            for za in range(_sub):
+                idx_matrix.append[0]
+
+        # adj_dense = torch.squeeze(adj_dense)
+        all_degree = torch.div((torch.sparse.sum(adj_sp, -2) + torch.sparse.sum(adj_sp, -1)).float(),
+                               float(adj_size - 1)).to_dense()
+        # degree_centrality = (idx_matrix @ all_degree[..., None].type_as(idx_matrix)).squeeze(-1)
+        degree_centrality = (idx_matrix @ all_degree[..., None].type_as(idx_matrix)).squeeze(-1)
+        return degree_centrality
+
+    @staticmethod
+    def _katz_feature_sp(adj_sp: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
+                         alpha=0.1, beta=1.0, normalized=True):
+        # if not adj_dense.is_sparse:
+        # adj_dense = torch.squeeze(adj_dense)
+        print(adj_sp.shape)
+        graph = adj_sp.transpose(2, 1)
+        bs = graph.shape[0]
+        b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
+        A = torch.stack([torch.eye(adj_size, adj_size).float().to_sparse()] * bs).to(device=graph.device) - (alpha * graph.float())
+        # L = torch.linalg.solve(A, b).squeeze(-1)
+        L = solve(A.to(torch.float64), b.to(torch.float64))
+        print(L)
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
         else:
