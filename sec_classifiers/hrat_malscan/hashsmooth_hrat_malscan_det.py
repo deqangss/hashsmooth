@@ -42,7 +42,7 @@ class HashSmooth4MalScan(HashSmooth):
         # if isinstance(x, np.ndarray):
         #     x = torch.from_numpy(x).to(device)
         counts = self.sample_lsh_funcs_a_point(x, n, adj_size, top_k, x_sensitive_dix,
-                                               n_subfeatures, self.base_classifier.batch_size, device, verbose)
+                                               n_subfeatures, 16, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -69,7 +69,6 @@ class HashSmooth4MalScan(HashSmooth):
 
             nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
                                                      n_subfeatures).squeeze()
-            print('testtest: ', nonzero_idx_sel.shape)
             with torch.no_grad():
                 # malscan_features = self.get_extra_feature2(x[:, :2], nonzero_idx_sel, x_sensitive_dix, adj_size, device)
                 pred_batch = self.base_classifier.predict(x[nonzero_idx_sel],
