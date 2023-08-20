@@ -86,7 +86,9 @@ class MalScan(BasicClassifier):
             adj_dense = torch.stack(adjs)
         else:
             adj_dense = x_batch if len(x_batch.shape) == 3 else x_batch[None, ...]
+        print("test1, test2")
         degree_fea = MalScan._degree_centrality(adj_dense, x_sensitive_dix, adj_size)
+        print("test2, test3")
         katz_fea = MalScan._katz_feature(adj_dense, x_sensitive_dix, adj_size)
         return torch.cat([degree_fea, katz_fea], -1).squeeze()
 
