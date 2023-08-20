@@ -90,6 +90,7 @@ class MalScan(BasicClassifier):
         degree_fea = MalScan._degree_centrality(adj_dense, x_sensitive_dix, adj_size)
         print("test2, test3")
         katz_fea = MalScan._katz_feature(adj_dense, x_sensitive_dix, adj_size)
+        print("test3, test4")
         return torch.cat([degree_fea, katz_fea], -1).squeeze()
 
     @staticmethod
