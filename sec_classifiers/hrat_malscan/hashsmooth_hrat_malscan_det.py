@@ -61,7 +61,7 @@ class HashSmooth4MalScan(HashSmooth):
         if len(n_subfeatures) == 0:
             n_subfeatures = [len(nonzero_idx)]
         preds = []
-        for idx in range(n // batch_size):
+        for idx in range(n // batch_size + 1):
             current_batch_size = min(batch_size, n)
             n -= current_batch_size
             if current_batch_size <= 0:
