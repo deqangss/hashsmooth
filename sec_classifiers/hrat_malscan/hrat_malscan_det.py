@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import torch
-from torch_sparse_solve import solve
 import warnings
 
 from hashsmooth.classifier_template import BasicClassifier
@@ -83,7 +82,7 @@ class MalScan(BasicClassifier):
             adjs = [torch.sparse_coo_tensor(x[:, :2].T,
                                             x[:, 2],
                                             size=(adj_size, adj_size)
-                                            ).float().to(device).to_dense() for x in x_batch]
+                                            ).float().to_dense().to(device) for x in x_batch]
             adj_dense = torch.stack(adjs)
         else:
             adj_dense = x_batch if len(x_batch.shape) == 3 else x_batch[None, ...]
@@ -93,7 +92,7 @@ class MalScan(BasicClassifier):
 
     @staticmethod
     def _degree_centrality(adj_dense: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int):
-        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
+        idx_matrix = torch.zeros((x_sensitive_dix.shape[0], adj_size), dtype=float, device=adj_dense.device)
         ii = np.where(x_sensitive_dix != -1)
         idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
 
@@ -144,7 +143,6 @@ class MalScan(BasicClassifier):
 
         degree_fea = MalScan._degree_centrality_sp(adjs_sp, x_sensitive_dix, adj_size)
         katz_fea = MalScan._katz_feature_sp(adjs_sp, x_sensitive_dix, adj_size)
-        exit(-1)
         return torch.cat([degree_fea, katz_fea], -1).squeeze()
 
     @staticmethod
@@ -169,22 +167,27 @@ class MalScan(BasicClassifier):
     def _katz_feature_sp(adj_sp: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
                          alpha=0.1, beta=1.0, normalized=True):
         # if not adj_dense.is_sparse:
-        # adj_dense = torch.squeeze(adj_dense)
-        print(adj_sp.shape)
-        graph = adj_sp.transpose(2, 1)
-        bs = graph.shape[0]
-        b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
-        A = torch.stack([torch.eye(adj_size, adj_size).float().to_sparse()] * bs).to(device=graph.device) - (alpha * graph.float())
-        # L = torch.linalg.solve(A, b).squeeze(-1)
-        L = solve(A.to(torch.float64), b.to(torch.float64))
-        print(L)
+        # b = torch.ones((adj_size, 1), device=adj_sp.device) * float(beta)
+        # L = torch.stack([torch.linalg.solve(
+        #     torch.eye(adj_size, adj_size, device=adj_sp.device).float() - alpha * adj.to_dense().T.float(), b).squeeze() for
+        #      adj in adj_sp])
+        bs = adj_sp.shape[0]
+        b = torch.ones((bs, adj_size, 1), device=adj_sp.device) * float(beta)
+        # eye_sp = torch.stack(
+        #     [torch.sparse_coo_tensor(torch.tensor([torch.arange(0, adj_size), torch.arange(0, adj_size)]),
+        #                              values=torch.tensor([1.] * adj_size))] * bs)
+
+        A_sp = adj_sp.transpose(2, 1) * (-1.0) * alpha + torch.stack(
+            [torch.sparse_coo_tensor(np.array([np.arange(0, adj_size), np.arange(0, adj_size)]),
+                                     values=torch.tensor([1.] * adj_size), device=adj_sp.device)] * bs)
+        L = torch.linalg.solve(A_sp.to_dense(), b).squeeze(-1)
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
         else:
             norm = 1.0
         centrality = torch.div(L, norm)
 
-        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_dense.device)
+        idx_matrix = torch.zeros((len(x_sensitive_dix), adj_size), dtype=float, device=adj_sp.device)
         ii = np.where(x_sensitive_dix != -1)
         idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
         katz_centrality = (idx_matrix @ centrality[..., None].type_as(idx_matrix)).squeeze(-1)

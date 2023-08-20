@@ -67,18 +67,19 @@ class HashSmooth4MalScan(HashSmooth):
             if current_batch_size <= 0:
                 break
 
-            nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
-                                                     n_subfeatures).squeeze()
-            malscan_features = self.base_classifier.get_extra_feature_sp(x[nonzero_idx_sel],
-                                                                         x_sensitive_dix,
-                                                                         adj_size,
-                                                                         device)
             with torch.no_grad():
+                nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
+                                                         n_subfeatures).squeeze()
+                malscan_features = self.base_classifier.get_extra_feature_sp(x[nonzero_idx_sel],
+                                                                             x_sensitive_dix,
+                                                                             adj_size,
+                                                                             device)
                 pred_batch = self.base_classifier.predict(malscan_features,
                                                           adj_size,
                                                           top_k,
-                                                          device,
-                                                          verbose)
+                                                          x_sensitive_dix=None,
+                                                          device=device,
+                                                          verbose=verbose)
             # x[:, 2] = 0
             # x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
             # pred = self.base_classifier.predict(x,
