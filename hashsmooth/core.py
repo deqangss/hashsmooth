@@ -228,7 +228,7 @@ class HashSmooth(BasicClassifier):
             counts = self.sample_lsh_funcs_a_point(x, n_sampling, self.base_classifier.batch_size)
         else:
             counts = self.sample_lsh_funcs(x, n_data, n_sampling)
-        # todo: need to batchnize the following functionality
+        # todo: need to batchize the following functionality
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
         count2 = counts[top2[1]]
