@@ -159,7 +159,6 @@ def _main():
         logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
-    exit(-1)
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
     if not os.path.exists(attack_id_path):
