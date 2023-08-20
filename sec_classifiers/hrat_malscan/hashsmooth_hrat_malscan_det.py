@@ -64,6 +64,8 @@ class HashSmooth4MalScan(HashSmooth):
         for idx in range(n // batch_size):
             current_batch_size = min(batch_size, n)
             n -= current_batch_size
+            if current_batch_size <= 0:
+                break
 
             nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
                                                      n_subfeatures).squeeze()
