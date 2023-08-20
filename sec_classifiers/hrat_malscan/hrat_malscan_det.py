@@ -167,20 +167,17 @@ class MalScan(BasicClassifier):
     def _katz_feature_sp(adj_sp: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
                          alpha=0.1, beta=1.0, normalized=True):
         # if not adj_dense.is_sparse:
-        # b = torch.ones((adj_size, 1), device=adj_sp.device) * float(beta)
-        # L = torch.stack([torch.linalg.solve(
-        #     torch.eye(adj_size, adj_size, device=adj_sp.device).float() - alpha * adj.to_dense().T.float(), b).squeeze() for
-        #      adj in adj_sp])
-        bs = adj_sp.shape[0]
-        b = torch.ones((bs, adj_size, 1), device=adj_sp.device) * float(beta)
-        # eye_sp = torch.stack(
-        #     [torch.sparse_coo_tensor(torch.tensor([torch.arange(0, adj_size), torch.arange(0, adj_size)]),
-        #                              values=torch.tensor([1.] * adj_size))] * bs)
-
-        A_sp = adj_sp.transpose(2, 1) * (-1.0) * alpha + torch.stack(
-            [torch.sparse_coo_tensor(np.array([np.arange(0, adj_size), np.arange(0, adj_size)]),
-                                     values=torch.tensor([1.] * adj_size), device=adj_sp.device)] * bs)
-        L = torch.linalg.solve(A_sp.to_dense(), b).squeeze(-1)
+        b = torch.ones((adj_size, 1), device=adj_sp.device) * float(beta)
+        L = torch.stack([torch.linalg.solve(
+            torch.eye(adj_size, adj_size, device=adj_sp.device).float() - alpha * adj.to_dense().T.float(), b).squeeze() for
+             adj in adj_sp])
+        # bs = adj_sp.shape[0]
+        # b = torch.ones((bs, adj_size, 1), device=adj_sp.device) * float(beta)
+        #
+        # A_sp = adj_sp.transpose(2, 1) * (-1.0) * alpha + torch.stack(
+        #     [torch.sparse_coo_tensor(np.array([np.arange(0, adj_size), np.arange(0, adj_size)]),
+        #                              values=torch.tensor([1.] * adj_size), device=adj_sp.device)] * bs)
+        # L = torch.linalg.solve(A_sp.to_dense(), b).squeeze(-1)
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
         else:
