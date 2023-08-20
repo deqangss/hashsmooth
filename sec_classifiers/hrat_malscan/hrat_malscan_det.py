@@ -115,9 +115,14 @@ class MalScan(BasicClassifier):
         # adj_dense = torch.squeeze(adj_dense)
         graph = adj_dense.permute([0, 2, 1])
         bs = graph.shape[0]
-        b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
-        A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
-        L = torch.linalg.solve(A, b).squeeze(-1)
+        # b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
+        # A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
+        # L = torch.linalg.solve(A, b).squeeze(-1)
+        b = torch.ones((adj_size, 1), device=adj_dense.device) * float(beta)
+        L = torch.stack([torch.linalg.solve(
+            torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
+                         for
+                         adj in graph])
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
         else:
