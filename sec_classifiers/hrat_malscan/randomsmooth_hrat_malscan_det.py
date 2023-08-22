@@ -156,6 +156,11 @@ class RandomSmooth4MalScan(RandomSmooth):
     def train(self):
         pass
 
+    def certify(self, x: np.ndarray, labels: np.ndarray, n_selection: int, n_estimation: int, k: (float, int),
+                alpha: float,
+                device='cpu'):
+        pass
+
     def predict(self, x: (np.ndarray, torch.Tensor), n: int, alpha: float,
                 adj_size: int, top_k=1, x_sensitive_dix=None,
                 k_per_instance=0, device='cpu', verbose=False):
