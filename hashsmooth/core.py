@@ -27,7 +27,7 @@ class HashSmooth(BasicClassifier):
                  num_of_classes: int,
                  hash_methods: list,
                  n_subfeatures: list,
-                 k_subhashcodes: list,
+                 k_hashcode: int,
                  max_radii: list,
                  n_grids: list,
                  default_mode=True
@@ -38,8 +38,8 @@ class HashSmooth(BasicClassifier):
         :param num_of_classes: number of the classes
         :param hash_methods: a list of LSH schemes
         :param n_subfeatures: a list of number of heterogeneous features
-        :param k_subhashcodes: number of hash functions is utilized to compose transformations
-        :param max_radii: list of maximum radii
+        :param k_hashcode: the number of hash functions is utilized to compose transformations
+        :param max_radii: a list of maximum radii
         :param n_grids: number of grids to split the radius
         :param default_mode: use the estimated confidence of the second class or not
         """
@@ -58,17 +58,16 @@ class HashSmooth(BasicClassifier):
             [isinstance(n_feature, int) for n_feature in n_subfeatures]))
             assert all([n_subfeature >= 0 for n_subfeature in n_subfeatures])
         self.n_subfeatures = n_subfeatures
-        if len(k_subhashcodes) == 0:
-            warnings.warn("Initialization can be conducted in the method of '_calc_radius'.\n")
+        self.k_hashcode = k_hashcode
+        if len(self.n_subfeatures) > 0 and self.n_subfeatures[0] > 0 and self.k_hashcode > 0:
+            self.k_subhashcodes = self.get_num_subhashcodes(self.n_subfeatures, self.k_hashcode)
         else:
-            assert (len(n_subfeatures) == len(k_subhashcodes)) and (all(
-                [isinstance(k_hashcode, int) for k_hashcode in k_subhashcodes]))
-            assert all([k_hashcode >= 0 for k_hashcode in k_subhashcodes])
-        self.k_subhashcodes = k_subhashcodes
+            self.k_subhashcodes = []
+
         if len(max_radii) == 0:
             warnings.warn("Initialization can be conducted in the method of '_calc_radius'.\n")
         else:
-            assert len(max_radii) == len(self.k_subhashcodes)
+            assert len(max_radii) == len(self.n_subfeatures)
             assert len(n_grids) == len(max_radii)
         self.max_radii = max_radii
         self.n_grids = n_grids
@@ -77,7 +76,7 @@ class HashSmooth(BasicClassifier):
     def certify(self, x: np.ndarray, n_selection: int, n_estimation: int, alpha: float,
                 hash_methods=[],
                 n_subfeatures=[],
-                k_subhashcodes=[],
+                k_hashcode=0,
                 max_radii=[],
                 n_grids=[],
                 ) -> (int, float):
@@ -93,7 +92,7 @@ class HashSmooth(BasicClassifier):
         :param alpha: confidence is 1 - \alpha
         :param hash_methods: another way to initializing the transformations,
         :param n_subfeatures: another way to initializing the transformations
-        :param k_subhashcodes: another way to initializing the transformations
+        :param k_hashcode: another way to initializing the transformations
         :param max_radii: another way to initializing the transformations
         :param n_grids: another way to initializing the transformations
         :return: (pred_class, cert_radius). Owing to the abstaining operation, (pred_class=-1, cert_radius=0) is used
@@ -102,17 +101,18 @@ class HashSmooth(BasicClassifier):
             x = x[np.newaxis, ...]
         assert len(x.shape) == 2 and n_selection > 0 and n_estimation > 0 and 0 < alpha < 1
 
-        assert len(hash_methods) == len(n_subfeatures) == len(k_subhashcodes) == len(max_radii) == len(n_grids)
+        assert len(hash_methods) == len(n_subfeatures) == len(max_radii) == len(n_grids)
+
 
         # first round sampling to predict the label
         n_data = x.shape[0]
         if n_data == 1:
-            counts_selection = self.sample_lsh_funcs_a_point(x,
+            counts_selection, k_subhashcodes = self.sample_lsh_funcs_a_point(x,
                                                              n_selection,
                                                              self.base_classifier.batch_size,
                                                              n_subfeatures)
         else:
-            counts_selection = self.sample_lsh_funcs(x,
+            counts_selection, k_subhashcodes = self.sample_lsh_funcs(x,
                                                      n_data,
                                                      n_selection,
                                                      n_subfeatures)
@@ -120,9 +120,9 @@ class HashSmooth(BasicClassifier):
 
         # second round sampling to estimate the probability
         if n_data == 1:
-            counts_estimation = self.sample_lsh_funcs_a_point(x, n_estimation, self.batch_size)
+            counts_estimation, _1 = self.sample_lsh_funcs_a_point(x, n_estimation, self.batch_size)
         else:
-            counts_estimation = self.sample_lsh_funcs(x, n_data, n_estimation)
+            counts_estimation, _1 = self.sample_lsh_funcs(x, n_data, n_estimation)
         n_targeted = counts_estimation[range(n_data), c_pred]
 
         # given the estimated probability, we calculate the radius
@@ -152,7 +152,7 @@ class HashSmooth(BasicClassifier):
                                                          )
         return c_pred, radii
 
-    def sample_lsh_funcs(self, x: np.ndarray, n_data: int, n_samples: int, n_subfeatures=[]):
+    def sample_lsh_funcs(self, x: np.ndarray, n_data: int, n_samples: int, n_subfeatures=[], k_hashcode=0):
         """
         randomly sample $n_samples$ examples and conduct prediction
         :param x: input
@@ -160,14 +160,16 @@ class HashSmooth(BasicClassifier):
         """
         self.base_classifier.eval()
         counts = np.zeros((n_data, self.num_of_classes), dtype=int)
+        if len(n_subfeatures) > 0 and k_hashcode > 0:
+            k_subhashcodes = self.get_num_subhashcodes(n_subfeatures, k_hashcode)
         for _ in tqdm.tqdm(range(n_samples)):
-            data_lsh_codes = self.transform_wrapper(x, n_subfeatures)
+            data_lsh_codes = self.transform_wrapper(x, n_subfeatures, k_subhashcodes)
             preds = self.base_classifier.predict(data_lsh_codes)
             preds_encoded = np.eye(self.num_of_classes, dtype=int)[preds]  # one-hot encodings
             counts += preds_encoded
-        return counts
+        return counts, k_subhashcodes
 
-    def sample_lsh_funcs_a_point(self, x: np.array, n_samples: int, batch_size: int, n_subfeatures=[]):
+    def sample_lsh_funcs_a_point(self, x: np.array, n_samples: int, batch_size: int, n_subfeatures=[], k_hashcode=0):
         """
         randomly sample $n_samples$ for an instance and split the $n_samples$ w.r.t. the batch size
         :param x: an input
@@ -176,41 +178,46 @@ class HashSmooth(BasicClassifier):
         assert n_samples > 0 and batch_size > 0
         self.base_classifier.eval()
         counts = np.zeros(self.num_of_classes, dtype=int)
+        if len(n_subfeatures) > 0 and k_hashcode > 0:
+            k_subhashcodes = self.get_num_subhashcodes(n_subfeatures, k_hashcode)
         for _ in range(math.ceil(n_samples / batch_size)):
             current_batch_size = min(batch_size, n_samples)
             n_samples -= current_batch_size
             if n_samples <= 0:
                 break
             batch_x = x.repeat((current_batch_size, 1))
-            batch_lsh_codes = self.transform_wrapper(batch_x, n_subfeatures)
+            batch_lsh_codes = self.transform_wrapper(batch_x, n_subfeatures, k_subhashcodes)
             preds = self.base_classifier.predict(batch_lsh_codes)
             assert isinstance(preds, np.ndarray), "Expected numpy array, but got {}.\n".format(type(preds))
             counts += np.bincount(preds.astype(int), minlength=self.num_of_classes)
-        return counts
+        return counts, k_subhashcodes
 
-    def transform_wrapper(self, input_vectors: (np.ndarray, torch.Tensor), n_subfeatures=[]) -> (np.ndarray, torch.Tensor):
+    def transform_wrapper(self, input_vectors: (np.ndarray, torch.Tensor), n_subfeatures=[], k_subhashcodes=[]) -> (np.ndarray, torch.Tensor):
         """
         conduct the input transformation
         """
         assert len(input_vectors.shape) == 2, "Only support 2D array: batch_size x dimension.\n"
         # hash_methods = self.randomized_trans if len(self.randomized_trans) > 0 else hash_methods
         n_subfeatures = self.n_subfeatures if len(self.n_subfeatures) > 0 else n_subfeatures
+
+        k_subhashcodes = self.k_subhashcodes if len(self.k_subhashcodes) > 0 else k_subhashcodes
+
         assert len(self.randomized_trans) == len(n_subfeatures)
         assert np.sum(n_subfeatures) == input_vectors.shape[1], \
             f"Inconsistent dimension: {np.sum(self.n_subfeatures)} vs. {input_vectors.shape[1]}.\n"
         slice_index = 0
         input_transformed = []
-        for hash_tran, n_subfeature in zip(self.randomized_trans, n_subfeatures):
+        for hash_tran, n_subfeature, k_subhashcode in zip(self.randomized_trans, n_subfeatures, k_subhashcodes):
             next_slice_index = slice_index + n_subfeature
             sub_input_vectors = input_vectors[:, slice_index: next_slice_index]
-            input_transformed.append(hash_tran.transform(sub_input_vectors))
+            input_transformed.append(hash_tran.transform(sub_input_vectors, k_subhashcode))
             slice_index = next_slice_index
         if isinstance(input_vectors, np.ndarray):
             return np.hstack(input_transformed)
         else:
             return torch.hstack(input_transformed)
 
-    def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
+    def predict(self, x: np.ndarray, n_sampling: int, alpha: float, n_subfeatures=[], k_hashcode=0):
         """ Monte Carlo algorithm for evaluating the prediction of g at x.  With probability at least 1 - alpha, the
         class returned by this method will equal g(x).
 
@@ -225,9 +232,9 @@ class HashSmooth(BasicClassifier):
         self.base_classifier.eval()
         n_data = x.shape[0]
         if n_data == 1:
-            counts = self.sample_lsh_funcs_a_point(x, n_sampling, self.base_classifier.batch_size)
+            counts, _1 = self.sample_lsh_funcs_a_point(x, n_sampling, self.base_classifier.batch_size, n_subfeatures, k_hashcode)
         else:
-            counts = self.sample_lsh_funcs(x, n_data, n_sampling)
+            counts, _1 = self.sample_lsh_funcs(x, n_data, n_sampling, n_subfeatures, k_hashcode)
         # todo: need to batchize the following functionality
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -240,6 +247,20 @@ class HashSmooth(BasicClassifier):
     def train(self):
         pass
 
+    def get_num_subhashcodes(self, n_subfeatures, number_of_hashcodes):
+        assert len(n_subfeatures) > 0
+        n_features = sum(n_subfeatures)
+        assert number_of_hashcodes > 0
+        if isinstance(number_of_hashcodes, float) and 0 < number_of_hashcodes <= 1.:
+            n_hashcodes = math.ceil(n_features * number_of_hashcodes)
+        else:
+            n_hashcodes = int(number_of_hashcodes)
+        n_subhashcodes = []
+        for n_subfeature in n_subfeatures:
+            ratio = float(n_subfeature) / float(n_features)
+            n_subhashcodes.append(math.ceil(n_hashcodes * ratio))
+        return n_subhashcodes
+
     def _calc_radius(self, probas, second_probas, k_subhashcodes=[], max_radii=[], n_grids=[]):
         """
         calculate the robustness radius
@@ -248,7 +269,7 @@ class HashSmooth(BasicClassifier):
         """
         batch_size = len(probas)
         threshold = (probas - second_probas) / 2.
-        bound_mesh, radii_mesh = self._get_radius_grid(probas, k_subhashcodes, max_radii, n_grids)
+        bound_mesh, radii_mesh = self._get_radius_grid(probas, None, k_subhashcodes, max_radii, n_grids)
         # select the radius corresponding to the estimated bound smaller than the threshold
         pos_sel = np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold)
         radii = radii_mesh[range(batch_size), pos_sel]

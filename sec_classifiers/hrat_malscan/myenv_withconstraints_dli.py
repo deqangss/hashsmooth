@@ -45,10 +45,9 @@ class CFGModifierEnvConstraints(object):
                  target_sen_api_idx, node_num,
                  w, steep, constraints,
                  malware_detector,
+                 predict_function,
                  X_train,
                  batch_size=64,
-                 n_sampling=1000,
-                 alpha=0.05,
                  device='cpu'):
         self.adj_sparse = target_graph
         self.adj_size_ori = node_num
@@ -63,6 +62,7 @@ class CFGModifierEnvConstraints(object):
         self.action_space = ['add_edge', 'rewiring', 'add_nodes', 'delete_nodes']
         self.cur_graph = target_graph
         self.malware_detector = malware_detector
+        self.predict_function = predict_function
         self.device = device
         self.batch_size = batch_size
         if isinstance(X_train, torch.Tensor):
@@ -71,8 +71,6 @@ class CFGModifierEnvConstraints(object):
             self.X_train = X_train
         else:
             raise ValueError
-        self.n_sampling = n_sampling
-        self.alpha = alpha
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
@@ -99,13 +97,16 @@ class CFGModifierEnvConstraints(object):
                                                    is_sp2dense=True,
                                                    device=self.device)
             if isinstance(self.malware_detector, HashSmooth4MalScan):
-                cur_label = self.malware_detector.predict(self.cur_graph, self.n_sampling, self.alpha,
-                                                          self.adj_size, top_k=k,
-                                                          x_sensitive_dix=self.sen_api_idx,
-                                                          device=self.device)
+                cur_label = self.predict_function(x=self.cur_graph,
+                                                  adj_size=self.adj_size,
+                                                  top_k=k,
+                                                  x_sensitive_dix=self.sen_api_idx,
+                                                  device=self.device)
             elif isinstance(self.malware_detector, MalScan):
-                cur_label = self.malware_detector.predict(self.state, self.adj_size, top_k=k,
-                                                          device=self.device)
+                cur_label = self.predict_function(x=self.state,
+                                                  adj_size=self.adj_size,
+                                                  top_k=k,
+                                                  device=self.device)
             else:
                 raise TypeError
         done = (cur_label != self.label)

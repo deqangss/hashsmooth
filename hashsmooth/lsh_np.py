@@ -27,26 +27,29 @@ class LSHTransformer(ABC):
         :param null_value: an integer to fill the non-sampled positions
         :param seed: an integer of random seed
         """
-        assert sub_k > 0 and isinstance(sub_k, int)
-        assert seed > 0 and isinstance(seed, int)
+        assert sub_k >= 0 and isinstance(sub_k, int)
+        assert seed >= 0 and isinstance(seed, int)
         self.sub_k = sub_k
         self.null_value = null_value
         self.seed = seed
         self.random_generator_np = np.random.RandomState(seed=self.seed)
 
-    def transform(self, ipt: np.ndarray) -> np.ndarray:
+    def transform(self, ipt: np.ndarray, sub_k_tmp=0) -> np.ndarray:
         """
         lsh transformation for data points
         :param ipt: input data, e.g., 2D representation vectors
+        :param sub_k_tmp: an alternative ways to initialize the number of selected elements
         :return: the transformed input that has the same feature type as that of the input
         """
-        return self._inverse_map(self._map(ipt))  # it should emerge in a pair-wise fashion
+        assert sub_k_tmp >= 0 and isinstance(sub_k_tmp, int)
+        return self._inverse_map(self._map(ipt, sub_k_tmp))  # it should emerge in a pair-wise fashion
 
     @abstractmethod
-    def _map(self, ipt):
+    def _map(self, ipt, sub_k_tmp):
         """
         mapping input by a type of LSH functions
         :param ipt: an input data, e.g., a set of features or a representation vector
+        :param sub_k_tmp: an alternative ways to initialize the number of selected elements
         """
         raise NotImplementedError("Not implemented yet.\n")
 
@@ -75,10 +78,11 @@ class JaccardLSHTransformer(LSHTransformer):
         super(JaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
         self.offset = 0
 
-    def _map(self, ipt):
+    def _map(self, ipt, sub_k_tmp):
         """
         map the input to a universal random space
         :param ipt: an array of word indices correspond to a vocabulary
+        :param sub_k_tmp: an alternative number of selected elements
         """
         assert isinstance(ipt, np.ndarray)
         assert len(ipt.shape) == 2, f"Expected a batch of vectors (e.g., 2D array), but got {len(ipt.shape)}.\n"
@@ -89,7 +93,8 @@ class JaccardLSHTransformer(LSHTransformer):
             self.offset = 1
         ipt += self.offset
         r, c = ipt.shape
-        _x, _y = self._init_permutations(r)  # keep the same data format
+        k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        _x, _y = self._init_permutations(k, r)  # keep the same data format
         # hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
         # # In case of long sentence, we split a batch of sentence element-wisely
         # for idx_c in range(c):
@@ -115,13 +120,13 @@ class JaccardLSHTransformer(LSHTransformer):
             (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
             _mersenne_primer) - self.offset
 
-    def _init_permutations(self, r:int):
+    def _init_permutations(self, sub_k: int, r: int):
         """
         generate random numbers for compositing hash functions
         """
         return np.array([(self.random_generator_np.randint(1, _mersenne_primer, (r, ), dtype=np.uint32),
                           self.random_generator_np.randint(0, _mersenne_primer, (r, ), dtype=np.uint32)) for _ in
-                         range(self.sub_k)],
+                         range(sub_k)],
                         dtype=np.uint32
                         ).transpose([1, 2, 0])
 
@@ -144,7 +149,7 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         super(WeightedJaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
         self.number_of_words = number_of_words
 
-    def _map(self, ipt: np.ndarray):
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
         """
         map the input to hash codes
         the input contains the corresponding occurrence of each word in the vocabulary
@@ -168,7 +173,8 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         r_idx, c_idx = sp_ipt.nonzero()
 
         # obtain permutations
-        rk, beta_k, ln_ck = self._init_permutations()
+        k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        rk, beta_k, ln_ck = self._init_permutations(k)
         rk_c_merged = np.array(rk, copy=True)[:, c_idx]
         betak_c_merged = np.array(beta_k, copy=True)[:, c_idx]
         ln_ck_c_merged = np.array(ln_ck, copy=True)[:, c_idx]
@@ -223,13 +229,13 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         #     b_input[i][hash_codes[:, 0]] = hash_codes[:, 1]
         return input_rtn
 
-    def _init_permutations(self):
+    def _init_permutations(self, sub_k):
         """
         generate random numbers for compositing hash functions
         """
-        rk = self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words)).astype(float)
-        ln_ck = np.log(self.random_generator_np.gamma(2, 1, (self.sub_k, self.number_of_words))).astype(float)
-        beta_k = self.random_generator_np.uniform(0, 1, (self.sub_k, self.number_of_words)).astype(float)
+        rk = self.random_generator_np.gamma(2, 1, (sub_k, self.number_of_words)).astype(float)
+        ln_ck = np.log(self.random_generator_np.gamma(2, 1, (sub_k, self.number_of_words))).astype(float)
+        beta_k = self.random_generator_np.uniform(0, 1, (sub_k, self.number_of_words)).astype(float)
         return rk, ln_ck, beta_k
 
     def get_collision_prob(self, distance):
@@ -271,7 +277,7 @@ class EditLSHTransformer(LSHTransformer):
         self._x = 1
         self._y = 0
 
-    def _map(self, ipt: np.ndarray):
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
         """
         the input is a batch of sequences with same dimension
         :param ipt: 2D numpy.array
@@ -287,10 +293,11 @@ class EditLSHTransformer(LSHTransformer):
         self.hashcode2input_dict.update([(k, v) for k, v in zip(kmer_quantification.flatten(), kmer_batch.flatten())])
         curr_len = len(self.hashcode2input_dict.items())
         # conduct mapping: need positions for retaining the sequential relationship
-        _x, _y = self._init_permutations()
+        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        _x, _y = self._init_permutations(sub_k)
         r, c = kmer_quantification.shape
-        hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
-        positions = np.zeros(shape=(r, self.sub_k), dtype=np.uint32)
+        hash_codes = np.ones(shape=(r, sub_k), dtype=np.uint32) * _mersenne_primer
+        positions = np.zeros(shape=(r, sub_k), dtype=np.uint32)
         # the same as that of jaccard LSH, note: there are duplications for each instance
         for idx_c in range(c):
             last_hash_codes = hash_codes
@@ -314,7 +321,7 @@ class EditLSHTransformer(LSHTransformer):
         assert len(self.hashcode2input_dict) > 0, "No mapping records. Exit!"
         hash_codes, positions, _x, _y = hash_codes_mapped
         batch_size_, sub_k_ = hash_codes.shape
-        assert sub_k_ == self.sub_k
+        # assert sub_k_ == self.sub_k
         assert hash_codes.dtype == np.uint32
         kmer_encodings = np.mod(
             (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
@@ -328,13 +335,13 @@ class EditLSHTransformer(LSHTransformer):
                     kmer_decodings[r_idx, c_idx]
         return input_rtn
 
-    def _init_permutations(self):
+    def _init_permutations(self, sub_k):
         """
         generate random numbers for compositing hash functions
         """
         return np.array([(self.random_generator_np.randint(1, _mersenne_primer, dtype=np.uint32),
                           self.random_generator_np.randint(0, _mersenne_primer, dtype=np.uint32)) for _ in
-                         range(self.sub_k)],
+                         range(sub_k)],
                         dtype=np.uint32
                         ).T
 
@@ -454,7 +461,7 @@ class HammingLSHTransformer(LSHTransformer):
         super(HammingLSHTransformer, self).__init__(sub_k, null_value, seed)
         self.dimension = dimension
 
-    def _map(self, ipt: np.ndarray):
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
         """
         sampling multiple bits
         :param ipt: 2D array
@@ -465,8 +472,9 @@ class HammingLSHTransformer(LSHTransformer):
         assert ((ipt == 0) | (ipt == 1)).all(), "Expect binary array. Exit!\n"
 
         batch_size = ipt.shape[0]
-        permutations = np.array([self._init_permutations() for _ in range(batch_size)])
-        hash_codes = np.empty(shape=(batch_size, self.sub_k), dtype=np.ndarray)
+        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        permutations = np.array([self._init_permutations(sub_k) for _ in range(batch_size)])
+        hash_codes = np.empty(shape=(batch_size, sub_k), dtype=np.ndarray)
         hash_codes[:] = ipt[np.array(range(batch_size))[:, np.newaxis], permutations]
         return hash_codes, permutations
 
@@ -481,8 +489,8 @@ class HammingLSHTransformer(LSHTransformer):
         input_rtn[np.array(range(batch_size_))[:, np.newaxis], permutations] = hash_codes
         return input_rtn
 
-    def _init_permutations(self, replace=True):
-        return np.random.choice(self.dimension, self.sub_k, replace=replace)
+    def _init_permutations(self, sub_k, replace=True):
+        return np.random.choice(self.dimension, sub_k, replace=replace)
 
     def get_collision_prob(self, distance):
         assert 0. <= distance <= 1., "Expected the normalized distance.\n"

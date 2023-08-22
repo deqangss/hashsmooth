@@ -22,3 +22,6 @@ class BasicClassifier(ABC):
     @abstractmethod
     def predict(self, x: np.ndarray) -> np.ndarray:
         raise NotImplementedError
+
+    def certify(self, x: np.ndarray):
+        raise NotImplementedError

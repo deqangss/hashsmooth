@@ -36,13 +36,13 @@ class HashSmooth4MalScan(HashSmooth):
 
     def predict(self, x: (np.ndarray, torch.Tensor), n: int, alpha: float,
                 adj_size: int, top_k=1, x_sensitive_dix=None,
-                n_subfeatures=[], device='cpu', verbose=False):
+                n_subfeatures=[], k_per_instance=0, device='cpu', verbose=False):
         # hash-based transformations
         # with torch.no_grad():
         # if isinstance(x, np.ndarray):
         #     x = torch.from_numpy(x).to(device)
         counts = self.sample_lsh_funcs_a_point(x, n, adj_size, top_k, x_sensitive_dix,
-                                               n_subfeatures, self.base_classifier.batch_size, device, verbose)
+                                               n_subfeatures, k_per_instance, self.base_classifier.batch_size, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -53,13 +53,22 @@ class HashSmooth4MalScan(HashSmooth):
             return top2[0]
 
     def sample_lsh_funcs_a_point(self, x, n, adj_size: int, top_k=1, x_sensitive_dix=None,
-                                 n_subfeatures=[], batch_size=64, device='cpu', verbose=False):
+                                 n_subfeatures=[], k_hashcode=16, batch_size=64, device='cpu', verbose=False):
         assert n > 0
         self.base_classifier.eval()
         values = x[:, 2].astype(int)
         nonzero_idx = values.nonzero()[0].copy()
+
         if len(n_subfeatures) == 0:
             n_subfeatures = [len(nonzero_idx)]
+        if isinstance(k_hashcode, int) and k_hashcode > 1:
+            k_subhashcodes = self.get_num_subhashcodes(n_subfeatures, k_hashcode)
+        elif isinstance(k_hashcode, float) and 0. < k_hashcode <= 1.:
+            k_hashcode_ = sum(n_subfeatures) * k_hashcode
+            k_subhashcodes = self.get_num_subhashcodes(n_subfeatures, k_hashcode_)
+        else:
+            k_subhashcodes = self.k_subhashcodes
+
         preds = []
         for idx in range(n // batch_size + 1):
             current_batch_size = min(batch_size, n)
@@ -69,7 +78,7 @@ class HashSmooth4MalScan(HashSmooth):
 
             with torch.no_grad():
                 nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
-                                                         n_subfeatures).squeeze()
+                                                         n_subfeatures, k_subhashcodes).squeeze()
                 malscan_features = self.base_classifier.get_extra_feature_sp(x[nonzero_idx_sel],
                                                                              x_sensitive_dix,
                                                                              adj_size,
@@ -92,20 +101,3 @@ class HashSmooth4MalScan(HashSmooth):
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
         return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes)
-
-    @staticmethod
-    def get_extra_feature2(x_position: np.ndarray,
-                           x_value: (np.ndarray, torch.Tensor),
-                           x_sensitive_dix: np.ndarray,
-                           adj_size: int,
-                           device='cpu'
-                           ) -> torch.Tensor:
-        adj_dense = torch.sparse_coo_tensor(x_position.T,
-                                            x_value,
-                                            size=(adj_size, adj_size)
-                                            ).float().to(device).to_dense()[None, ...]
-        # else:
-        #     adj_dense = x_batch if len(x_batch.shape) == 3 else x_batch[None, ...]
-        degree_fea = MalScan._degree_centrality(adj_dense, x_sensitive_dix, adj_size)
-        katz_fea = MalScan._katz_feature(adj_dense, x_sensitive_dix, adj_size)
-        return torch.cat([degree_fea, katz_fea], -1).squeeze()
