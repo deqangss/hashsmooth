@@ -58,7 +58,7 @@ cmd_md.add_argument('--is_benign', action='store_true', default=True,
                     help='Just use benign instances to optimize perturbations.')
 cmd_md.add_argument('--sub_k_ratio', type=float, default=0.01,
                     help='Number of hash functions.')
-cmd_md.add_argument('--alpha', type=float, default=0.05,
+cmd_md.add_argument('--alpha', type=float, default=0.01,
                     help='Significance level of hypotheses testing.')
 cmd_md.add_argument('--n_sampling', type=int, default=100,
                     help='Number of sampling times for estimating the predictive label.')
@@ -107,12 +107,10 @@ def _main():
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
     train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-    benign_x_producer = torch.from_numpy(
-        train_x[train_y == 1])  # beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
     train_y = torch.from_numpy(train_y).to(device)
     if args.model == 'malscan':
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
-        predict_func = malscan.predict
+        certify_func = malscan.certify
     elif args.model == 'hash_malscan':
         input_transfermor = JaccardLSHTransformer(sub_k=0,  # initialize this value afterwards
                                                   null_value=0,
@@ -135,7 +133,7 @@ def _main():
                                      n_grids=[],
                                      default_mode=True
                                      )
-        predict_func = functools.partial(malscan.predict, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
+        certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
                                          k_per_instance=args.sub_k_ratio)
     elif args.model == 'random_malscan':
         input_transfermor = RandomTransformer(keep_per_image=0,
@@ -155,7 +153,7 @@ def _main():
                                        transform_method=input_transfermor,
                                        default_mode=True
                                        )
-        predict_func = functools.partial(malscan.predict, n=args.n_sampling, alpha=args.alpha,
+        certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha,
                                          k_per_instance=args.sub_k_ratio)
     else:
         raise ValueError("Choose either of 'malscan', 'random_smooth', and 'hash_malscan'.\n")
@@ -163,28 +161,6 @@ def _main():
     # test
     _1, _2, test_pkl = dataset.load()
     test_dict, test_y, test_sha256 = test_pkl
-    if args.test:
-        pred_y = np.empty(shape=(len(test_y, )), dtype=int)
-        correct_count = 0
-        for i, sha256 in enumerate(test_sha256):
-            adj_sp = test_dict[sha256]['adjacent_matrix']
-            senstive_node_idx = test_dict[sha256]['sensitive_api_list']
-            triple = trans2triple(adj_sp)
-            start_time = time.time()
-            pred_y[i] = predict_func(x=triple,
-                                     adj_size=adj_sp.shape[0],
-                                     x_sensitive_dix=senstive_node_idx,
-                                     device=device)
-            total_time = time.time() - start_time
-            print("prediction time: seconds {:.4}.".format(total_time))
-            if pred_y[i] == test_y[i]:
-                correct_count += 1
-            print('correct number: ', correct_count, i + 1)
-        mean_acc = np.sum(test_y == pred_y) / len(test_y)
-        print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
-        logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
-    else:
-        pass
 
     # conduct attack for malware examples
     attack_id_path = os.path.join(feature_saving_path, "attack_id.list")
@@ -213,139 +189,30 @@ def _main():
     print("==== loading test constraints ====")
     test_constraints = [test_dict[sha]["constraints"] for sha in tqdm(attack_id)]
 
-    dqn = DQN(states_dim=train_x.shape[1],
-              actions_num=ACTION_NUM,
-              memory_capacity=args.memory_cap,
-              learning_rate=args.lr,
-              device=device
-              )
+    logging.info("sub k ratio {}, number of selection {}, number of estimation {}, confidence level {}.".format(
+        args.sub_k_ratio,
+        args.n_sampling,
+        args.n_estimation,
+        args.alpha
+    ))
     for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
-        print("\nAttacking: {}.\n".format(test_mal_id))
+        print("\nCertifying: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
         test_sensi_idx = test_sensi_indices[idx]
         triple_path = os.path.join(args.save_path, 'triple_set')
         utils.mkdir(triple_path)
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
+
         if test_mal_triple is None:
             logging.info("{}: preprocessing failed.".format(test_mal_id))
             continue
-
-        pred_y = predict_func(x=test_mal_triple,
-                              adj_size=test_mal_adj.shape[0],
-                              x_sensitive_dix=test_sensi_idx,
-                              device=device)
-        if pred_y != 0:
-            print('==== data cannot be correctly classified as malware ====\t')
-            logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
-            continue
-
-        print('\t ==== get the nearest neighbors for optimization ====')
-        if not args.is_benign:
-            weight = (2 * (train_y != 0) - 1).float()
-            X_train = train_x_producer
-        else:
-            # caution: benign label is 1
-            weight = torch.ones(((train_y == 1).sum().to(torch.int),), dtype=float, device=device)
-            X_train = benign_x_producer
-
-        env = myenv_withconstraints_dli.CFGModifierEnvConstraints(target_graph=test_mal_triple,
-                                                                  label=0,
-                                                                  target_sen_api_idx=test_sensi_idx,
-                                                                  node_num=test_mal_adj.shape[0],
-                                                                  w=weight,
-                                                                  steep=args.steep,
-                                                                  constraints=test_constraints[idx],
-                                                                  malware_detector=malscan,
-                                                                  X_train=X_train,
-                                                                  device=device,
-                                                                  batch_size=args.batch_size
-                                                                  )
-        print('\t ==== Attacking...collecting experience ... ====')
-        flag = 0
-        episode_stop, max_iterations = 5, 100
-        best_modifications = 100
-        for i_episode in range(15):
-            actions_store = []
-            state = env.reset()
-            ep_r = 0
-            count = 0
-            while True:
-                if dqn.memory_counter <= args.memory_cap:
-                    action_type = np.random.randint(ACTION_NUM)
-                else:
-                    action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
-                start_time = time.time()
-                state_, reward, done, info, cur_graph = env.step(action=action_type)
-                total_time = time.time() - start_time
-                print("prediction time: seconds {:.4}.".format(total_time))
-                if type(action_type) is np.ndarray:
-                    action_type = action_type[0]
-                action = np.array([action_type] + info)
-                dqn.store_transition(state, action, reward, state_, args.memory_cap)
-                actions_store.append(action.tolist())
-                ep_r += reward
-                print("Episode {} w/ round {}: using action {} obtain reward {}/{} w/modification info {}.".format(
-                    i_episode,
-                    count,
-                    action_type,
-                    reward,
-                    ep_r,
-                    info)
-                )
-                if dqn.memory_counter > args.memory_cap:
-                    dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
-                if done:
-                    # check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
-                    # if check_label == 0:
-                    #     logging.warning("something went wrong: check label is {}.".format(check_label))
-                    if count < episode_stop:
-                        flag = 1
-                    if best_modifications >= count:
-                        best_modifications = count
-                        res_save_path = os.path.join(args.save_path, 'actionseq')
-                        utils.mkdir(res_save_path)
-                        action_path = res_save_path + "/" + test_mal_id + "action_list" + ".txt"
-                        file = open(action_path, 'w')
-                        for az in actions_store:
-                            file.write(str(az))
-                            file.write('\n')
-                        file.write(str(done))
-                        file.write('\n')
-                        file.close()
-
-                        graph_path = res_save_path + "/" + test_mal_id + "graph" + ".npy"
-                        np.save(graph_path, cur_graph)
-
-                        feature_file_name = res_save_path + "/" + test_mal_id + "feature_epi" + ".txt"
-                        file_feature = open(feature_file_name, 'w')
-                        file_feature.write(str(state_.tolist()))
-                        file_feature.write('\n')
-                        file_feature.write(str(state.tolist()))
-                        file_feature.write('\n')
-                        file_feature.close()
-                        distance = env.getWeightedJaccard(cur_graph, test_mal_triple)
-                        logging.info(
-                            "{}: predict as {}, Attack {} with episode {}, count {}, modification reward {}, jacard distance {}/{}.".format(
-                                test_mal_id,
-                                pred_y,
-                                1,
-                                i_episode,
-                                count,
-                                ep_r,
-                                distance,
-                                max(test_mal_triple.shape[0], cur_graph.shape[0])))
-                    break
-                if count >= max_iterations:
-                    break
-                s = state_
-                count += 1
-            if flag == 1:
-                print('!!!! finish within {}.'.format(episode_stop))
-                break
-        else:
-            logging.info(
-                "{}: predict as {}, Attack {}".format(test_mal_id, pred_y, 0))  # Attack failed
+        start_time = time.time()
+        radius = certify_func()
+        end_time = time.time()
+        print("Time elaspsed: ", end_time - start_time)
+        logging.info(
+            "{}: robust radius {}".format(test_mal_id, radius))  # Attack failed
 
 
 def get_feature_rpst(file_pkl):
