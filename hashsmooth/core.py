@@ -258,7 +258,10 @@ class HashSmooth(BasicClassifier):
         n_subhashcodes = []
         for n_subfeature in n_subfeatures:
             ratio = float(n_subfeature) / float(n_features)
-            n_subhashcodes.append(math.ceil(n_hashcodes * ratio))
+            n_subhash = math.ceil(n_hashcodes * ratio)
+            print("test: ", n_subhash)
+            n_subhash = n_subhash if n_subhash >= 2 else 2
+            n_subhashcodes.append(n_subhash)
         return n_subhashcodes
 
     def _calc_radius(self, probas, second_probas, k_subhashcodes=[], max_radii=[], n_grids=[]):
