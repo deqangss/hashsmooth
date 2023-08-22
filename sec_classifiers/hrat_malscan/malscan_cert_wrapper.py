@@ -58,6 +58,8 @@ cmd_md.add_argument('--is_benign', action='store_true', default=True,
                     help='Just use benign instances to optimize perturbations.')
 cmd_md.add_argument('--sub_k_ratio', type=float, default=0.01,
                     help='Number of hash functions.')
+cmd_md.add_argument('--max_k', type=int, default=1000,
+                    help='maximum number of hash functions.')
 cmd_md.add_argument('--alpha', type=float, default=0.01,
                     help='Significance level of hypotheses testing.')
 cmd_md.add_argument('--n_sampling', type=int, default=100,
@@ -110,7 +112,7 @@ def _main():
     train_y = torch.from_numpy(train_y).to(device)
     if args.model == 'malscan':
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
-        certify_func = malscan.certify
+        # certify_func = malscan.certify
     elif args.model == 'hash_malscan':
         input_transfermor = JaccardLSHTransformer(sub_k=0,  # initialize this value afterwards
                                                   null_value=0,
@@ -128,13 +130,13 @@ def _main():
         malscan = HashSmooth4MalScan(malscan, num_of_classes=2,
                                      hash_methods=[input_transfermor],
                                      n_subfeatures=[],
-                                     k_subhashcodes=[],
+                                     k_hashcode=0,
                                      max_radii=[],
                                      n_grids=[],
                                      default_mode=True
                                      )
-        certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
-                                         k_per_instance=args.sub_k_ratio)
+        # certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
+        #                                  k_per_instance=args.sub_k_ratio)
     elif args.model == 'random_malscan':
         input_transfermor = RandomTransformer(keep_per_image=0,
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
@@ -151,10 +153,11 @@ def _main():
         malscan = MalScan(torch.from_numpy(train_x_tran), train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, number_of_classes=2,
                                        transform_method=input_transfermor,
+                                       max_k=args.max_k,
                                        default_mode=True
                                        )
-        certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha,
-                                         k_per_instance=args.sub_k_ratio)
+        # certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha,
+        #                                  k_per_instance=args.sub_k_ratio)
     else:
         raise ValueError("Choose either of 'malscan', 'random_smooth', and 'hash_malscan'.\n")
 
@@ -208,7 +211,11 @@ def _main():
             logging.info("{}: preprocessing failed.".format(test_mal_id))
             continue
         start_time = time.time()
-        radius = certify_func()
+        radius = malscan.certify(test_mal_triple, label=0, n_selection=args.n_sampling, n_estimation=args.n_estimation,
+                                 k_per_instance=args.sub_k_ratio, alpha=args.alpha, adj_size=test_mal_adj.shape[0],
+                                 top_k=1,
+                                 x_sensitive_dix=test_sensi_idx,
+                                 device=device)
         end_time = time.time()
         print("Time elaspsed: ", end_time - start_time)
         logging.info(

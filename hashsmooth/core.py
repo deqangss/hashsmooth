@@ -28,6 +28,7 @@ class HashSmooth(BasicClassifier):
                  hash_methods: list,
                  n_subfeatures: list,
                  k_hashcode: int,
+                 max_k: int,
                  max_radii: list,
                  n_grids: list,
                  default_mode=True
@@ -39,6 +40,7 @@ class HashSmooth(BasicClassifier):
         :param hash_methods: a list of LSH schemes
         :param n_subfeatures: a list of number of heterogeneous features
         :param k_hashcode: the number of hash functions is utilized to compose transformations
+        :param max_k: the maximum number of hash codes
         :param max_radii: a list of maximum radii
         :param n_grids: number of grids to split the radius
         :param default_mode: use the estimated confidence of the second class or not
@@ -55,7 +57,7 @@ class HashSmooth(BasicClassifier):
             warnings.warn("Initialization can be conducted in the method of 'transform_wrapper'.\n")
         else:
             assert (len(hash_methods) == len(n_subfeatures)) and (all(
-            [isinstance(n_feature, int) for n_feature in n_subfeatures]))
+                [isinstance(n_feature, int) for n_feature in n_subfeatures]))
             assert all([n_subfeature >= 0 for n_subfeature in n_subfeatures])
         self.n_subfeatures = n_subfeatures
         self.k_hashcode = k_hashcode
@@ -63,6 +65,8 @@ class HashSmooth(BasicClassifier):
             self.k_subhashcodes = self.get_num_subhashcodes(self.n_subfeatures, self.k_hashcode)
         else:
             self.k_subhashcodes = []
+
+        self.max_k = max_k
 
         if len(max_radii) == 0:
             warnings.warn("Initialization can be conducted in the method of '_calc_radius'.\n")
@@ -103,19 +107,20 @@ class HashSmooth(BasicClassifier):
 
         assert len(hash_methods) == len(n_subfeatures) == len(max_radii) == len(n_grids)
 
-
         # first round sampling to predict the label
         n_data = x.shape[0]
         if n_data == 1:
             counts_selection, k_subhashcodes = self.sample_lsh_funcs_a_point(x,
-                                                             n_selection,
-                                                             self.base_classifier.batch_size,
-                                                             n_subfeatures)
+                                                                             n_selection,
+                                                                             self.base_classifier.batch_size,
+                                                                             n_subfeatures,
+                                                                             k_hashcode)
         else:
             counts_selection, k_subhashcodes = self.sample_lsh_funcs(x,
-                                                     n_data,
-                                                     n_selection,
-                                                     n_subfeatures)
+                                                                     n_data,
+                                                                     n_selection,
+                                                                     n_subfeatures,
+                                                                     k_hashcode)
         c_pred = counts_selection.argmax(axis=1)
 
         # second round sampling to estimate the probability
@@ -192,7 +197,8 @@ class HashSmooth(BasicClassifier):
             counts += np.bincount(preds.astype(int), minlength=self.num_of_classes)
         return counts, k_subhashcodes
 
-    def transform_wrapper(self, input_vectors: (np.ndarray, torch.Tensor), n_subfeatures=[], k_subhashcodes=[]) -> (np.ndarray, torch.Tensor):
+    def transform_wrapper(self, input_vectors: (np.ndarray, torch.Tensor), n_subfeatures=[], k_subhashcodes=[]) -> (
+    np.ndarray, torch.Tensor):
         """
         conduct the input transformation
         """
@@ -232,7 +238,8 @@ class HashSmooth(BasicClassifier):
         self.base_classifier.eval()
         n_data = x.shape[0]
         if n_data == 1:
-            counts, _1 = self.sample_lsh_funcs_a_point(x, n_sampling, self.base_classifier.batch_size, n_subfeatures, k_hashcode)
+            counts, _1 = self.sample_lsh_funcs_a_point(x, n_sampling, self.base_classifier.batch_size, n_subfeatures,
+                                                       k_hashcode)
         else:
             counts, _1 = self.sample_lsh_funcs(x, n_data, n_sampling, n_subfeatures, k_hashcode)
         # todo: need to batchize the following functionality
@@ -305,11 +312,13 @@ class HashSmooth(BasicClassifier):
         radii_splitting = []
         if len(max_radii_calc) == 1:
             radii_splitting.append(
-                np.linspace(0, max_radii_calc[0], n_grids[0] + 1))  # int(round(max_radii_calc[0] * self.n_subfeatures[0])) + 1)
+                np.linspace(0, max_radii_calc[0],
+                            n_grids[0] + 1))  # int(round(max_radii_calc[0] * self.n_subfeatures[0])) + 1)
         elif not len(max_radii_calc) <= 1:
             # position product
             for i, max_r in enumerate(max_radii_calc):
-                radii_splitting.append(np.linspace(0, max_r, n_grids[i] + 1))  # int(round(max_r * self.n_subfeatures[i])) + 1)
+                radii_splitting.append(
+                    np.linspace(0, max_r, n_grids[i] + 1))  # int(round(max_r * self.n_subfeatures[i])) + 1)
         else:
             raise ValueError
         radii_mesh = list(itertools.product(*radii_splitting))

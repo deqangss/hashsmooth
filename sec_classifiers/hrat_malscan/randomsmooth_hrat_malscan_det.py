@@ -6,6 +6,7 @@ from statsmodels.stats.proportion import proportion_confint, binom_test
 
 from hashsmooth.core import BasicClassifier
 from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
+from hashsmooth.utils_hash import lower_confidence_interval
 
 
 class RandomTransformer(object):
@@ -70,12 +71,13 @@ class RandomTransformer(object):
 class RandomSmooth(BasicClassifier):
     ABSTAIN = -1
 
-    def __init__(self, base_classifier, number_of_classes, transform_method, default_mode=True):
+    def __init__(self, base_classifier, number_of_classes, transform_method, max_k=1000, default_mode=True):
         self.base_classifier = base_classifier
         BasicClassifier.__init__(self, self.base_classifier.batch_size)
         self.number_of_classes = number_of_classes
         self.transform_method = transform_method
         self.default_mode = default_mode
+        self.max_k = max_k
 
     def certify(self, x: np.ndarray, labels: np.ndarray, n_selection: int, n_estimation: int, k: (float, int),
                 alpha: float,
@@ -94,9 +96,9 @@ class RandomSmooth(BasicClassifier):
         radii[guesses != labels] = -1
         return radii
 
-    def predict(self, x: np.ndarray, n_sampling: int, alpha: float, k: (float, int), device='cpu'):
+    def predict(self, x: np.ndarray, n_sampling: int, k_per_instance: (float, int), alpha: float, device='cpu'):
         self.base_classifier.eval()
-        counts = self.sample_funcs(x, n_sampling, k, device)
+        counts = self.sample_funcs(x, n_sampling, k_per_instance, device)
         # todo: need to batchize the following functionality
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -141,14 +143,13 @@ class RandomSmooth(BasicClassifier):
             radius += 1
         return radii
 
-
 class RandomSmooth4MalScan(RandomSmooth):
     def __init__(self, malscan_det: MalScan, number_of_classes: int, transform_method: RandomTransformer,
-                 default_mode: bool):
+                 max_k: int, default_mode: bool):
         """
         Customized RandomSmooth w.r.t. Malscan
         """
-        RandomSmooth.__init__(self, malscan_det, number_of_classes, transform_method, default_mode)
+        RandomSmooth.__init__(self, malscan_det, number_of_classes, transform_method, max_k, default_mode)
 
     def eval(self):
         pass
@@ -156,16 +157,32 @@ class RandomSmooth4MalScan(RandomSmooth):
     def train(self):
         pass
 
-    def certify(self, x: np.ndarray, labels: np.ndarray, n_selection: int, n_estimation: int, k: (float, int),
+    def certify(self, x: np.ndarray, label: int, n_selection: int, n_estimation: int, k_per_instance: (float, int),
                 alpha: float,
-                device='cpu'):
-        pass
-
-    def predict(self, x: (np.ndarray, torch.Tensor), n: int, alpha: float,
                 adj_size: int, top_k=1, x_sensitive_dix=None,
-                k_per_instance=0, device='cpu', verbose=False):
-        counts = self.sample_funcs(x, n, adj_size, top_k, x_sensitive_dix,
-                                   k_per_instance, self.base_classifier.batch_size, device, verbose)
+                device='cpu',
+                verbose=False):
+        with torch.no_grad():
+            counts_selection, k_per_instance = self.sample_funcs(x, adj_size, n_selection, self.base_classifier.batch_size, k_per_instance,
+                                                 top_k, x_sensitive_dix, device, verbose)
+            counts_estimation, _1 = self.sample_funcs(x, adj_size, n_estimation,  self.base_classifier.batch_size, k_per_instance,
+                                                  top_k, x_sensitive_dix, device, verbose)
+
+            c_pred = counts_selection.argmax()
+            n_targeted = counts_estimation[c_pred]
+
+            prob_underlined = lower_confidence_interval(n_targeted, n_estimation, alpha)
+            radius = self.population_radius_for_majority(np.array([prob_underlined])[None, ...], n_estimation, k_per_instance)
+
+            if c_pred != label:
+                return RandomSmooth.ABSTAIN
+            else:
+                return radius
+
+    def predict(self, x: np.ndarray, adj_size: int, n: int, k_per_instance: int, alpha: float,
+                top_k=1, x_sensitive_dix=None, device='cpu', verbose=False):
+        counts, _1 = self.sample_funcs(x, adj_size, n, self.base_classifier.batch_size, k_per_instance,
+                                   top_k, x_sensitive_dix, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -175,17 +192,17 @@ class RandomSmooth4MalScan(RandomSmooth):
         else:
             return top2[0]
 
-    def sample_funcs(self, x, n_sampling, adj_size: int, top_k=1, x_sensitive_dix=None,
-                     k_per_instance=0, batch_size=64, device='cpu', verbose=False):
-        assert n_sampling > 0
+    def sample_funcs(self, x: np.ndarray, adj_size: int, n, batch_size=64, k_per_instance=0,
+                     top_k=1, x_sensitive_dix=None, device='cpu', verbose=False):
+        assert n > 0
         self.base_classifier.eval()
         values = x[:, 2].astype(float)
         if 0 < k_per_instance <= 1:
-            k_per_instance = math.ceil(len(values) * k_per_instance)
+            k_per_instance = min(math.ceil(len(values) * k_per_instance), self.max_k)
         preds = []
-        for idx in range(n_sampling // batch_size + 1):
-            current_batch_size = min(batch_size, n_sampling)
-            n_sampling -= current_batch_size
+        for idx in range(n // batch_size + 1):
+            current_batch_size = min(batch_size, n)
+            n -= current_batch_size
             if current_batch_size <= 0:
                 break
 
@@ -210,7 +227,7 @@ class RandomSmooth4MalScan(RandomSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
-        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.number_of_classes)
+        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.number_of_classes), k_per_instance
 
     @staticmethod
     def get_extra_feature2(x_position: np.ndarray,

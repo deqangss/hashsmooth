@@ -58,6 +58,8 @@ cmd_md.add_argument('--is_benign', action='store_true', default=True,
                     help='Just use benign instances to optimize perturbations.')
 cmd_md.add_argument('--sub_k_ratio', type=float, default=0.05,
                     help='Number of hash functions.')
+cmd_md.add_argument('--max_k', type=int, default=1000,
+                    help='maximum number of hash functions.')
 cmd_md.add_argument('--alpha', type=float, default=0.05,
                     help='Significance level of hypotheses testing.')
 cmd_md.add_argument('--n_sampling', type=int, default=100,
@@ -128,7 +130,8 @@ def _main():
         malscan = HashSmooth4MalScan(malscan, num_of_classes=2,
                                      hash_methods=[input_transfermor],
                                      n_subfeatures=[],
-                                     k_subhashcodes=[],
+                                     k_hashcode=0,
+                                     max_k=args.max_k,
                                      max_radii=[],
                                      n_grids=[],
                                      default_mode=True
@@ -151,6 +154,7 @@ def _main():
         malscan = MalScan(torch.from_numpy(train_x_tran), train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, number_of_classes=2,
                                        transform_method=input_transfermor,
+                                       max_k=args.max_k,
                                        default_mode=True
                                        )
         predict_func = functools.partial(malscan.predict, n=args.n_sampling, alpha=args.alpha,
