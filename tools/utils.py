@@ -22,8 +22,11 @@ try:
 except Exception:
     basestring = str
 
+log_dir = os.getcwd()+'/logs/'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
 logging.basicConfig(level=logging.INFO,
-                    filename=os.path.join(os.getcwd(), time.strftime("%Y%m%d-%H%M%S") + ".log"),
+                    filename=os.path.join(log_dir, time.strftime("%Y%m%d-%H%M%S") + ".log"),
                     filemode="w",
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
                     datefmt='%Y/%m/%d %H:%M:%S')
