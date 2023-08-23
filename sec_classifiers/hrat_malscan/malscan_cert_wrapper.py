@@ -72,6 +72,7 @@ cmd_md.add_argument('--model', type=str, default='malscan',
                     help="model type, choose from 'malscan', 'random_malscan', 'hash_malscan'\n")
 
 logger = utils.logging.getLogger("Certification")
+logger.addHandler(utils.ErrorHandler)
 
 def _main():
     args = cmd_md.parse_args()
