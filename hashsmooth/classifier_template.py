@@ -23,5 +23,5 @@ class BasicClassifier(ABC):
     def predict(self, x: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
-    def certify(self, x: np.ndarray):
+    def certify(self, x: np.ndarray, label: (int, np.ndarray), ):
         raise NotImplementedError

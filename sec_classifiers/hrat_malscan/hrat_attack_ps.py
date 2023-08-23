@@ -7,7 +7,6 @@ import time
 import os
 import warnings
 import argparse
-import logging
 from tqdm import tqdm
 import multiprocessing
 import functools
@@ -70,18 +69,12 @@ cmd_md.add_argument('--model', type=str, default='malscan',
                     choices=['malscan', 'random_malscan', 'hash_malscan'],
                     help="model type, choose from 'malscan', 'random_malscan', 'hash_malscan'\n")
 
+logger = utils.logging.getLogger("Hrat-attack")
 
 def _main():
     args = cmd_md.parse_args()
     if not os.path.exists(args.save_path):
         utils.mkdir(args.save_path)
-    logging.basicConfig(level=logging.INFO,
-                        filename=os.path.join(args.save_path, time.strftime("%Y%m%d-%H%M%S") + ".log"),
-                        filemode="w",
-                        format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
-                        datefmt='%Y/%m/%d %H:%M:%S')
-    ErrorHandler = logging.StreamHandler()
-    ErrorHandler.setFormatter(logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s'))
 
     if args.cuda:
         assert torch.cuda.is_available(), "No GPU device."
@@ -184,7 +177,7 @@ def _main():
             print('correct number: ', correct_count, i + 1)
         mean_acc = np.sum(test_y == pred_y) / len(test_y)
         print("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
-        logging.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
+        logger.info("The mean accuracy is {:.4f}%.\n".format(mean_acc * 100))
     else:
         pass
 
@@ -230,7 +223,7 @@ def _main():
         utils.mkdir(triple_path)
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
         if test_mal_triple is None:
-            logging.info("{}: preprocessing failed.".format(test_mal_id))
+            logger.info("{}: preprocessing failed.".format(test_mal_id))
             continue
 
         pred_y = predict_func(x=test_mal_triple,
@@ -239,7 +232,7 @@ def _main():
                               device=device)
         if pred_y != 0:
             print('==== data cannot be correctly classified as malware ====\t')
-            logging.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
+            logger.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
             continue
 
         print('\t ==== get the nearest neighbors for optimization ====')
@@ -301,7 +294,7 @@ def _main():
                 if done:
                     # check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     # if check_label == 0:
-                    #     logging.warning("something went wrong: check label is {}.".format(check_label))
+                    #     logger.warning("something went wrong: check label is {}.".format(check_label))
                     if count < episode_stop:
                         flag = 1
                     if best_modifications >= count:
@@ -328,7 +321,7 @@ def _main():
                         file_feature.write('\n')
                         file_feature.close()
                         distance = env.getWeightedJaccard(cur_graph, test_mal_triple)
-                        logging.info(
+                        logger.info(
                             "{}: predict as {}, Attack {} with episode {}, count {}, modification reward {}, jacard distance {}/{}.".format(
                                 test_mal_id,
                                 pred_y,
@@ -347,7 +340,7 @@ def _main():
                 print('!!!! finish within {}.'.format(episode_stop))
                 break
         else:
-            logging.info(
+            logger.info(
                 "{}: predict as {}, Attack {}".format(test_mal_id, pred_y, 0))  # Attack failed
 
 
@@ -389,7 +382,7 @@ def get_feature_rpst_tran(file_pkl, tran_func, k_ratio):
         for idx, rpst in enumerate(pool.imap(_parallel_tran_featurization, pargs)):
             feature_x[idx] = rpst[0]
             sub_k.append(rpst[1])
-    logging.info("The mean number of selected elements is {}.".format(np.mean(sub_k)))
+    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k)))
     return feature_x
 
     # feature_x = []
@@ -428,7 +421,7 @@ def get_feature_rpst_rand(file_pkl, tran_func, ratio, device):
         # triple_list.append(triple_torch.cpu().numpy())
         feature_x.append(MalScan.get_extra_feature(triple_torch, node_sens_idx, adj_sp.shape[0], True, 'cpu').numpy())
         sub_k_list.append(k)
-    logging.info("The mean number of selected elements is {}.".format(np.mean(sub_k_list)))
+    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k_list)))
     return np.array(feature_x)
     # pargs = [(triple_list[i], feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list']) for i, sha256
     #          in

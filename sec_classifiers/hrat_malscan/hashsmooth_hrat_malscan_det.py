@@ -38,7 +38,7 @@ class HashSmooth4MalScan(HashSmooth):
     def eval(self):
         pass
 
-    def certify(self, x: np.ndarray, adj_size: int, n_selection: int, n_estimation: int, alpha: float,
+    def certify(self, x: np.ndarray, label: int, adj_size: int, n_selection: int, n_estimation: int, alpha: float,
                 hash_methods=[], n_subfeatures=[], k_per_instance=0, max_radii=[], n_grids=[],
                 top_k=1, x_sensitive_dix=None, device='cpu', verbose=False
                 ) -> (int, float):
@@ -54,6 +54,8 @@ class HashSmooth4MalScan(HashSmooth):
                                                                          k_per_instance,
                                                                          top_k, x_sensitive_dix, device, verbose)
         c_pred = counts_selection.argmax()
+        if c_pred != label:
+            return HashSmooth.ABSTAIN
 
         # second round sampling to estimate the probability
         counts_estimation, _1 = self.sample_lsh_funcs_a_point(x, adj_size,
@@ -66,6 +68,7 @@ class HashSmooth4MalScan(HashSmooth):
 
         # given the estimated probability, we calculate the radius
         prob_underlined = lower_confidence_interval(n_targeted, n_estimation, alpha)
+        c_pred = np.array([c_pred])[None, ...]
         if self.default_mode:
             abstain_indicator = prob_underlined <= 0.5
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
@@ -78,7 +81,7 @@ class HashSmooth4MalScan(HashSmooth):
                                                           )
         else:
             c_pred_runnerup = counts_selection.argsort()[:, -2]
-            n_targeted_runnerup = counts_estimation[range(n_data), c_pred_runnerup]
+            n_targeted_runnerup = counts_estimation[c_pred_runnerup]
             prob_upperlined = upper_confidence_interval(n_targeted_runnerup, c_pred_runnerup, alpha)
             abstain_indicator = prob_underlined <= prob_upperlined
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
@@ -89,7 +92,7 @@ class HashSmooth4MalScan(HashSmooth):
                                                          max_radii,
                                                          n_grids
                                                          )
-        return c_pred, radii
+        return radii
 
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, n: int, n_subfeatures: list, k_per_instance: int,
                 alpha: float,
@@ -98,9 +101,9 @@ class HashSmooth4MalScan(HashSmooth):
         # with torch.no_grad():
         # if isinstance(x, np.ndarray):
         #     x = torch.from_numpy(x).to(device)
-        counts = self.sample_lsh_funcs_a_point(x, adj_size, n, self.base_classifier.batch_size, n_subfeatures,
-                                               k_per_instance,
-                                               top_k, x_sensitive_dix, device, verbose)
+        counts, _1 = self.sample_lsh_funcs_a_point(x, adj_size, n, self.base_classifier.batch_size, n_subfeatures,
+                                                   k_per_instance,
+                                                   top_k, x_sensitive_dix, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -159,4 +162,4 @@ class HashSmooth4MalScan(HashSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
-        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes)
+        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes), k_subhashcodes

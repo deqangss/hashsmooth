@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import argparse
 import os
+import time
+import logging
 import warnings
 import sys
 import fileinput
@@ -19,6 +21,14 @@ try:
     basestring
 except Exception:
     basestring = str
+
+logging.basicConfig(level=logging.INFO,
+                    filename=os.path.join(os.getcwd(), time.strftime("%Y%m%d-%H%M%S") + ".log"),
+                    filemode="w",
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
+                    datefmt='%Y/%m/%d %H:%M:%S')
+ErrorHandler = logging.StreamHandler()
+ErrorHandler.setFormatter(logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s'))
 
 
 def dump_pickle(data, path):

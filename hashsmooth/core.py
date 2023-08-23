@@ -266,7 +266,6 @@ class HashSmooth(BasicClassifier):
         for n_subfeature in n_subfeatures:
             ratio = float(n_subfeature) / float(n_features)
             n_subhash = math.ceil(n_hashcodes * ratio)
-            print("test: ", n_subhash)
             n_subhash = n_subhash if n_subhash >= 2 else 2
             n_subhashcodes.append(n_subhash)
         return n_subhashcodes
@@ -281,7 +280,8 @@ class HashSmooth(BasicClassifier):
         threshold = (probas - second_probas) / 2.
         bound_mesh, radii_mesh = self._get_radius_grid(probas, None, k_subhashcodes, max_radii, n_grids)
         # select the radius corresponding to the estimated bound smaller than the threshold
-        pos_sel = np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold)
+        pos_sel = np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold).squeeze()
+        pos_sel = np.maximum(0, pos_sel - 1)
         radii = radii_mesh[range(batch_size), pos_sel]
         return radii
 
@@ -307,15 +307,14 @@ class HashSmooth(BasicClassifier):
                                               n_grid=n_grids[i]
                                               )
             max_radii_calc.append(max_radius)
-
         regions = {}
         radii_splitting = []
         if len(max_radii_calc) == 1:
             radii_splitting.append(
                 np.linspace(0, max_radii_calc[0],
                             n_grids[0] + 1))  # int(round(max_radii_calc[0] * self.n_subfeatures[0])) + 1)
-        elif not len(max_radii_calc) <= 1:
-            # position product
+        elif not len(max_radii_calc) <= 1: # for hybrid of hash functions
+            # position product,
             for i, max_r in enumerate(max_radii_calc):
                 radii_splitting.append(
                     np.linspace(0, max_r, n_grids[i] + 1))  # int(round(max_r * self.n_subfeatures[i])) + 1)
@@ -329,15 +328,16 @@ class HashSmooth(BasicClassifier):
         shape = [len(e) for e in radii_splitting]
         radii4bounds = np.zeros([len(probas)] + shape)
         bounds4radii = np.zeros([len(probas)] + shape, dtype=tuple)
+        idx_range = np.arange(len(probas))
         for _radii, region in regions.items():
             idx_folded = radii_mesh.index(_radii)
             idx = get_position(idx_folded, shape)
             if np.sum(_radii) == 0:
-                radii4bounds[idx] = 0.
-                bounds4radii[idx] = _radii
+                radii4bounds[idx_range, idx] = 0.
+                bounds4radii[idx_range, idx] = _radii
             else:
-                radii4bounds[idx] = self._calc_bound_batch(regions=region, confidence_ests=probas)
-                bounds4radii[idx] = _radii
+                radii4bounds[idx_range, idx] = self._calc_bound_batch(regions=region, confidence_ests=probas)
+                bounds4radii[idx_range, idx] = _radii
         return radii4bounds, bounds4radii
 
     def _get_max_radius(self, max_proba, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
@@ -361,8 +361,7 @@ class HashSmooth(BasicClassifier):
                     break
                 lower_idx = curr_idx
             else:
-                upper_dix = curr_idx
-
+                upper_idx = curr_idx
         if abs(radius - max_radius) <= max_radius / n_grid:
             return self._get_max_radius(max_proba, k_hashcode, max_radius, 2 * max_radius, n_grid)
         else:
@@ -377,7 +376,7 @@ class HashSmooth(BasicClassifier):
         """
         if isinstance(k_hashcodes, int):
             k_hashcodes = [k_hashcodes]
-        if isinstance(curr_radii, int):
+        if isinstance(curr_radii, (int, float)):
             curr_radii = [curr_radii]
         assert np.all(np.array(k_hashcodes) >= 0)
         assert np.all(np.array(curr_radii) >= 0)
@@ -396,14 +395,13 @@ class HashSmooth(BasicClassifier):
             curr_p_k = []
             for i, r in enumerate(curr_radii):
                 curr_p_k.append(self.randomized_trans[i].get_collision_prob(r))
-
-            probas = np.ones((total_K,), dtype=float) * -1
+            probas = np.ones((total_K,), dtype=float) * (-1)
             cursor = 0
             for i, n in enumerate(k_hashcodes):
                 probas[cursor: cursor + n] = curr_p_k[i]
                 cursor += n
             pb = PoiBin(probas)
-            px_prime = pb.pmf
+            px_prime = pb.pmf[::-1]
             prob_diff = px - px_prime
             return np.column_stack((px, px_prime, prob_diff))
 
@@ -417,23 +415,24 @@ class HashSmooth(BasicClassifier):
         """
         assert regions.shape[1] == 3
         assert 0. <= confidence_est <= 1.
-        # sort the regions
-        sorted_regions = sorted(
-            list(regions), key=lambda a: a[2], reverse=True)
-        # we utilize the dual result
-        if duality:
-            return confidence_est * (1. - sorted_regions[0][1] / sorted_regions[0][0])
-        else:
-            p_clean, p_adver = 0., 0.
-            for i, (px, px_prime, _) in enumerate(sorted_regions):
-                if p_clean + px >= confidence_est:
-                    p_clean_ast = px
-                    p_adver_ast = px_prime
-                    break
-                else:
-                    p_clean += px
-                    p_adver += px_prime
-            return (confidence_est - p_adver) * (1 - (p_adver_ast / p_clean_ast))
+        with gmpy2.context(precision=1000):
+            # sort the regions
+            sorted_regions = sorted(
+                list(regions), key=lambda a: a[2], reverse=True)
+            # we utilize the dual result
+            if duality:
+                return confidence_est * (1. - sorted_regions[0][1] / sorted_regions[0][0])
+            else:
+                p_clean, p_adver = 0., 0.
+                for i, (px, px_prime, _) in enumerate(sorted_regions):
+                    if p_clean + px >= confidence_est:
+                        p_clean_ast = px
+                        p_adver_ast = px_prime
+                        break
+                    else:
+                        p_clean += px
+                        p_adver += px_prime
+                return (confidence_est - p_adver) * (1 - (p_adver_ast / p_clean_ast))
 
     def _calc_bound_batch(self, regions: np.ndarray, confidence_ests: np.ndarray, duality=True, is_sort=True):
         """

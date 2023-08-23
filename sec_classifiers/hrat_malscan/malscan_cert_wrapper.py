@@ -7,7 +7,6 @@ import time
 import os
 import warnings
 import argparse
-import logging
 from tqdm import tqdm
 import multiprocessing
 import functools
@@ -72,18 +71,12 @@ cmd_md.add_argument('--model', type=str, default='malscan',
                     choices=['malscan', 'random_malscan', 'hash_malscan'],
                     help="model type, choose from 'malscan', 'random_malscan', 'hash_malscan'\n")
 
+logger = utils.logging.getLogger("Certification")
 
 def _main():
     args = cmd_md.parse_args()
     if not os.path.exists(args.save_path):
         utils.mkdir(args.save_path)
-    logging.basicConfig(level=logging.INFO,
-                        filename=os.path.join(args.save_path, time.strftime("%Y%m%d-%H%M%S") + ".log"),
-                        filemode="w",
-                        format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
-                        datefmt='%Y/%m/%d %H:%M:%S')
-    ErrorHandler = logging.StreamHandler()
-    ErrorHandler.setFormatter(logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s'))
 
     if args.cuda:
         assert torch.cuda.is_available(), "No GPU device."
@@ -112,7 +105,7 @@ def _main():
     train_y = torch.from_numpy(train_y).to(device)
     if args.model == 'malscan':
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
-        # certify_func = malscan.certify
+        certify_func = malscan.certify
     elif args.model == 'hash_malscan':
         input_transfermor = JaccardLSHTransformer(sub_k=0,  # initialize this value afterwards
                                                   null_value=0,
@@ -131,12 +124,12 @@ def _main():
                                      hash_methods=[input_transfermor],
                                      n_subfeatures=[],
                                      k_hashcode=0,
+                                     max_k=args.max_k,
                                      max_radii=[],
                                      n_grids=[],
                                      default_mode=True
                                      )
-        # certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
-        #                                  k_per_instance=args.sub_k_ratio)
+        certify_func = functools.partial(malscan.certify, max_radii=[0.1], n_grids=[100])
     elif args.model == 'random_malscan':
         input_transfermor = RandomTransformer(keep_per_image=0,
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
@@ -156,8 +149,7 @@ def _main():
                                        max_k=args.max_k,
                                        default_mode=True
                                        )
-        # certify_func = functools.partial(malscan.certify, n=args.n_sampling, alpha=args.alpha,
-        #                                  k_per_instance=args.sub_k_ratio)
+        certify_func = malscan.certify
     else:
         raise ValueError("Choose either of 'malscan', 'random_smooth', and 'hash_malscan'.\n")
 
@@ -192,7 +184,7 @@ def _main():
     print("==== loading test constraints ====")
     test_constraints = [test_dict[sha]["constraints"] for sha in tqdm(attack_id)]
 
-    logging.info("sub k ratio {}, number of selection {}, number of estimation {}, confidence level {}.".format(
+    logger.info("sub k ratio {}, number of selection {}, number of estimation {}, confidence level {}.".format(
         args.sub_k_ratio,
         args.n_sampling,
         args.n_estimation,
@@ -208,18 +200,17 @@ def _main():
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
 
         if test_mal_triple is None:
-            logging.info("{}: preprocessing failed.".format(test_mal_id))
+            logger.info("{}: preprocessing failed.".format(test_mal_id))
             continue
         start_time = time.time()
-        radius = malscan.certify(test_mal_triple, label=0, n_selection=args.n_sampling, n_estimation=args.n_estimation,
-                                 k_per_instance=args.sub_k_ratio, alpha=args.alpha, adj_size=test_mal_adj.shape[0],
-                                 top_k=1,
-                                 x_sensitive_dix=test_sensi_idx,
-                                 device=device)
+        radius = certify_func(test_mal_triple, label=0, n_selection=args.n_sampling, n_estimation=args.n_estimation,
+                              k_per_instance=args.sub_k_ratio, alpha=args.alpha, adj_size=test_mal_adj.shape[0],
+                              top_k=1,
+                              x_sensitive_dix=test_sensi_idx,
+                              device=device)
         end_time = time.time()
-        print("Time elaspsed: ", end_time - start_time)
-        logging.info(
-            "{}: robust radius {}".format(test_mal_id, radius))  # Attack failed
+        print("\nTime elaspsed: ", end_time - start_time)
+        logger.info("{}: robust radius {}".format(test_mal_id, radius.squeeze()))  # Attack failed
 
 
 def get_feature_rpst(file_pkl):
@@ -260,7 +251,7 @@ def get_feature_rpst_tran(file_pkl, tran_func, k_ratio):
         for idx, rpst in enumerate(pool.imap(_parallel_tran_featurization, pargs)):
             feature_x[idx] = rpst[0]
             sub_k.append(rpst[1])
-    logging.info("The mean number of selected elements is {}.".format(np.mean(sub_k)))
+    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k)))
     return feature_x
 
     # feature_x = []
@@ -299,7 +290,7 @@ def get_feature_rpst_rand(file_pkl, tran_func, ratio, device):
         # triple_list.append(triple_torch.cpu().numpy())
         feature_x.append(MalScan.get_extra_feature(triple_torch, node_sens_idx, adj_sp.shape[0], True, 'cpu').numpy())
         sub_k_list.append(k)
-    logging.info("The mean number of selected elements is {}.".format(np.mean(sub_k_list)))
+    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k_list)))
     return np.array(feature_x)
     # pargs = [(triple_list[i], feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list']) for i, sha256
     #          in
