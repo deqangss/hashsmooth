@@ -141,6 +141,7 @@ class HashSmooth4MalScan(HashSmooth):
             with torch.no_grad():
                 nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
                                                          n_subfeatures, k_subhashcodes).squeeze()
+                print("Debug:", nonzero_idx_sel)
                 malscan_features = self.base_classifier.get_extra_feature_sp(x[nonzero_idx_sel],
                                                                              x_sensitive_dix,
                                                                              adj_size,
