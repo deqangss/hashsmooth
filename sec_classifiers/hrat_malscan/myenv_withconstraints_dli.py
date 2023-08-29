@@ -74,7 +74,7 @@ class CFGModifierEnvConstraints(object):
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
-        start_time = time.time()
+        assert not np.any(self.cur_graph[:, 0] == self.cur_graph[:, 1]), "Failed."
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
@@ -88,8 +88,12 @@ class CFGModifierEnvConstraints(object):
             self.cur_graph, node_info = self.del_node(self.cur_graph)
         else:
             raise ValueError("No action {}.\n".format(action))
-        total_time = time.time() - start_time
-        print("cost time 1: secondes {:.4}.".format(total_time))
+
+        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        if np.any(check_flag):
+            print(self.cur_graph[check_flag])
+            exit(-1)
+
         with torch.no_grad():
             self.state = MalScan.get_extra_feature(self.cur_graph,
                                                    self.sen_api_idx,
