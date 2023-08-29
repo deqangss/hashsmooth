@@ -117,6 +117,13 @@ class HashSmooth4MalScan(HashSmooth):
                                  top_k=1, x_sensitive_dix=None, device='cpu', verbose=False):
         assert n > 0
         self.base_classifier.eval()
+
+        # debug:
+        check_flag = x[:, 0] == x[:, 1]
+        if np.any(check_flag):
+            print(x[check_flag])
+            exit(-1)
+
         values = x[:, 2].astype(int)
         nonzero_idx = values.nonzero()[0].copy()
 
@@ -141,7 +148,6 @@ class HashSmooth4MalScan(HashSmooth):
             with torch.no_grad():
                 nonzero_idx_sel = self.transform_wrapper(np.tile(nonzero_idx.copy(), (current_batch_size, 1)),
                                                          n_subfeatures, k_subhashcodes).squeeze()
-                print("Debug:", nonzero_idx_sel)
                 malscan_features = self.base_classifier.get_extra_feature_sp(x[nonzero_idx_sel],
                                                                              x_sensitive_dix,
                                                                              adj_size,
