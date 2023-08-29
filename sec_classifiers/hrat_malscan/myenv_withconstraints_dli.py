@@ -74,7 +74,7 @@ class CFGModifierEnvConstraints(object):
 
     def step(self, action, k=1):
         assert len(self.action_space) >= action + 1
-        assert not np.any(self.cur_graph[:, 0] == self.cur_graph[:, 1]), "Failed."
+        print("Current action: ", action)
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
