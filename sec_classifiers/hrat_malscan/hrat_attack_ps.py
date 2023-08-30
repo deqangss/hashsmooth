@@ -115,7 +115,7 @@ def _main():
         train_x_tran_path = os.path.join(feature_saving_path, "hash_train_x_{}.npy".format(args.sub_k_ratio))
         if not os.path.exists(train_x_tran_path):
             train_pkl, _1, _2 = dataset.load()
-            train_x_tran = get_feature_rpst_tran(train_pkl, input_transfermor.transform, args.sub_k_ratio)
+            train_x_tran = get_feature_rpst_tran(train_pkl, input_transfermor.transform, args.sub_k_ratio,  args.max_k)
             np.save(train_x_tran_path, train_x_tran)
         else:
             train_x_tran = np.load(train_x_tran_path)
@@ -140,7 +140,7 @@ def _main():
         train_x_tran_path = os.path.join(feature_saving_path, "random_train_x_{}.npy".format(args.sub_k_ratio))
         if not os.path.exists(train_x_tran_path):
             train_pkl, _1, _2 = dataset.load()
-            train_x_tran = get_feature_rpst_rand(train_pkl, input_transfermor.transform, args.sub_k_ratio, device)
+            train_x_tran = get_feature_rpst_rand(train_pkl, input_transfermor.transform, args.sub_k_ratio, args.max_k, device)
             np.save(train_x_tran_path, train_x_tran)
         else:
             train_x_tran = np.load(train_x_tran_path)
@@ -215,7 +215,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(20, len(attack_id))):
+    for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("\nAttacking: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
@@ -369,9 +369,9 @@ def get_feature_rpst(file_pkl):
     # return np.array(feature_x), label
 
 
-def get_feature_rpst_tran(file_pkl, tran_func, k_ratio):
+def get_feature_rpst_tran(file_pkl, tran_func, k_ratio, max_k):
     feature_dict, _1, sha256s = file_pkl
-    pargs = [(tran_func, feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list'], k_ratio)
+    pargs = [(tran_func, feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list'], k_ratio, max_k)
              for sha256
              in
              sha256s]
@@ -403,7 +403,7 @@ def get_feature_rpst_tran(file_pkl, tran_func, k_ratio):
     # return np.array(feature_x)
 
 
-def get_feature_rpst_rand(file_pkl, tran_func, ratio, device):
+def get_feature_rpst_rand(file_pkl, tran_func, ratio, max_k, device):
     feature_dict, _1, sha256s = file_pkl
     triple_list = []
     sub_k_list = []
@@ -414,7 +414,7 @@ def get_feature_rpst_rand(file_pkl, tran_func, ratio, device):
         node_sens_idx = feature_dict[sha256]['sensitive_api_list']
         triple_torch = torch.from_numpy(trans2triple(adj_sp)).float().to(device)
         # train_x_v = torch.from_numpy(triple[:, 2].copy()).float().to(device)
-        k = int(triple_torch.shape[0] * ratio)
+        k = min(int(triple_torch.shape[0] * ratio), max_k)
         k = k if k >= 2 else 2
         train_x_v_tran = tran_func(triple_torch[:, 2:].T, k)
         # print(train_x_v.shape, train_x_v_tran.shape)
@@ -455,11 +455,11 @@ def _parallel_featurization(args):
 
 
 def _parallel_tran_featurization(args):
-    tran_func, adj_sp, node_sens_idx, k_ratio = args
+    tran_func, adj_sp, node_sens_idx, k_ratio, max_k = args
     triple = trans2triple(adj_sp)
     train_x_v = triple[:, 2].copy()
     nonzero_idx = train_x_v.nonzero()[0]
-    k = int(len(nonzero_idx) * k_ratio)
+    k = min(int(len(nonzero_idx) * k_ratio), max_k)
     k = k if k >= 2 else 2
     nonzero_idx_sel = tran_func(nonzero_idx[None, ...].copy(), k)
     triple[:, 2] = 0.
