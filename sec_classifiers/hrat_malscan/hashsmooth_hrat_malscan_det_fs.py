@@ -117,7 +117,6 @@ class HashSmooth4MalScan(HashSmooth):
                                                                              adj_size,
                                                                              True,
                                                                              device)
-
             counts, _1 = self.sample_lsh_funcs_a_point(malscan_feature_vec, n, self.base_classifier.batch_size,
                                                        n_subfeatures,
                                                        k_per_instance,

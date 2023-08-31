@@ -114,7 +114,7 @@ class MalScan(BasicClassifier):
         # if not adj_dense.is_sparse:
         # adj_dense = torch.squeeze(adj_dense)
         graph = adj_dense.permute([0, 2, 1])
-        bs = graph.shape[0]
+        # bs = graph.shape[0]
         # b = torch.ones((bs, adj_size, 1), device=graph.device) * float(beta)
         # A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
         # L = torch.linalg.solve(A, b).squeeze(-1)
@@ -133,7 +133,7 @@ class MalScan(BasicClassifier):
         ii = np.where(x_sensitive_dix != -1)
         idx_matrix[ii[0], x_sensitive_dix[ii]] = 1.
         katz_centrality = (idx_matrix @ centrality[..., None].type_as(idx_matrix)).squeeze(-1)
-        return katz_centrality
+        return katz_centrality.clamp(min=0)  # suppress the negative values
 
     @staticmethod
     def get_extra_feature_sp(x_batch: (np.ndarray, torch.Tensor),

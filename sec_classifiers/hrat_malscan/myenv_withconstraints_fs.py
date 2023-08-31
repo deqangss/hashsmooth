@@ -76,9 +76,11 @@ class CFGModifierEnvConstraints(object):
             self.X_train = X_train
         else:
             raise ValueError
+        self.top_k = 1
 
-    def step(self, action, k=1):
+    def step(self, action, top_k=1):
         assert len(self.action_space) >= action + 1
+        self.top_k = top_k
         print("Current action: ", action)
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
@@ -107,7 +109,7 @@ class CFGModifierEnvConstraints(object):
                                                    device=self.device)
             cur_label = self.predict_function(x=self.state,
                                               adj_size=self.adj_size,
-                                              top_k=k,
+                                              top_k=self.top_k,
                                               device=self.device)
         done = (cur_label == self.tar_label)
 
@@ -531,7 +533,7 @@ class CFGModifierEnvConstraints(object):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
-                [torch.sum((feature.float() - torch.squeeze(x.to(self.device))).pow(2), 1) for x in self.X_train])
+                [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
             loss = torch.sum(self.w.squeeze() * (torch.sigmoid(self.steep * dist)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
@@ -542,13 +544,12 @@ class CFGModifierEnvConstraints(object):
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
-
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 dist = torch.cat(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(self.device)).pow(2), -1) for x in self.X_train])
+                    [torch.sum((feature_tran[:, None, :] - x[None, ...]).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
@@ -565,7 +566,7 @@ class CFGModifierEnvConstraints(object):
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 dist = torch.cat(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(self.device)).pow(2), -1) for x in
+                    [torch.sum((feature_tran[:, None, :] - x[None, ...]).pow(2), -1) for x in
                      self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))

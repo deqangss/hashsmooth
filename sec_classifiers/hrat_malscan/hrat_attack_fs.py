@@ -39,6 +39,8 @@ cmd_md.add_argument('--lr', type=float, default=0.01,
                     help='The learning rate of DQN.')
 cmd_md.add_argument('--steep', type=float, default=1.,
                     help='The hyper-parameter of surrogate KNN.')
+cmd_md.add_argument('--knn_num', type=int, default=10,
+                    help='The neighors of KNN.')
 cmd_md.add_argument('--max_node', type=int, default=5000,
                     help='The maximum number of nodes for saving RAM')
 cmd_md.add_argument('--seed', type=int, default=23456,
@@ -101,8 +103,6 @@ def _main():
 
     if args.model == 'malscan':
         train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-        benign_x_producer = torch.from_numpy(train_x_producer[
-                                                 train_y == 1])  # waging attacks via nearest neighbour algorithms. beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
         train_y = torch.from_numpy(train_y).to(device)
         input_transfermor = None
         malscan = MalScan(train_x_producer, train_y, args.batch_size)  # basic classifier
@@ -113,8 +113,6 @@ def _main():
                                                                null_value=0,
                                                                seed=args.seed)
         train_x_train = get_rpst_hashtran(train_x, input_transfermor, args.batch_size, device)
-        benign_x_producer = torch.from_numpy(train_x_train[
-                                                 train_y == 1])  # waging attacks via nearest neighbour algorithms. beign_x_producer = dataset.get_dataloader(train_x[train_y == 1])
         train_x_producer = torch.from_numpy(train_x_train)
         train_y = torch.from_numpy(train_y).to(device)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
@@ -134,7 +132,6 @@ def _main():
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
         train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
-        benign_x_producer = torch.from_numpy(train_x_train[train_y == 1])
         train_x_producer = torch.from_numpy(train_x_train)
         train_y = torch.from_numpy(train_y).to(device)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
@@ -207,7 +204,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(0, len(attack_id))):
+    for idx in tqdm(range(1, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("\nAttacking: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
@@ -215,27 +212,46 @@ def _main():
         triple_path = os.path.join(args.save_path, 'triple_set')
         utils.mkdir(triple_path)
         test_mal_triple = trans2triple_rw(test_mal_adj, test_mal_id, triple_path, overwrite=False)
+        test_mal_representation = MalScan.get_extra_feature(test_mal_triple,
+                                                            test_sensi_idx,
+                                                            adj_size=test_mal_adj.shape[0],
+                                                            is_sp2dense=True,
+                                                            device=device)
         if test_mal_triple is None:
             logger.info("{}: preprocessing failed.".format(test_mal_id))
             continue
 
-        pred_y = predict_func(x=test_mal_triple,
+        pred_y = predict_func(x=test_mal_representation,
                               adj_size=test_mal_adj.shape[0],
-                              x_sensitive_dix=test_sensi_idx,
+                              x_sensitive_dix=None,
+                              top_k=1,
                               device=device)
         if pred_y == 1:
             print('==== data cannot be correctly classified as malware ====\t')
             logger.info("{}: predict as {}, Attack {}.".format(test_mal_id, pred_y, -1))
             continue
 
-        print('\t ==== get the nearest neighbors for optimization ====')
-        if not args.is_benign:
-            weight = (2 * (train_y != 0) - 1).float()[None, :]
-            X_train = train_x_producer
-        else:
-            # caution: benign label is 1
-            weight = torch.ones((1, (train_y == 1).sum().to(torch.int)), dtype=float, device=device)
-            X_train = benign_x_producer
+        print('\t ==== select the nearest neighbors for optimization ====')
+        X_train_list = torch.split(train_x_producer, args.batch_size)
+        dist = torch.cat(
+            [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
+             X_train_list])
+
+        ben_dist = dist[train_y == 1]
+        ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
+        ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
+        ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
+
+        mal_dist = dist[train_y == 0]
+        mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
+        mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
+        mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
+
+        train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
+        train_y_s[:len(ben_train_x)] = 1
+
+        weight = (2 * (train_y_s != 0) - 1).float()[None, :]
+        X_train_sel = torch.vstack([ben_train_x, mal_train_x])
 
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                  tar_label=1,
@@ -248,7 +264,7 @@ def _main():
                                                                  predict_function=predict_func,
                                                                  transformer_obj=input_transfermor,
                                                                  n_sampling=args.n_sampling,
-                                                                 X_train=X_train,
+                                                                 X_train=X_train_sel,
                                                                  device=device,
                                                                  batch_size=args.batch_size
                                                                  )
