@@ -20,7 +20,7 @@ from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
 from sec_classifiers.hrat_malscan.hashsmooth_hrat_malscan_det import HashSmooth4MalScan
 from tools import utils
 from sec_classifiers.hrat_malscan.Utils import trans2triple_rw, trans2triple
-from sec_classifiers.hrat_malscan import myenv_withconstraints_dli
+from sec_classifiers.hrat_malscan import myenv_withconstraints_ps
 from sec_classifiers.hrat_malscan.model import DQN
 from sec_classifiers.dataset import Dataset
 from sec_classifiers.hrat_malscan.randomsmooth_hrat_malscan_det import RandomTransformer, RandomSmooth4MalScan

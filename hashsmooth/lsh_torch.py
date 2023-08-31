@@ -32,10 +32,11 @@ class LSHTransformerTorch(ABC):
         self.random_generator_torch.manual_seed(self.seed)
 
     @abstractmethod
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
+    def transform(self, ipt: torch.Tensor, sub_k_tmp=0) -> torch.Tensor:
         """
         lsh transformation for a data point
         :param ipt: an input data, e.g., a set of features or a representation vector
+        :param sub_k_tmp: an alternative ways to initialize the number of selected elements
         :return: the transformed input that has the same feature type as that of the input
         """
         raise NotImplementedError
@@ -56,10 +57,10 @@ class JaccardLSHTransformerTorch(LSHTransformerTorch):
         super(JaccardLSHTransformerTorch, self).__init__(sub_k, null_value, seed)
         self.lsh_np = JaccardLSHTransformer(sub_k, null_value, seed)
 
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
+    def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
-            ipt_tran = self.lsh_np.transform(ipt_np)
+            ipt_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
             elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
             elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
             null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
@@ -83,16 +84,21 @@ class WeightedJaccardLSHTransformerTorch(LSHTransformerTorch):
                                                     seed
                                                     )
 
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
+    def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
-            ipt_tran = self.lsh_np.transform(ipt_np)
-            elem_indicator = (ipt_tran != self.null_value)
-            weights = np.copy(elem_indicator)
-            weights[elem_indicator] = ipt_tran[elem_indicator] / ipt_np[elem_indicator]
+            # ipt_trans = np.empty_like(ipt_np)
+            # for i, ipt_array in enumerate(ipt_np):
+            #     ipt_trans[i] = self.lsh_np.transform(ipt_array.reshape([1, -1]), sub_k_tmp)
+            ipt_trans = self.lsh_np.transform(ipt_np, sub_k_tmp)
+
+            elem_indicator = (ipt_trans != self.null_value)
+            weights = np.copy(elem_indicator).astype(float)
+            weights[elem_indicator] = ipt_trans[elem_indicator] / ipt_np[elem_indicator]
             weights_torch = torch.from_numpy(weights).to(device=ipt.device, dtype=ipt.dtype)
             null_value_torch = torch.ones_like(ipt, device=ipt.device) * self.null_value
             null_value_torch[torch.from_numpy(elem_indicator)] = 0.
+
         return ipt * weights_torch + null_value_torch
 
     def get_collision_prob(self, distance):
@@ -113,10 +119,10 @@ class EditLSHTransformerTorch(LSHTransformerTorch):
                                          seed
                                          )
 
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
+    def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
-            ipt_tran = self.lsh_np.transform(ipt_np)
+            ipt_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
             elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
             elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
             null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
@@ -142,10 +148,10 @@ class PStableLSHTransformerTorch(LSHTransformerTorch):
         self.scaler_minmax = (0., 0.)
         self.decoder = get_simple_fc_model(self.sub_k, self.dimension)
 
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
-        return self._inverse_map(self._map(ipt))
+    def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
+        return self._inverse_map(self._map(ipt, sub_k_tmp))
 
-    def _map(self, ipt: torch.Tensor) -> torch.Tensor:
+    def _map(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         assert len(ipt.shape) == 2 and ipt.shape[1] == self.dimension
         a, b, self.basic_func = self._init_permutations()
         a = a.to(dtype=ipt.dtype, device=ipt.device())
@@ -210,10 +216,10 @@ class HammingLSHTransformerTorch(LSHTransformerTorch):
         super(HammingLSHTransformerTorch, self).__init__(sub_k, null_value, seed)
         self.lsh_np = HammingLSHTransformer(dimension, sub_k, null_value, seed)
 
-    def transform(self, ipt: torch.Tensor) -> torch.Tensor:
+    def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
-            ipt_tran = self.lsh_np.transform(ipt_np)
+            ipt_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
             elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
             elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
             null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value

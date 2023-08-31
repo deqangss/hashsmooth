@@ -25,8 +25,8 @@ class RandomTransformer(object):
         """
         self.keep_per_image = keep_per_image if keep_per_image > 0 else self.keep_per_image
         flat = batch.reshape(batch.shape[0], -1)
-        out_c1 = torch.zeros(flat.shape).cuda()
-        out_c2 = torch.zeros(flat.shape).cuda()
+        out_c1 = torch.zeros(flat.shape, dtype=flat.dtype).cuda()
+        out_c2 = torch.zeros(flat.shape, dtype=flat.dtype).cuda()
 
         if (self.reuse_noise):
             # ones = torch.ones(flat.shape[1]).cuda()
@@ -183,10 +183,20 @@ class RandomSmooth4MalScan(RandomSmooth):
             else:
                 return radius
 
-    def predict(self, x: np.ndarray, adj_size: int, n: int, k_per_instance: int, alpha: float,
+    def predict(self, x: torch.Tensor, adj_size: int, n: int, k_per_instance: int, alpha: float,
                 top_k=1, x_sensitive_dix=None, device='cpu', verbose=False):
-        counts, _1 = self.sample_funcs(x, adj_size, n, self.base_classifier.batch_size, k_per_instance,
-                                       top_k, x_sensitive_dix, device, verbose)
+        with torch.no_grad():
+            if x_sensitive_dix is None:
+                malscan_feature_vec = x.to(device)
+            else:
+                # get feature representations
+                malscan_feature_vec = self.base_classifier.get_extra_feature(x,
+                                                                             x_sensitive_dix,
+                                                                             adj_size,
+                                                                             True,
+                                                                             device).float()
+        counts, _1 = self.sample_funcs(malscan_feature_vec, n, self.base_classifier.batch_size, k_per_instance,
+                                       top_k, device, verbose)
         # prediction
         top2 = counts.argsort()[::-1][:2]
         count1 = counts[top2[0]]
@@ -196,56 +206,37 @@ class RandomSmooth4MalScan(RandomSmooth):
         else:
             return top2[0]
 
-    def sample_funcs(self, x: np.ndarray, adj_size: int, n, batch_size=64, k_per_instance=0,
-                     top_k=1, x_sensitive_dix=None, device='cpu', verbose=False):
+    def sample_funcs(self, x: torch.Tensor, n, batch_size=64, k_per_instance=0,
+                     top_k=1, device='cpu', verbose=False):
         assert n > 0
         self.base_classifier.eval()
-        values = x[:, 2].astype(float)
         if 0 < k_per_instance <= 1:
-            k_per_instance = min(math.ceil(len(values) * k_per_instance), self.max_k)
+            k_per_instance = min(math.ceil(len(x) * k_per_instance), self.max_k)
         preds = []
-
         for idx in range(n // batch_size + 1):
             current_batch_size = min(batch_size, n)
             n -= current_batch_size
             if current_batch_size <= 0:
                 break
+
             with torch.no_grad():
-                values_batch = torch.from_numpy(np.tile(values.copy(), (current_batch_size, 1))).float().to(device)
-                values_tran = self.transform_method.transform(values_batch, k_per_instance).squeeze()
-                malscan_features = self.get_extra_feature2(x[:, :2], values_tran, x_sensitive_dix, adj_size, device)
+                malscan_features = self.transform_method.transform(torch.tile(x[None, :], (current_batch_size, 1)),
+                                                                   k_per_instance).squeeze()
                 pred_batch = self.base_classifier.predict(malscan_features,
-                                                          adj_size,
+                                                          None,
                                                           top_k,
                                                           x_sensitive_dix=None,
                                                           device=device,
                                                           verbose=verbose)
-                # x[:, 2] = 0
-                # x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
-                # pred = self.base_classifier.predict(x,
-                #                                     adj_size,
-                #                                     top_k,
-                #                                     x_sensitive_dix,
-                #                                     device,
-                #                                     verbose
-                #                                     )
-                # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
-                preds.append(pred_batch)
+            # x[:, 2] = 0
+            # x[:, 2][nonzero_idx_sel] = values[nonzero_idx_sel]
+            # pred = self.base_classifier.predict(x,
+            #                                     adj_size,
+            #                                     top_k,
+            #                                     x_sensitive_dix,
+            #                                     device,
+            #                                     verbose
+            #                                     )
+            # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
+            preds.append(pred_batch)
         return np.bincount(np.concatenate(preds).squeeze(), minlength=self.number_of_classes), k_per_instance
-
-    @staticmethod
-    def get_extra_feature2(x_position: np.ndarray,
-                           x_value: (np.ndarray, torch.Tensor),
-                           x_sensitive_dix: np.ndarray,
-                           adj_size: int,
-                           device='cpu'
-                           ) -> torch.Tensor:
-        adj_dense = torch.stack([torch.sparse_coo_tensor(x_position.T,
-                                                         x_v,
-                                                         size=(adj_size, adj_size)
-                                                         ).float().to(device).to_dense() for x_v in x_value])
-        # else:
-        #     adj_dense = x_batch if len(x_batch.shape) == 3 else x_batch[None, ...]
-        degree_fea = MalScan._degree_centrality(adj_dense, x_sensitive_dix, adj_size)
-        katz_fea = MalScan._katz_feature(adj_dense, x_sensitive_dix, adj_size)
-        return torch.cat([degree_fea, katz_fea], -1).squeeze()

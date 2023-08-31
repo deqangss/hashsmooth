@@ -205,6 +205,8 @@ class CFGModifierEnvConstraints(object):
             if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[0])] == -1 or zi[
                 -1] < 0:  # caller cannot be contained in constraints; -1为新constraints
                 flag = 1
+                if zi[-1] < 0:
+                    break
             # find functions that call target nodes
             ind_caller = np.where(graph[:, 0] == int(zi[0]))  # 应该是graph[:,1]吧
             caller_idx = graph[ind_caller, 0]
@@ -216,8 +218,6 @@ class CFGModifierEnvConstraints(object):
                     break
             if flag == 1:
                 continue
-            elif zi[-1] < 0:
-                break
             else:
                 tar_node = int(zi[0])
                 break
@@ -234,9 +234,9 @@ class CFGModifierEnvConstraints(object):
         # find edges from tar node
         tmp_ind_from = np.where(graph[:, 0] == tar_node)[0]
         edge_from_tar_node = graph[tmp_ind_from, :]
-        # edge_from_tar_node = np.squeeze(edge_from_tar_node)
-        # tmp_ind = np.where(edge_from_tar_node[:, 2] == 1)[0]
-        edge_from_tar_node = edge_from_tar_node[tmp_ind, :]
+        edge_from_tar_node = np.squeeze(edge_from_tar_node)
+        tmp_ind = np.where(edge_from_tar_node[:, 2] == 1)
+        edge_from_tar_node = np.squeeze(edge_from_tar_node[tmp_ind, :], axis=0)
 
         # print(edge_to_tar_node, edge_from_tar_node)
 
@@ -244,12 +244,12 @@ class CFGModifierEnvConstraints(object):
         if edge_from_tar_node.size != 0 and edge_to_tar_node.size != 0:
             # 对于所有调用了改节点的函数
             for zind_beg in edge_to_tar_node[:, 0]:
-                tmp_ind = np.where(graph[:, 0] == zind_beg)[0]
+                tmp_ind = np.where(graph[:, 0] == zind_beg)
                 tmp_ind = np.squeeze(tmp_ind)
-                edge_tmp = np.squeeze(graph[graph[:, 0] == zind_beg, :])
+                edge_tmp = np.squeeze(graph[tmp_ind, :])
                 # 对于所有该结点调用的结点
                 for zind_end in edge_from_tar_node[:, 1]:
-                    tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)[0]
+                    tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)
                     tmp_ind1 = np.squeeze(tmp_ind1)
                     if tmp_ind1.size != 0:
                         # edge = tmp_ind[tmp_ind1]
@@ -260,10 +260,11 @@ class CFGModifierEnvConstraints(object):
                         # graph.append([zind_beg, zind_end, 1])
                         graph = np.append(graph, np.array([zind_beg, zind_end, 1])[:, np.newaxis].transpose(), axis=0)
         # del nodes
-        tmp_ind_to = np.where(graph[:, 1] == tar_node)[0]
+        tmp_ind_to = np.where(graph[:, 1] == tar_node)
         graph = np.delete(graph, tmp_ind_to, axis=0)
-        tmp_ind_from = np.where(graph[:, 0] == tar_node)[0]
+        tmp_ind_from = np.where(graph[:, 0] == tar_node)
         graph = np.delete(graph, tmp_ind_from, axis=0)
+
         # graph[np.where(graph[:, 1] > tar_node), 1] -= 1
         # graph[np.where(graph[:, 0] > tar_node), 0] -= 1
 

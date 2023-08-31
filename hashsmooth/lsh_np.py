@@ -5,6 +5,7 @@ from ast import literal_eval
 import multiprocessing
 import collections
 import numpy as np
+from scipy.stats import gamma
 from scipy import sparse as sp_sparse
 from scipy import integrate
 from sklearn.preprocessing import MinMaxScaler
@@ -148,6 +149,7 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         """
         super(WeightedJaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
         self.number_of_words = number_of_words
+        self.type_tar = None
 
     def _map(self, ipt: np.ndarray, sub_k_tmp: int):
         """
@@ -163,9 +165,9 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         assert ipt.shape[1] == self.number_of_words, \
             f"Each instance has the dimension of input as {self.number_of_words}, but got {ipt.shape[1]}."
 
+        self.type_tar = ipt.dtype
         sp_ipt = sp_sparse.csr_matrix(ipt, dtype=np.float32, copy=True)
         sp_ipt.sort_indices()
-
         batch_size = sp_ipt.shape[0]
         batch_hash_codes = [None for _ in range(batch_size)]
 
@@ -174,17 +176,25 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
 
         # obtain permutations
         k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
-        rk, beta_k, ln_ck = self._init_permutations(k)
-        rk_c_merged = np.array(rk, copy=True)[:, c_idx]
-        betak_c_merged = np.array(beta_k, copy=True)[:, c_idx]
-        ln_ck_c_merged = np.array(ln_ck, copy=True)[:, c_idx]
-        log_data = np.log(sp_ipt[r_idx, c_idx].A1)
+
+        # rk, beta_k, ln_ck = self._init_permutations(k, batch_size)
+        # rk_c_merged = rk[:, r_idx, c_idx]
+        # betak_c_merged = beta_k[:, r_idx, c_idx]
+        # ln_ck_c_merged = ln_ck[:, r_idx, c_idx]
+        # for saving memory and time
+        rk, beta_k, ln_ck = self._init_permutations(k, batch_size, len(r_idx))
+        rk_c_merged = rk
+        betak_c_merged = beta_k
+        ln_ck_c_merged = ln_ck
+
+        log_data = np.log(ipt[r_idx, c_idx])  # log_data = np.log(sp_ipt[r_idx, c_idx].A1)
         log_data = np.vstack([log_data] * self.sub_k)  # sub_k x number_of_words
 
         # intermediates stated in the paper
         t = np.floor(log_data / rk_c_merged + betak_c_merged)  # sub_k x number_of_words
         ln_y = (t - betak_c_merged) * rk_c_merged
         ln_a = ln_ck_c_merged - ln_y - rk_c_merged
+
         # obtain the hash codes instance-wisely
         r_rear_idx = sp_ipt.indptr.tolist()[
                      1:]  # remove the head idx of first instance for facilitating the implementation
@@ -202,14 +212,24 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
             instance_argmin = np.argmin(instance_ln_a, axis=1)
             instance_k = instance_span[instance_argmin]
 
-            hash_codes = np.zeros((self.sub_k, 2), dtype=int)
+            hash_codes = np.zeros((self.sub_k, 2), dtype=self.type_tar)
             hash_codes[:, 0] = instance_k
             # We here make a difference from the paper (using y rather than t) because we need hash values
             # hash_codes[:, 1] = t[range(self.sub_k), instance_head_idx + instance_argmin]
-            hash_codes[:, 1] = np.ceil(np.exp(ln_y))[range(self.sub_k), instance_head_idx + instance_argmin]
-            batch_hash_codes[current_idx] = hash_codes
+            hash_codes[:, 1] = np.exp(ln_y)[range(self.sub_k), instance_head_idx + instance_argmin]
 
+            batch_hash_codes[current_idx] = hash_codes
             instance_head_idx = instance_next_idx
+        batch_hash_codes = np.array(batch_hash_codes)
+
+        # # batchize for a sample
+        # batch_ln_a = ln_a.reshape([k, batch_size, -1])
+        # batch_argmin = np.argmin(batch_ln_a, axis=-1).transpose([1, 0])  # shape: batch_size x k
+        # batch_c_idx = c_idx.reshape([batch_size, -1])
+        # batch_k = batch_c_idx[np.arange(batch_size)[:, None], batch_argmin]  # shape: batch_size x k
+        # batch_y = np.exp(ln_y).reshape([k, batch_size, -1]).transpose([1, 0, 2])
+        # batch_v = batch_y[np.arange(batch_size)[:, None], np.arange(k)[None, :], batch_argmin]
+        # batch_hash_codes = np.stack([batch_k, batch_v], axis=-1)
 
         return batch_hash_codes
 
@@ -218,24 +238,33 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
         map the hash codes back to the input space
         :param hash_codes_mapped: a list of hash codes returned by the _amp function
         """
-        assert isinstance(hash_codes_mapped, list)
+        # assert isinstance(hash_codes_mapped, (np.ndarray, list))
         assert len(hash_codes_mapped) > 0
-        input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=int) * self.null_value
-        n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
-        with multiprocessing.Pool(n_proc) as pool:
-            for idx, input_transf in enumerate(pool.imap(_wrapper_w_jaccard, zip(hash_codes_mapped, input_rtn))):
-                input_rtn[idx] = input_transf
+        # input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=self.type_tar) * self.null_value
+        # n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
+        # with multiprocessing.Pool(n_proc) as pool:
+        #     for idx, input_transf in enumerate(pool.imap(_wrapper_w_jaccard, zip(hash_codes_mapped, input_rtn))):
+        #         input_rtn[idx] = input_transf
+
         # for i, hash_codes in enumerate(hash_codes_mapped):
-        #     b_input[i][hash_codes[:, 0]] = hash_codes[:, 1]
+        #     input_rtn[i][hash_codes[:, 0].astype(int)] = hash_codes[:, 1]
+        input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=self.type_tar) * self.null_value
+        batch_size, _k, _1 = hash_codes_mapped.shape
+        input_rtn[np.arange(batch_size)[:, None], hash_codes_mapped[..., 0].astype(int)] = hash_codes_mapped[..., 1]
         return input_rtn
 
-    def _init_permutations(self, sub_k):
+    def _init_permutations(self, sub_k: int, r: int, sp_elemnt_num=None):
         """
         generate random numbers for compositing hash functions
         """
-        rk = self.random_generator_np.gamma(2, 1, (sub_k, self.number_of_words)).astype(float)
-        ln_ck = np.log(self.random_generator_np.gamma(2, 1, (sub_k, self.number_of_words))).astype(float)
-        beta_k = self.random_generator_np.uniform(0, 1, (sub_k, self.number_of_words)).astype(float)
+        if sp_elemnt_num is None:
+            rk = self.random_generator_np.gamma(2., 1., (sub_k, r, self.number_of_words)).astype(float)
+            ln_ck = np.log(self.random_generator_np.gamma(2., 1., (sub_k, r, self.number_of_words))).astype(float)
+            beta_k = self.random_generator_np.uniform(0., 1., (sub_k, r, self.number_of_words)).astype(float)
+        else:
+            rk = self.random_generator_np.gamma(2., 1., (sub_k, sp_elemnt_num)).astype(float)
+            ln_ck = np.log(self.random_generator_np.gamma(2., 1., (sub_k, sp_elemnt_num))).astype(float)
+            beta_k = self.random_generator_np.uniform(0., 1., (sub_k, sp_elemnt_num)).astype(float)
         return rk, ln_ck, beta_k
 
     def get_collision_prob(self, distance):
@@ -245,7 +274,7 @@ class WeightedJaccardLSHTransformer(LSHTransformer):
 
 def _wrapper_w_jaccard(args):
     _codes, _transf = args[0], args[1]
-    _transf[_codes[:, 0]] = _codes[:, 1]
+    _transf[_codes[:, 0].astype(int)] = _codes[:, 1]
     return _transf
 
 
@@ -382,7 +411,7 @@ class PStableLSHTransformer(LSHTransformer):
         self.scaler = MinMaxScaler()
         self.decoder = get_simple_fc_model(self.sub_k, self.dimension)
 
-    def _map(self, ipt: np.ndarray) -> np.ndarray:
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int) -> np.ndarray:
         """
         conduct p-stable distribution based lsh transformations
         :param ipt: a batch of representation vector
@@ -514,7 +543,26 @@ def test_jaccard_dist():
         assert set(input_transf.flatten()).issubset(set(input_array.flatten()))
         i += 1
 
+def test_w_jaccard_lsh():
+    # each entity is the corresponding occurrence of words in vocabulary
+    input_array = np.random.uniform(0, 1, (1, 6))
+    input_array[0, 0] = 0.
+    input_array[0, 3] = 0.
+    input_array = np.tile(input_array, (5, 1))
+    w_jaccard_lsh = WeightedJaccardLSHTransformer(number_of_words=6,
+                                                  sub_k=3,
+                                                  null_value=0,
+                                                  seed=2345)
+
+    i = 1
+    while i <= 10:
+        input_transf = w_jaccard_lsh.transform(input_array)
+        assert (np.all(input_transf <= input_array))
+        assert (np.all(input_transf >= 0))
+        i += 1
+
 
 if __name__ == "__main__":
     # test_pstable_dist()
-    test_jaccard_dist()
+    # test_jaccard_dist()
+    test_w_jaccard_lsh()
