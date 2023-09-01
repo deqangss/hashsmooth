@@ -238,12 +238,24 @@ def _main():
              X_train_list])
 
         ben_dist = dist[train_y == 1]
-        ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
+        if args.knn_num > 1:
+            ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
+        else:
+            min_value, _ = torch.min(ben_dist, dim=-1, keepdim=True)
+            ben_knn_num = len(ben_dist.isclose(min_value).nonzero()) + 1
+            ben_knn_num = ben_knn_num if ben_knn_num <= len(ben_dist) else len(ben_dist)
         ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
         ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
 
         mal_dist = dist[train_y == 0]
-        mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
+        if args.knn_num > 1:
+            mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
+        else:
+            min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
+            mal_knn_num = len(mal_dist.isclose(min_value).nonzero()) + 1
+            mal_knn_num = mal_knn_num if mal_knn_num <= len(mal_dist) else len(mal_dist)
+        print(ben_knn_num, mal_knn_num, len(ben_dist), len(mal_dist))
+        continue
         mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
         mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
 
