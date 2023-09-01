@@ -282,8 +282,6 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
-
-                action_type = 3
                 start_time = time.time()
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 total_time = time.time() - start_time
