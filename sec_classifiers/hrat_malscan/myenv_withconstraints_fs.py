@@ -223,17 +223,17 @@ class CFGModifierEnvConstraints(object):
             print("zkf no nodes to delete")
             return graph, [-1, -1, -1]
         # find edges to tar node
-        tmp_ind_to = np.where(graph[:, 1] == tar_node)[0]
+        tmp_ind_to = np.where(graph[:, 1] == tar_node)
         edge_to_tar_node = graph[tmp_ind_to, :]
-        # edge_to_tar_node = np.squeeze(edge_to_tar_node)
-        tmp_ind = np.where(edge_to_tar_node[:, 2] == 1)[0]
-        edge_to_tar_node = edge_to_tar_node[tmp_ind, :]
+        edge_to_tar_node = np.squeeze(edge_to_tar_node)
+        tmp_ind = np.where(edge_to_tar_node[:, 2] != 0)
+        edge_to_tar_node = np.squeeze(edge_to_tar_node[tmp_ind, :], axis=0)
 
         # find edges from tar node
-        tmp_ind_from = np.where(graph[:, 0] == tar_node)[0]
+        tmp_ind_from = np.where(graph[:, 0] == tar_node)
         edge_from_tar_node = graph[tmp_ind_from, :]
         edge_from_tar_node = np.squeeze(edge_from_tar_node)
-        tmp_ind = np.where(edge_from_tar_node[:, 2] == 1)
+        tmp_ind = np.where(edge_from_tar_node[:, 2] != 0)
         edge_from_tar_node = np.squeeze(edge_from_tar_node[tmp_ind, :], axis=0)
 
         # print(edge_to_tar_node, edge_from_tar_node)
@@ -249,7 +249,7 @@ class CFGModifierEnvConstraints(object):
                 for zind_end in edge_from_tar_node[:, 1]:
                     tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)
                     tmp_ind1 = np.squeeze(tmp_ind1)
-                    if tmp_ind1.size != 0:
+                    if tmp_ind1.size != 0 and zind_beg != zind_end:
                         # edge = tmp_ind[tmp_ind1]
                         # ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
                         # graph[ii, 2] = 1
