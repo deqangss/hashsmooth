@@ -253,6 +253,13 @@ class CFGModifierEnvConstraints(object):
                     else:
                         # graph.append([zind_beg, zind_end, 1])
                         graph = np.append(graph, np.array([zind_beg, zind_end, 1])[:, np.newaxis].transpose(), axis=0)
+
+        check_flag = graph[:, 0] == graph[:, 1]
+        if np.any(check_flag):
+            print('del node debug 1: ', graph[check_flag])
+            exit(-1)
+        print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
+
         # del nodes
         tmp_ind_to = np.where(graph[:, 1] == tar_node)
         graph = np.delete(graph, tmp_ind_to, axis=0)
@@ -273,7 +280,7 @@ class CFGModifierEnvConstraints(object):
 
         check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
-            print('del node debug: ', graph[check_flag])
+            print('del node debug 2 : ', graph[check_flag])
             exit(-1)
         print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
 
