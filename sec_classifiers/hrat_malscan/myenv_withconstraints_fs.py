@@ -248,6 +248,7 @@ class CFGModifierEnvConstraints(object):
                         # edge = tmp_ind[tmp_ind1]
                         # ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
                         # graph[ii, 2] = 1
+                        print("testtest same: ", zind_beg, zind_end, tmp_ind[tmp_ind1])
                         graph[tmp_ind[tmp_ind1], 2] = 1
                     else:
                         # graph.append([zind_beg, zind_end, 1])
