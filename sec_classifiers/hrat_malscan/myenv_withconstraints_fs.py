@@ -244,7 +244,7 @@ class CFGModifierEnvConstraints(object):
                 for zind_end in edge_from_tar_node[:, 1]:
                     tmp_ind1 = np.where(edge_tmp[:, 1] == zind_end)
                     tmp_ind1 = np.squeeze(tmp_ind1)
-                    if tmp_ind1.size != 0 and zind_beg != zind_end:
+                    if tmp_ind1.size != 0:
                         # edge = tmp_ind[tmp_ind1]
                         # ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
                         # graph[ii, 2] = 1
@@ -270,9 +270,9 @@ class CFGModifierEnvConstraints(object):
         self.constraints = np.delete(self.constraints, tar_node)
         self.adj_size -= 1
 
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
-            print('del node debug: ', self.cur_graph[check_flag])
+            print('del node debug: ', graph[check_flag])
             exit(-1)
         print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
 
@@ -322,9 +322,9 @@ class CFGModifierEnvConstraints(object):
         #       "  size graph:", str(max(tmpz[:, 0])), ',', str(max(tmpz[:, 1])),
         #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
 
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
-            print('add node debug: ', self.cur_graph[check_flag])
+            print('add node debug: ', graph[check_flag])
             exit(-1)
 
         return tmpz, [int(np.squeeze(tmpz[ii, 0])), int(np.squeeze(tmpz[ii, 1])), self.adj_size - 1]
@@ -391,9 +391,9 @@ class CFGModifierEnvConstraints(object):
         #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
         self.constraints[edge[1]] = -1
 
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
-            print('add edge 2 debug: ', self.cur_graph[check_flag])
+            print('add edge 2 debug: ', graph[check_flag])
             exit(-1)
 
         return graph, [-1, int(np.squeeze(edge[0])), int(np.squeeze(edge[1]))]
@@ -433,7 +433,7 @@ class CFGModifierEnvConstraints(object):
         # get the add edge
         add_edge_ind = np.where(graph[:, -1] == 0.)[0]
         tmp_add = grad[add_edge_ind, :]
-        # tmp_add = np.squeeze(tmp_add)
+        tmp_add = np.squeeze(tmp_add)
         beg_node = del_edge[0]
         tar_node = del_edge[1]
 
@@ -482,9 +482,9 @@ class CFGModifierEnvConstraints(object):
         #       str(max(graph[:, 1])),
         #       ' sen_api_idx:', str(np.max(self.sen_api_idx)))
 
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
-            print('rewiring debug: ', self.cur_graph[check_flag])
+            print('rewiring debug: ', graph[check_flag])
             exit(-1)
 
         return graph, [beg_node, tar_node, mid_node]
