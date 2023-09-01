@@ -275,10 +275,10 @@ class CFGModifierEnvConstraints(object):
         self.constraints = np.delete(self.constraints, tar_node)
         self.adj_size -= 1
 
-        # print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
-        #       str(max(graph[:, 1])),
-        #       ', sen_api_idx:', str(np.max(self.sen_api_idx)))
-        # print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
+        print("len con:", str(len(self.constraints)), "  size graph:", str(max(graph[:, 0])), ',',
+              str(max(graph[:, 1])),
+              ', sen_api_idx:', str(np.max(self.sen_api_idx)))
+        print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
 
         return graph, [-3, -1, tar_node]
 

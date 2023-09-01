@@ -204,7 +204,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(1, len(attack_id))):
+    for idx in tqdm(range(5, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("\nAttacking: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
@@ -282,6 +282,8 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
+
+                action_type = 3
                 start_time = time.time()
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 total_time = time.time() - start_time
