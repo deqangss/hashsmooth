@@ -331,16 +331,19 @@ def _main():
                         file_feature.write(str(state.tolist()))
                         file_feature.write('\n')
                         file_feature.close()
-                        distance = env.getWeightedJaccard(cur_graph, test_mal_triple)
+                        distance_ps = env.getWeightedJaccard(cur_graph, test_mal_triple)
+                        distance_fs = env.getWeightedJaccard4Vec(state_.detach().cpu().numpy(),
+                                                                 test_mal_representation.detach().cpu().numpy())
                         logger.info(
-                            "{}: predict as {}, Attack {} with episode {}, count {}, modification reward {}, jacard distance {}/{}.".format(
+                            "{}: predict as {}, Attack {} with episode {}, count {}, modification reward {}, jacard distance {} - {}/{}.".format(
                                 test_mal_id,
                                 pred_y,
                                 1,
                                 i_episode,
                                 count,
                                 ep_r,
-                                distance,
+                                distance_ps,
+                                distance_fs,
                                 max(test_mal_triple.shape[0], cur_graph.shape[0])))
                     break
                 if count >= max_iterations:

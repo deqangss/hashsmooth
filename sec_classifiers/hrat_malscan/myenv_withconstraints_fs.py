@@ -81,7 +81,6 @@ class CFGModifierEnvConstraints(object):
     def step(self, action, top_k=1):
         assert len(self.action_space) >= action + 1
         self.top_k = top_k
-        print("Current action: ", action)
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
@@ -110,7 +109,7 @@ class CFGModifierEnvConstraints(object):
 
         check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
         if np.any(check_flag):
-            print('rewiring debug: ', self.cur_graph[check_flag])
+            print('Debug: ', self.cur_graph[check_flag])
             exit(-1)
 
         if done:
@@ -187,6 +186,14 @@ class CFGModifierEnvConstraints(object):
         sum_max = 1e-6 if sum_max == 0 else sum_max
         return 1 - sum_min / sum_max
 
+    def getWeightedJaccard4Vec(self, vec: np.ndarray, last_vec: np.ndarray):
+        assert vec.shape == last_vec.shape
+
+        vec_stack = np.stack([vec, last_vec], axis=-1)
+        min_v = np.min(vec_stack, axis=-1)
+        max_v = np.max(vec_stack, axis=-1)
+        return 1. - np.sum(min_v, axis=-1) / (np.sum(max_v, axis=-1) + 1e-8)
+
     def del_node(self, graph):
         # cal grad of all edges
         tmp_grad = self.get_gradient2(graph, is_dense=True)
@@ -254,11 +261,9 @@ class CFGModifierEnvConstraints(object):
                         # edge = tmp_ind[tmp_ind1]
                         # ii = np.where(np.all((graph[:, :2] == edge), axis=1) == True)
                         # graph[ii, 2] = 1
-                        print("testtest same: ", zind_beg, zind_end, graph[tmp_ind[tmp_ind1]])
                         graph[tmp_ind[tmp_ind1], 2] = 1
                     else:
                         # graph.append([zind_beg, zind_end, 1])
-                        print("testtest same: ", zind_beg, zind_end, graph[tmp_ind[tmp_ind1]])
                         graph = np.append(graph, np.array([zind_beg, zind_end, 1])[:, np.newaxis].transpose(), axis=0)
         # del nodes
         tmp_ind_to = np.where(graph[:, 1] == tar_node)
@@ -495,8 +500,6 @@ class CFGModifierEnvConstraints(object):
         loss = self.get_loss(feature)
         loss.backward()
 
-        print("Debug: distance loss is ", loss.detach().cpu().item())
-
         tmp = triple_torch.grad.data.cpu().numpy()
         grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp[:, 2:]), 1)
         return grad
@@ -515,7 +518,6 @@ class CFGModifierEnvConstraints(object):
                                             is_sp2dense=False,
                                             device=self.device).float()
         loss = self.get_loss(feature)
-        print("Debug: distance loss is ", loss.detach().cpu().item())
         loss.backward()
         if not is_dense:
             tmp = graph_dense.grad.data.to_sparse()
@@ -532,6 +534,7 @@ class CFGModifierEnvConstraints(object):
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
                 [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
+            print(dist, torch.sigmoid(self.steep * dist))
             loss = torch.sum(self.w.squeeze() * (torch.sigmoid(self.steep * dist)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, HashSmooth4MalScan):

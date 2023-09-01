@@ -78,7 +78,6 @@ class DQN(object):
         # input only one sample
         if np.random.uniform() < EPSILON:
             action_type = self.eval_net.forward(x)
-            print("predicted action type:   "+str(action_type))
             action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
         else:  # random
             action = np.random.randint(actions_num)
@@ -113,7 +112,6 @@ class DQN(object):
         q_next = self.target_net(b_state_new).detach()  # detach from graph, don't backpropagate
         q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
         loss = self.loss_func(q_eval, q_target)
-        print("DQN current loss is: "+ str(loss))
 
         self.optimizer.zero_grad()
         loss.backward()
