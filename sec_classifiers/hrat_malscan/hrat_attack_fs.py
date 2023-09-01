@@ -254,8 +254,6 @@ def _main():
             min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
             mal_knn_num = len(mal_dist.isclose(min_value).nonzero()) + 1
             mal_knn_num = mal_knn_num if mal_knn_num <= len(mal_dist) else len(mal_dist)
-        print(ben_knn_num, mal_knn_num, len(ben_dist), len(mal_dist))
-        continue
         mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
         mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
 
