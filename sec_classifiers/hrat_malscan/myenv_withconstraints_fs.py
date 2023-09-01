@@ -233,6 +233,12 @@ class CFGModifierEnvConstraints(object):
 
         # print(edge_to_tar_node, edge_from_tar_node)
 
+        check_flag = graph[:, 0] == graph[:, 1]
+        if np.any(check_flag):
+            print('del node debug 0: ', graph[check_flag])
+            exit(-1)
+        print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
+
         # 如果该节点调用了其他节点，且该节点存在调用
         if edge_from_tar_node.size != 0 and edge_to_tar_node.size != 0:
             # 对于所有调用了改节点的函数
@@ -253,13 +259,11 @@ class CFGModifierEnvConstraints(object):
                     else:
                         # graph.append([zind_beg, zind_end, 1])
                         graph = np.append(graph, np.array([zind_beg, zind_end, 1])[:, np.newaxis].transpose(), axis=0)
-
         check_flag = graph[:, 0] == graph[:, 1]
         if np.any(check_flag):
             print('del node debug 1: ', graph[check_flag])
             exit(-1)
         print("\t\t graph idx:", np.min(graph[:, 0]), ", ", np.min(graph[:, 1]), ", ", np.min(graph[:, 2]), ", ")
-
         # del nodes
         tmp_ind_to = np.where(graph[:, 1] == tar_node)
         graph = np.delete(graph, tmp_ind_to, axis=0)
