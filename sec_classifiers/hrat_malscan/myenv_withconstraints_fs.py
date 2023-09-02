@@ -534,6 +534,8 @@ class CFGModifierEnvConstraints(object):
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
                 [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
+            ben_num = np.sum(self.w.cpu().numpy() == 1)
+            print(dist[:ben_num], dist[ben_num:])
             loss = torch.sum(self.w.squeeze() * (torch.sigmoid(self.steep * dist)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
