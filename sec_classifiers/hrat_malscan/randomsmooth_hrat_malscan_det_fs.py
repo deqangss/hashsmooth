@@ -29,9 +29,9 @@ class RandomTransformer(object):
         out_c2 = torch.zeros(flat.shape, dtype=flat.dtype).cuda()
 
         if (self.reuse_noise):
-            # ones = torch.ones(flat.shape[1]).cuda()
-            # idx = torch.multinomial(ones, self.keep_per_image)
-            idx = np.random.choice(flat.shape[1], self.keep_per_image, replace=False)
+            ones = torch.ones(flat.shape[1]).cuda()
+            idx = torch.multinomial(ones, self.keep_per_image)
+            # idx = np.random.choice(flat.shape[1], self.keep_per_image, replace=False)
             out_c1[:, idx] = flat[:, idx]
             # out_c2[:, idx] = 1. - flat[:, idx]
         else:

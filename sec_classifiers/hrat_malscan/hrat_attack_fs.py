@@ -204,7 +204,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
-    for idx in tqdm(range(0, len(attack_id))):
+    for idx in tqdm(range(26, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("\nAttacking: {}.\n".format(test_mal_id))
         test_mal_adj = test_adj[idx]
@@ -242,7 +242,7 @@ def _main():
             ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
         else:
             min_value, _ = torch.min(ben_dist, dim=-1, keepdim=True)
-            ben_knn_num = len(ben_dist.isclose(min_value).nonzero()) + 1
+            ben_knn_num = len(ben_dist.isclose(min_value).nonzero())
             ben_knn_num = ben_knn_num if ben_knn_num <= len(ben_dist) else len(ben_dist)
         ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
         ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
@@ -252,7 +252,7 @@ def _main():
             mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
         else:
             min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
-            mal_knn_num = len(mal_dist.isclose(min_value).nonzero()) + 1
+            mal_knn_num = len(mal_dist.isclose(min_value).nonzero())
             mal_knn_num = mal_knn_num if mal_knn_num <= len(mal_dist) else len(mal_dist)
         mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
         mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
@@ -292,10 +292,7 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
-                start_time = time.time()
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
-                total_time = time.time() - start_time
-                print("prediction time: seconds {:.4}.".format(total_time))
                 if type(action_type) is np.ndarray:
                     action_type = action_type[0]
                 action = np.array([action_type] + info)

@@ -192,7 +192,7 @@ class CFGModifierEnvConstraints(object):
         vec_stack = np.stack([vec, last_vec], axis=-1)
         min_v = np.min(vec_stack, axis=-1)
         max_v = np.max(vec_stack, axis=-1)
-        return 1. - np.sum(min_v, axis=-1) / (np.sum(max_v, axis=-1) + 1e-8)
+        return 1. - (np.sum(min_v, axis=-1) / np.sum(max_v, axis=-1))
 
     def del_node(self, graph):
         # cal grad of all edges
@@ -208,10 +208,10 @@ class CFGModifierEnvConstraints(object):
         for zi in a:
             flag = 0
             if self.constraints[int(zi[0])] == 0 or self.constraints[int(zi[0])] == -1 or zi[
-                -1] < 0:  # caller cannot be contained in constraints; -1为新constraints
+                -1] <= 0:  # caller cannot be contained in constraints; -1为新constraints
                 flag = 1
-                if zi[-1] < 0:
-                    break
+            if zi[-1] <= 0:
+                break
             # find functions that call target nodes
             ind_caller = np.where(graph[:, 0] == int(zi[0]))  # 应该是graph[:,1]吧
             caller_idx = graph[ind_caller, 0]
@@ -534,7 +534,6 @@ class CFGModifierEnvConstraints(object):
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
                 [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
-            print(dist, torch.sigmoid(self.steep * dist))
             loss = torch.sum(self.w.squeeze() * (torch.sigmoid(self.steep * dist)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
