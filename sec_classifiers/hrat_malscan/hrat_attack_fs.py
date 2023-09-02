@@ -233,6 +233,9 @@ def _main():
 
         print('\t ==== select the nearest neighbors for optimization ====')
 
+        print(train_x_producer.shape)
+        exit(-1)
+
         X_train_list = torch.split(train_x_producer, args.batch_size)
         dist = torch.cat(
             [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
