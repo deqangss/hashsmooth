@@ -251,7 +251,7 @@ def _main():
         train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
         train_y_s[:len(ben_train_x)] = 1
 
-        weight = (2 * (train_y_s != 0) - 1).float()[None, :]
+        weight = (2 * (train_y_s != 0) - 1).float()
         X_train_sel = torch.vstack([ben_train_x, mal_train_x])
 
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
