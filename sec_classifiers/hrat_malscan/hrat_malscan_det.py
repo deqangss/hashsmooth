@@ -65,7 +65,6 @@ class MalScan(BasicClassifier):
                 final_label = []
                 for idx in range(malscan_feature.shape[0]):
                     l = self.train_y[min_v_indices[min_v_indices[:, 0] == idx][:, 1]]
-                    print("The minest value: ", min_value, l)
                     pred_l = l.bincount(minlength=self.n_class).argmax().data.item()
                     final_label.append(pred_l)
                 final_label = np.array(final_label)

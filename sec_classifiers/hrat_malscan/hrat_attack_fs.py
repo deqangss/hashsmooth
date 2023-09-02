@@ -248,12 +248,14 @@ def _main():
         mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
         mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
 
-        train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
-        train_y_s[:len(ben_train_x)] = 1
-
+        if not args.is_benign:
+            train_y_s = torch.zeros((len(ben_train_x),), dtype=int, device=device)
+            X_train_sel = ben_train_x
+        else:
+            train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
+            train_y_s[:len(ben_train_x)] = 1
+            X_train_sel = torch.vstack([ben_train_x, mal_train_x])
         weight = (2 * (train_y_s != 0) - 1).float()
-        X_train_sel = torch.vstack([ben_train_x, mal_train_x])
-
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                  tar_label=1,
                                                                  target_sen_api_idx=test_sensi_idx,

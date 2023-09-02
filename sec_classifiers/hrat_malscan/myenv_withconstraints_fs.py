@@ -550,8 +550,6 @@ class CFGModifierEnvConstraints(object):
                 mal_knn_num = torch.max(torch.sum(mal_dist.isclose(min_value), dim=-1))
             mal_dist_s, mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False, dim=-1)
             mal_w = self.w[is_mal][mal_idx_s]
-            print("bendist: ", ben_dist_s)
-            print("maldist: ", mal_dist_s)
             return torch.hstack([ben_dist_s, mal_dist_s]), torch.hstack([ben_w, mal_w])
 
         if isinstance(self.malware_detector, MalScan):
