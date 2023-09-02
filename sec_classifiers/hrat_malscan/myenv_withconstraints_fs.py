@@ -558,7 +558,7 @@ class CFGModifierEnvConstraints(object):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
-                [torch.sum((feature.float() - torch.squeeze(x.to(feature.device))).pow(2), 1) for x in self.X_train])
+                [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
             dist_s, w = _get_nn_sample(dist[None, ...])
             loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
@@ -575,7 +575,7 @@ class CFGModifierEnvConstraints(object):
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 dist = torch.cat(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in self.X_train])
+                    [torch.sum((feature_tran[:, None, :] - x[None, ...]).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 dist_s, w = _get_nn_sample(dist)
                 loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))

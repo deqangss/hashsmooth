@@ -232,37 +232,27 @@ def _main():
             continue
 
         print('\t ==== select the nearest neighbors for optimization ====')
-        weight = (2 * (train_y != 0) - 1).float()
-        # X_train_list = torch.split(train_x_producer, args.batch_size)
-        # dist = torch.cat(
-        #     [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
-        #      X_train_list])
-        #
-        # ben_dist = dist[train_y == 1]
-        # if args.knn_num > 1:
-        #     ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
-        # else:
-        #     min_value, _ = torch.min(ben_dist, dim=-1, keepdim=True)
-        #     ben_knn_num = len(ben_dist.isclose(min_value).nonzero())
-        #     ben_knn_num = ben_knn_num if ben_knn_num <= len(ben_dist) else len(ben_dist)
-        # ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
-        # ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
-        #
-        # mal_dist = dist[train_y == 0]
-        # if args.knn_num > 1:
-        #     mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
-        # else:
-        #     min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
-        #     mal_knn_num = len(mal_dist.isclose(min_value).nonzero())
-        #     mal_knn_num = mal_knn_num if mal_knn_num <= len(mal_dist) else len(mal_dist)
-        # mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
-        # mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
-        #
-        # train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
-        # train_y_s[:len(ben_train_x)] = 1
-        #
-        # weight = (2 * (train_y_s != 0) - 1).float()[None, :]
-        # X_train_sel = torch.vstack([ben_train_x, mal_train_x])
+
+        X_train_list = torch.split(train_x_producer, args.batch_size)
+        dist = torch.cat(
+            [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
+             X_train_list])
+
+        ben_dist = dist[train_y == 1]
+        ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
+        ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
+        ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
+
+        mal_dist = dist[train_y == 0]
+        mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
+        mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
+        mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
+
+        train_y_s = torch.zeros((len(ben_train_x) + len(mal_train_x),), dtype=int, device=device)
+        train_y_s[:len(ben_train_x)] = 1
+
+        weight = (2 * (train_y_s != 0) - 1).float()[None, :]
+        X_train_sel = torch.vstack([ben_train_x, mal_train_x])
 
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                  tar_label=1,
@@ -275,7 +265,7 @@ def _main():
                                                                  predict_function=predict_func,
                                                                  transformer_obj=input_transfermor,
                                                                  n_sampling=args.n_sampling,
-                                                                 X_train=train_x_producer,
+                                                                 X_train=X_train_sel,
                                                                  device=device,
                                                                  batch_size=args.batch_size
                                                                  )
