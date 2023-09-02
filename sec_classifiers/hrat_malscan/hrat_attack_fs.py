@@ -241,12 +241,12 @@ def _main():
         ben_dist = dist[train_y == 1]
         ben_knn_num = args.knn_num if args.knn_num <= len(ben_dist) else len(ben_dist)
         ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False)[1].to('cpu')
-        ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s].to(device)
+        ben_train_x = train_x_producer[(train_y == 1).to('cpu')][ben_idx_s]
 
         mal_dist = dist[train_y == 0]
         mal_knn_num = args.knn_num if args.knn_num <= len(mal_dist) else len(mal_dist)
         mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False)[1].to('cpu')
-        mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s].to(device)
+        mal_train_x = train_x_producer[(train_y == 0).to('cpu')][mal_idx_s]
 
         if not args.is_benign:
             train_y_s = torch.zeros((len(ben_train_x),), dtype=int, device=device)
