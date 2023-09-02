@@ -529,14 +529,38 @@ class CFGModifierEnvConstraints(object):
             return graph_dense.grad.data
 
     def get_loss(self, feature):
+
+        def _get_nn_sample(dist):
+            is_benign = self.w == 1.
+            ben_dist = dist[:, is_benign]
+            if self.top_k > 1:
+                ben_knn_num = self.top_k if self.top_k <= ben_dist.shape[1] else ben_dist.shape[1]
+            else:
+                min_value, _ = torch.min(ben_dist, dim=-1, keepdim=True)
+                ben_knn_num = torch.max(torch.sum(ben_dist.isclose(min_value), dim=-1))
+            ben_dist_s, ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False, dim=-1)
+            ben_w = self.w[is_benign][ben_idx_s]
+
+            is_mal = self.w == -1.
+            mal_dist = dist[:, is_mal]
+            if self.top_k > 1:
+                mal_knn_num = self.top_k if self.top_k <= mal_dist.shape[1] else mal_dist.shape[1]
+            else:
+                min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
+                mal_knn_num = torch.max(torch.sum(mal_dist.isclose(min_value), dim=-1))
+            mal_dist_s, mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False, dim=-1)
+            mal_w = self.w[is_mal][mal_idx_s]
+            print("bendist: ", ben_dist_s)
+            print("maldist: ", mal_dist_s)
+            return torch.hstack([ben_dist_s, mal_dist_s]), torch.hstack([ben_w, mal_w])
+
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
             dist = torch.cat(
-                [torch.sum((feature.float() - torch.squeeze(x)).pow(2), 1) for x in self.X_train])
-            ben_num = np.sum(self.w.cpu().numpy() == 1)
-            print(dist[:ben_num], dist[ben_num:])
-            loss = torch.sum(self.w.squeeze() * (torch.sigmoid(self.steep * dist)))
+                [torch.sum((feature.float() - torch.squeeze(x.to(feature.device))).pow(2), 1) for x in self.X_train])
+            dist_s, w = _get_nn_sample(dist[None, ...])
+            loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
             n_counts = self.n_sampling
@@ -551,9 +575,10 @@ class CFGModifierEnvConstraints(object):
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 dist = torch.cat(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...]).pow(2), -1) for x in self.X_train])
+                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
-                loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
+                dist_s, w = _get_nn_sample(dist)
+                loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         elif isinstance(self.malware_detector, RandomSmooth4MalScan):
             n_counts = self.n_sampling
@@ -571,7 +596,9 @@ class CFGModifierEnvConstraints(object):
                     [torch.sum((feature_tran[:, None, :] - x[None, ...]).pow(2), -1) for x in
                      self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
-                loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
+                # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
+                dist_s, w = _get_nn_sample(dist)
+                loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
         else:
             raise TypeError
