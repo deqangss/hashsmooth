@@ -66,12 +66,12 @@ class HashSmooth4MalScan(HashSmooth):
             return HashSmooth.ABSTAIN
 
         # second round sampling to estimate the probability
-        counts_estimation, _1 = self.sample_lsh_funcs_a_point(x, adj_size,
+        counts_estimation, _1 = self.sample_lsh_funcs_a_point(malscan_feature_vec,
                                                               n_estimation,
                                                               self.base_classifier.batch_size,
                                                               n_subfeatures,
                                                               k_per_instance,
-                                                              top_k, x_sensitive_dix, device, verbose)
+                                                              top_k, device, verbose)
         n_targeted = counts_estimation[c_pred]
 
         # given the estimated probability, we calculate the radius

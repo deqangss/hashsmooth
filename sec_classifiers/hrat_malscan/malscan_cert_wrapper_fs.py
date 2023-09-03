@@ -15,15 +15,15 @@ import numpy as np
 import torch
 import math
 
-from hashsmooth import JaccardLSHTransformer
+from hashsmooth import WeightedJaccardLSHTransformerTorch
 from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
-from sec_classifiers.hrat_malscan.hashsmooth_hrat_malscan_det import HashSmooth4MalScan
+from sec_classifiers.hrat_malscan.hashsmooth_hrat_malscan_det_fs import HashSmooth4MalScan
 from tools import utils
 from sec_classifiers.hrat_malscan.Utils import trans2triple_rw, trans2triple
 from sec_classifiers.hrat_malscan import myenv_withconstraints_ps
 from sec_classifiers.hrat_malscan.model import DQN
 from sec_classifiers.dataset import Dataset
-from sec_classifiers.hrat_malscan.randomsmooth_hrat_malscan_det import RandomTransformer, RandomSmooth4MalScan
+from sec_classifiers.hrat_malscan.randomsmooth_hrat_malscan_det_fs import RandomTransformer, RandomSmooth4MalScan
 
 ACTION_NUM = 4
 
@@ -55,10 +55,8 @@ cmd_md.add_argument('--test', action='store_true', default=False,
                     help='Predict labels for all test data instances.')
 cmd_md.add_argument('--is_benign', action='store_true', default=True,
                     help='Just use benign instances to optimize perturbations.')
-cmd_md.add_argument('--sub_k_ratio', type=float, default=0.01,
+cmd_md.add_argument('--sub_k', type=int, default=64,
                     help='Number of hash functions.')
-cmd_md.add_argument('--max_k', type=int, default=1000,
-                    help='maximum number of hash functions.')
 cmd_md.add_argument('--alpha', type=float, default=0.01,
                     help='Significance level of hypotheses testing.')
 cmd_md.add_argument('--n_sampling', type=int, default=100,
@@ -73,6 +71,7 @@ cmd_md.add_argument('--model', type=str, default='malscan',
 
 logger = utils.logging.getLogger("Certification")
 logger.addHandler(utils.ErrorHandler)
+
 
 def _main():
     args = cmd_md.parse_args()
@@ -102,52 +101,41 @@ def _main():
         val_x_y = np.load(val_x_y_path)
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
 
-    train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
-    train_y = torch.from_numpy(train_y).to(device)
     if args.model == 'malscan':
+        train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
+        train_y = torch.from_numpy(train_y).to(device)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
         certify_func = malscan.certify
     elif args.model == 'hash_malscan':
-        input_transfermor = JaccardLSHTransformer(sub_k=0,  # initialize this value afterwards
-                                                  null_value=0,
-                                                  seed=args.seed)
-        # obtain transformed features
-        train_x_tran_path = os.path.join(feature_saving_path, "hash_train_x_{}.npy".format(args.sub_k_ratio))
-        if not os.path.exists(train_x_tran_path):
-            train_pkl, _1, _2 = dataset.load()
-            train_x_tran = get_feature_rpst_tran(train_pkl, input_transfermor.transform, args.sub_k_ratio)
-            np.save(train_x_tran_path, train_x_tran)
-        else:
-            train_x_tran = np.load(train_x_tran_path)
-
-        malscan = MalScan(torch.from_numpy(train_x_tran), train_y, args.batch_size)
+        input_transfermor = WeightedJaccardLSHTransformerTorch(number_of_words=train_x.shape[-1],
+                                                               sub_k=args.sub_k,  # initialize this value afterwards
+                                                               null_value=0,
+                                                               seed=args.seed)
+        train_x_train = get_rpst_hashtran(train_x, input_transfermor, args.batch_size, device)
+        train_x_producer = torch.from_numpy(train_x_train)
+        train_y = torch.from_numpy(train_y).to(device)
+        malscan = MalScan(train_x_producer, train_y, args.batch_size)
         malscan = HashSmooth4MalScan(malscan, num_of_classes=2,
                                      hash_methods=[input_transfermor],
                                      n_subfeatures=[],
                                      k_hashcode=0,
-                                     max_k=args.max_k,
+                                     max_k=args.sub_k,
                                      max_radii=[],
                                      n_grids=[],
                                      default_mode=True
                                      )
         certify_func = functools.partial(malscan.certify, max_radii=[0.1], n_grids=[100])
     elif args.model == 'random_malscan':
-        input_transfermor = RandomTransformer(keep_per_image=0,
-                                              reuse_noise=True,  # time-consuming if set reuse_noise to be false
+        input_transfermor = RandomTransformer(keep_per_image=args.sub_k,
+                                              reuse_noise=False,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
-        # obtain transformed features
-        train_x_tran_path = os.path.join(feature_saving_path, "random_train_x_{}.npy".format(args.sub_k_ratio))
-        if not os.path.exists(train_x_tran_path):
-            train_pkl, _1, _2 = dataset.load()
-            train_x_tran = get_feature_rpst_rand(train_pkl, input_transfermor.transform, args.sub_k_ratio, device)
-            np.save(train_x_tran_path, train_x_tran)
-        else:
-            train_x_tran = np.load(train_x_tran_path)
-
-        malscan = MalScan(torch.from_numpy(train_x_tran), train_y, args.batch_size)
+        train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
+        train_x_producer = torch.from_numpy(train_x_train)
+        train_y = torch.from_numpy(train_y).to(device)
+        malscan = MalScan(train_x_producer, train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, number_of_classes=2,
                                        transform_method=input_transfermor,
-                                       max_k=args.max_k,
+                                       max_k=args.sub_k,
                                        default_mode=True
                                        )
         certify_func = malscan.certify
@@ -185,8 +173,8 @@ def _main():
     print("==== loading test constraints ====")
     test_constraints = [test_dict[sha]["constraints"] for sha in tqdm(attack_id)]
 
-    logger.info("sub k ratio {}, number of selection {}, number of estimation {}, confidence level {}.".format(
-        args.sub_k_ratio,
+    logger.info("sub k {}, number of selection {}, number of estimation {}, confidence level {}.".format(
+        args.sub_k,
         args.n_sampling,
         args.n_estimation,
         args.alpha
@@ -204,8 +192,9 @@ def _main():
             logger.info("{}: preprocessing failed.".format(test_mal_id))
             continue
         start_time = time.time()
-        radius = certify_func(test_mal_triple, label=0, n_selection=args.n_sampling, n_estimation=args.n_estimation,
-                              k_per_instance=args.sub_k_ratio, alpha=args.alpha, adj_size=test_mal_adj.shape[0],
+        radius = certify_func(test_mal_triple, label=0, adj_size=test_mal_adj.shape[0],
+                              n_selection=args.n_sampling, n_estimation=args.n_estimation,
+                              k_per_instance=args.sub_k, alpha=args.alpha,
                               top_k=1,
                               x_sensitive_dix=test_sensi_idx,
                               device=device)
@@ -225,91 +214,38 @@ def get_feature_rpst(file_pkl):
         for idx, rpst in enumerate(pool.imap(_parallel_featurization, pargs)):
             feature_x[idx] = rpst
     return feature_x, label
-    # feature_x = []
-    # for sha256 in sha256s:
-    #     print("Doing: ", sha256)
-    #     adj_sp = feature_dict[sha256]['adjacent_matrix']
-    #     node_idx = feature_dict[sha256]['sensitive_api_list']
-    #     triple = trans2triple(adj_sp)
-    #     feature_x.append(MalScan.get_extra_feature(triple,
-    #                                                node_idx,
-    #                                                adj_sp.shape[0],
-    #                                                device=device).cpu().numpy())
-    # return np.array(feature_x), label
 
 
-def get_feature_rpst_tran(file_pkl, tran_func, k_ratio):
-    feature_dict, _1, sha256s = file_pkl
-    pargs = [(tran_func, feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list'], k_ratio)
-             for sha256
-             in
-             sha256s]
-    feature_dim = len(feature_dict[sha256s[0]]['sensitive_api_list']) * 2
-    feature_x = np.empty(shape=(len(sha256s), feature_dim), dtype=float)
-    sub_k = []
-    n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
-    with multiprocessing.Pool(n_proc) as pool:
-        for idx, rpst in enumerate(pool.imap(_parallel_tran_featurization, pargs)):
-            feature_x[idx] = rpst[0]
-            sub_k.append(rpst[1])
-    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k)))
-    return feature_x
-
-    # feature_x = []
-    # for sha256 in sha256s:
-    #     adj_sp = feature_dict[sha256]['adjacent_matrix']
-    #     node_idx = feature_dict[sha256]['sensitive_api_list']
-    #     triple = trans2triple(adj_sp)
-    #     train_x_v = triple[:, 2].copy()
-    #     nonzero_idx = train_x_v.nonzero()[0]
-    #     nonzero_idx_sel = tran_func(nonzero_idx[None, ...])
-    #     triple[:, 2] = 0.
-    #     triple[:, 2][nonzero_idx_sel] = train_x_v[nonzero_idx_sel]
-    #     feature_x.append(MalScan.get_extra_feature(triple,
-    #                                                node_idx,
-    #                                                adj_sp.shape[0],
-    #                                                True, 'cpu').numpy())
-    # return np.array(feature_x)
-
-
-def get_feature_rpst_rand(file_pkl, tran_func, ratio, device):
-    feature_dict, _1, sha256s = file_pkl
-    triple_list = []
-    sub_k_list = []
+def get_rpst_hashtran(train_x, tran_func_obj, batch_size=64, device="cpu"):
     feature_x = []
-    for sha256 in sha256s:
-        print(sha256)
-        adj_sp = feature_dict[sha256]['adjacent_matrix']
-        node_sens_idx = feature_dict[sha256]['sensitive_api_list']
-        triple_torch = torch.from_numpy(trans2triple(adj_sp)).float().to(device)
-        # train_x_v = torch.from_numpy(triple[:, 2].copy()).float().to(device)
-        k = int(triple_torch.shape[0] * ratio)
-        k = k if k >= 2 else 2
-        train_x_v_tran = tran_func(triple_torch[:, 2:].T, k)
-        # print(train_x_v.shape, train_x_v_tran.shape)
-        triple_torch[:, 2] = train_x_v_tran.squeeze()
-        # triple_list.append(triple_torch.cpu().numpy())
-        feature_x.append(MalScan.get_extra_feature(triple_torch, node_sens_idx, adj_sp.shape[0], True, 'cpu').numpy())
-        sub_k_list.append(k)
-    logger.info("The mean number of selected elements is {}.".format(np.mean(sub_k_list)))
-    return np.array(feature_x)
-    # pargs = [(triple_list[i], feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list']) for i, sha256
-    #          in
-    #          enumerate(sha256s)]
-    # feature_dim = len(feature_dict[sha256s[0]]['sensitive_api_list']) * 2
-    # feature_x = np.empty(shape=(len(sha256s), feature_dim), dtype=float)
-    # n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
-    # with multiprocessing.Pool(n_proc) as pool:
-    #     for idx, rpst in enumerate(pool.imap(_parallel_partial_featurization, pargs)):
-    #         pritn(rpst)
-    #         feature_x[idx] = rpst
-    # return feature_x
+    num_x = train_x.shape[0]
+    current_idx = 0
+    for idx in range(num_x // batch_size + 1):
+        if current_idx >= num_x - 1:
+            break
+        batch_train_x = train_x[current_idx: current_idx + batch_size]
+        feature_x_batch = np.zeros_like(batch_train_x, dtype=float)
+        zero_indicator = np.all(batch_train_x == 0., axis=-1)
+        feature_x_batch[~zero_indicator] = \
+            tran_func_obj.transform(torch.from_numpy(batch_train_x[~zero_indicator]).to(device),
+                                    tran_func_obj.sub_k).cpu().numpy()
+        feature_x.append(feature_x_batch)
+        current_idx += batch_size
+    return np.vstack(feature_x)
 
-    # feature_x.append(MalScan.get_extra_feature(triple_torch,
-    #                                            node_idx,
-    #                                            adj_sp.shape[0],
-    #                                            True, device).cpu().numpy())
-    # return np.array(feature_x)
+
+def get_rpst_randomtran(train_x, tran_func_obj, batch_size, device):
+    feature_x = []
+    num_x = train_x.shape[0]
+    current_idx = 0
+    for idx in range(num_x // batch_size + 1):
+        if current_idx >= num_x - 1:
+            break
+        batch_train_x = train_x[current_idx: current_idx + batch_size]
+        feature_x.append(tran_func_obj.transform(torch.from_numpy(batch_train_x).float().to(device),
+                                                 tran_func_obj.keep_per_image).cpu().numpy())
+        current_idx += batch_size
+    return np.vstack(feature_x)
 
 
 def _parallel_partial_featurization(args):
@@ -321,19 +257,6 @@ def _parallel_featurization(args):
     adj_sp, node_sens_idx = args
     triple = trans2triple(adj_sp)
     return MalScan.get_extra_feature(triple, node_sens_idx, adj_sp.shape[0], True, 'cpu').numpy()
-
-
-def _parallel_tran_featurization(args):
-    tran_func, adj_sp, node_sens_idx, k_ratio = args
-    triple = trans2triple(adj_sp)
-    train_x_v = triple[:, 2].copy()
-    nonzero_idx = train_x_v.nonzero()[0]
-    k = int(len(nonzero_idx) * k_ratio)
-    k = k if k >= 2 else 2
-    nonzero_idx_sel = tran_func(nonzero_idx[None, ...].copy(), k)
-    triple[:, 2] = 0.
-    triple[:, 2][nonzero_idx_sel] = train_x_v[nonzero_idx_sel]
-    return MalScan.get_extra_feature(triple, node_sens_idx, adj_sp.shape[0], True, 'cpu').numpy(), k
 
 
 if __name__ == "__main__":

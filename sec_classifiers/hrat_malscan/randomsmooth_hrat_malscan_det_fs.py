@@ -158,23 +158,29 @@ class RandomSmooth4MalScan(RandomSmooth):
     def train(self):
         pass
 
-    def certify(self, x: np.ndarray, label: int, n_selection: int, n_estimation: int, k_per_instance: (float, int),
+    def certify(self, x: np.ndarray, label: int, adj_size: int, n_selection: int, n_estimation: int, k_per_instance: (float, int),
                 alpha: float,
-                adj_size: int, top_k=1, x_sensitive_dix=None,
+                top_k=1, x_sensitive_dix=None,
                 device='cpu',
                 verbose=False):
         with torch.no_grad():
-            counts_selection, k_per_instance = self.sample_funcs(x, adj_size, n_selection,
+            malscan_feature_vec = self.base_classifier.get_extra_feature(x,
+                                                                         x_sensitive_dix,
+                                                                         adj_size,
+                                                                         True,
+                                                                         device).float()
+            counts_selection, k_per_instance = self.sample_funcs(malscan_feature_vec, n_selection,
                                                                  self.base_classifier.batch_size, k_per_instance,
-                                                                 top_k, x_sensitive_dix, device, verbose)
-            counts_estimation, _1 = self.sample_funcs(x, adj_size, n_estimation, self.base_classifier.batch_size,
+                                                                 top_k, device, verbose)
+            counts_estimation, _1 = self.sample_funcs(malscan_feature_vec, n_estimation, self.base_classifier.batch_size,
                                                       k_per_instance,
-                                                      top_k, x_sensitive_dix, device, verbose)
+                                                      top_k, device, verbose)
 
             c_pred = counts_selection.argmax()
             n_targeted = counts_estimation[c_pred]
 
             prob_underlined = lower_confidence_interval(n_targeted, n_estimation, alpha)
+            print(prob_underlined, n_targeted, n_estimation)
             radius = self.population_radius_for_majority(np.array([prob_underlined])[None, ...], n_estimation,
                                                          k_per_instance)
 
