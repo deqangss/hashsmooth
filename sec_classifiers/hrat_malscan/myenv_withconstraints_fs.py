@@ -81,6 +81,7 @@ class CFGModifierEnvConstraints(object):
     def step(self, action, top_k=1):
         assert len(self.action_space) >= action + 1
         self.top_k = top_k
+        last_graph = self.cur_graph.copy()
         if action == 0:  # add dege
             self.cur_graph, node_info = self.add_edge2(self.cur_graph)
 
@@ -107,16 +108,11 @@ class CFGModifierEnvConstraints(object):
                                               device=self.device)
         done = (cur_label == self.tar_label)
 
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
-        if np.any(check_flag):
-            print('Debug: ', self.cur_graph[check_flag])
-            exit(-1)
-
         if done:
             reward = 10
         else:
             # todo ADD THE DISTANCE OF CUR_GRAPH TO NEWAREST BENIGH
-            reward = self.getReward(self.cur_graph)
+            reward = self.getReward(self.cur_graph, last_graph)
             if action == 1:
                 if reward == 0:
                     reward = -2.0
@@ -124,7 +120,7 @@ class CFGModifierEnvConstraints(object):
                     reward = -3.0
             else:
                 if reward == 0 and node_info == [-1, -1, -1]:
-                    reward = -3.0
+                    reward = -2.0
         return self.state, reward, done, node_info, self.cur_graph
 
     def reset(self):
@@ -137,23 +133,23 @@ class CFGModifierEnvConstraints(object):
                                                    self.adj_size,
                                                    True,
                                                    device=self.device).float()
-            self.last_n_edge = np.where(self.cur_graph[:, -1] != 0)[0].shape[0]
-            self.last_n_node = max(np.unique(self.cur_graph[:, 0]).shape[0], np.unique(self.cur_graph[:, 1]).shape[0])
         return self.state
 
-    def getReward(self, graph, budget_node=1, budget_edge=1):
-        n_edge = np.where(graph[:, -1] != 0)[0].shape[0]
-        n_node = max(np.unique(graph[:, 0]).shape[0], np.unique(graph[:, 1]).shape[0])
+    def getReward(self, graph,last_graph, budget_node=1, budget_edge=1):
+        n_edge = np.where(graph[:, -1] == 1)[0].size
+        n_node = np.max([len(np.unique(graph[:, 0])), len(np.unique(graph[:, 1]))])
+        last_n_edge = np.where(last_graph[:, -1] == 1)[0].size
+        last_n_node = np.max([len(np.unique(last_graph[:, 0])), len(np.unique(last_graph[:, 1]))])
 
-        if n_edge == self.last_n_edge:
+        if n_edge == last_n_edge:
             edge_r = 0
         else:
-            edge_r = 1 / budget_edge * (self.last_n_edge - n_edge)
+            edge_r = 1 / budget_edge * (last_n_edge - n_edge)
 
-        if n_node == self.last_n_node:
+        if n_node == last_n_node:
             node_r = 0
         else:
-            node_r = 1 / budget_node * (self.last_n_node - n_node)
+            node_r = 1 / budget_node * (last_n_node - n_node)
 
         reward = -(abs(edge_r) + abs(node_r))
         return reward
