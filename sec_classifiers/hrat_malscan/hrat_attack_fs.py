@@ -5,7 +5,6 @@
 # software: PyCharm
 import time
 import os
-import warnings
 import argparse
 from tqdm import tqdm
 import multiprocessing
@@ -13,7 +12,6 @@ import functools
 
 import numpy as np
 import torch
-import math
 
 from hashsmooth import WeightedJaccardLSHTransformerTorch
 from sec_classifiers.hrat_malscan.hrat_malscan_det import MalScan
@@ -177,7 +175,7 @@ def _main():
         max_attack_num = 200
         mal_indicator = (test_y == 0)
         mal_test_sha256 = [sha256 for i, sha256 in enumerate(test_sha256) if mal_indicator[i]]
-        # remove unattackable instance
+        # remove un-attackable instance
         remove_mal_list = []
         for i in range(len(mal_test_sha256)):
             test_sensti_indix = test_dict[mal_test_sha256[i]]["sensitive_api_list"]
@@ -271,7 +269,7 @@ def _main():
                                                                  device=device,
                                                                  batch_size=args.batch_size
                                                                  )
-        print('\t ==== Attacking...collecting experience ... ====')
+        print('\t ==== Attacking... collecting experience ... ====')
         flag = 0
         episode_stop, max_iterations = 5, 100
         best_modifications = 100
