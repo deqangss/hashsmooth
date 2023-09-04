@@ -135,7 +135,7 @@ class CFGModifierEnvConstraints(object):
                                                    device=self.device).float()
         return self.state
 
-    def getReward(self, graph,last_graph, budget_node=1, budget_edge=1):
+    def getReward(self, graph, last_graph, budget_node=1, budget_edge=1):
         n_edge = np.where(graph[:, -1] == 1)[0].size
         n_node = np.max([len(np.unique(graph[:, 0])), len(np.unique(graph[:, 1]))])
         last_n_edge = np.where(last_graph[:, -1] == 1)[0].size
