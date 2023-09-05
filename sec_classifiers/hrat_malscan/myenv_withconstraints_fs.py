@@ -108,6 +108,11 @@ class CFGModifierEnvConstraints(object):
                                               device=self.device)
         done = (cur_label == self.tar_label)
 
+        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        if np.any(check_flag):
+            print('Debug: ', self.cur_graph[check_flag])
+            exit(-1)
+
         if done:
             reward = 10
         else:
