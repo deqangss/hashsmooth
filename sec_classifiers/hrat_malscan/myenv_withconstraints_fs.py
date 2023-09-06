@@ -96,6 +96,11 @@ class CFGModifierEnvConstraints(object):
         else:
             raise ValueError("No action {}.\n".format(action))
 
+        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
+        if np.any(check_flag):
+            print('Debug: ', self.cur_graph[check_flag])
+            exit(-1)
+
         with torch.no_grad():
             self.state = MalScan.get_extra_feature(self.cur_graph,
                                                    self.sen_api_idx,
@@ -107,11 +112,6 @@ class CFGModifierEnvConstraints(object):
                                               top_k=self.top_k,
                                               device=self.device)
         done = (cur_label == self.tar_label)
-
-        check_flag = self.cur_graph[:, 0] == self.cur_graph[:, 1]
-        if np.any(check_flag):
-            print('Debug: ', self.cur_graph[check_flag])
-            exit(-1)
 
         if done:
             reward = 10
