@@ -122,6 +122,7 @@ class MalScan(BasicClassifier):
 
         for adj in graph:
             check_flag = torch.diag(adj) == 0.
+            print(check_flag)
             if np.all(check_flag):
                 print('Debug: ', adj[~check_flag])
                 exit(-1)
