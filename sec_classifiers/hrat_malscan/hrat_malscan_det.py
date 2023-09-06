@@ -122,10 +122,9 @@ class MalScan(BasicClassifier):
 
         for adj in graph:
             check_flag = torch.diag(adj) == 0.
-            print(torch.all(check_flag))
-            if not torch.all(check_flag):
-                print('Debug: ', adj[~check_flag])
-                exit(-1)
+            check_flag2 = adj == 10.
+            print(adj[check_flag2])
+            print(torch.nonzero(check_flag2))
             tmp_adj = torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float()
             print(adj)
             print(adj_size)
@@ -135,6 +134,7 @@ class MalScan(BasicClassifier):
             torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
                          for
                          adj in graph])
+
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
         else:
