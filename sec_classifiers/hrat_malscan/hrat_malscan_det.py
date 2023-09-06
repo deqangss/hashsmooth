@@ -119,21 +119,17 @@ class MalScan(BasicClassifier):
         # A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
         # L = torch.linalg.solve(A, b).squeeze(-1)
         b = torch.ones((adj_size, 1), device=adj_dense.device) * float(beta)
-
-        for adj in graph:
-            check_flag = torch.diag(adj) == 0.
-            check_flag2 = adj == 10.
-            print(adj[check_flag2])
-            print(torch.nonzero(check_flag2))
-            tmp_adj = torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float()
-            print(adj)
-            print(adj_size)
-
-
-        L = torch.stack([torch.linalg.solve(
-            torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
-                         for
-                         adj in graph])
+        try:
+            L = torch.stack([torch.linalg.solve(
+                torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
+                             for
+                             adj in graph])
+        except Exception:
+            L = torch.stack([torch.linalg.solve(
+                torch.eye(adj_size, adj_size, device=adj_dense.device).float() - 0.11 * adj.float(), b).squeeze()
+                             for
+                             adj in graph])
+            exit(-1)
 
         if normalized:
             norm = torch.sign(torch.sum(L, dim=-1, keepdim=True)) * torch.norm(L, dim=-1, keepdim=True)
