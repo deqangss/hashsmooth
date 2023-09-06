@@ -18,7 +18,6 @@ class Net(nn.Module):
         self.out = nn.Linear(50, actions_num)
         self.out.weight.data.normal_(0, 0.1)  # initialization
         self.act = nn.ReLU()
-        # self.logsoftmax = nn.LogSoftmax(dim=1)
         self.softmax = nn.Softmax(dim=1)
 
 
@@ -111,6 +110,7 @@ class DQN(object):
         b_state_new = torch.FloatTensor(b_memory[:, -N_STATES:]).to(self.device)
 
         # q_eval w.r.t the action in experience
+        self.eval_net.train()
         q_eval = self.eval_net(b_state).gather(1, b_action)  # shape (batch, 1)
         q_next = self.target_net(b_state_new).detach()  # detach from graph, don't backpropagate
         q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
