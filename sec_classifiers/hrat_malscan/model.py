@@ -63,6 +63,7 @@ class DQN(object):
     def __init__(self, states_dim, actions_num, memory_capacity, learning_rate, device):
         self.device = device
         self.eval_net, self.target_net = Net(states_dim, actions_num).to(self.device), Net(states_dim, actions_num).to(self.device)
+        self.target_net.eval()
         self.learn_step_counter = 0
         # self.action_space = ['add_edge', 'rewiring', 'add_nodes', 'delete_nodes']
         
