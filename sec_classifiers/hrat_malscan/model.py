@@ -78,12 +78,14 @@ class DQN(object):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
         x = torch.unsqueeze(x.float(), 0).to(self.device)
         # input only one sample
-        if np.random.uniform() < EPSILON:
-            action_type = self.eval_net.forward(x)
-            action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
-        else:  # random
-            action = np.random.randint(actions_num)
-            action_type = action
+        self.eval_net.eval()
+        with torch.no_grad():
+            if np.random.uniform() < EPSILON:
+                action_type = self.eval_net.forward(x)
+                action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
+            else:  # random
+                action = np.random.randint(actions_num)
+                action_type = action
 
         return action_type
 
