@@ -202,6 +202,7 @@ def _main():
               learning_rate=args.lr,
               device=device
               )
+    # dqn.load(args.dataset_dir + '/hrat-dpn-model')
     for idx in tqdm(range(0, len(attack_id))):
         test_mal_id = attack_id[idx]
         print("\nAttacking: {}.\n".format(test_mal_id))
@@ -283,7 +284,6 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
-                action_type = 0
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 if type(action_type) is np.ndarray:
                     action_type = action_type[0]
@@ -356,6 +356,7 @@ def _main():
             logger.info(
                 "{}: predict as {}, Attack {}".format(test_mal_id, pred_y, 0))  # Attack failed
 
+        dqn.save(args.dataset_dir + '/hrat-dpn-model')
 
 def get_feature_rpst(file_pkl):
     feature_dict, label, sha256s = file_pkl

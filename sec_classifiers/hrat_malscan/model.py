@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
+from tools import utils
 
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # device = torch.device('cpu')
@@ -117,3 +119,28 @@ class DQN(object):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+    def save(self, save_dir):
+        utils.mkdir(save_dir)
+
+        net_save_path = os.path.join(save_dir, 'model.ckpt')
+        torch.save({
+            'eval_model':  self.eval_net.state_dict(),
+            'tar_model': self.target_net.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+        },
+            net_save_path)
+
+        utils.dump_pickle((self.memory, self.memory_counter), os.path.join(save_dir, 'aux.pkl'))
+
+    def load(self, save_dir):
+        net_save_path = os.path.join(save_dir, 'model.ckpt')
+        if os.path.exists(net_save_path):
+            ckpt = torch.load(net_save_path)
+            self.eval_net.load_state_dict(ckpt['eval_model'])
+            self.target_net.load_state_dict(ckpt['tar_model'])
+            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        else:
+            raise ValueError
+
+        self.memory, self.memory_counter = utils.read_pickle(os.path.join(save_dir, 'aux.pkl'))
