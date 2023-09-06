@@ -31,7 +31,7 @@ np.random.seed(23456)
 
 cmd_md = argparse.ArgumentParser(description='arguments for hrat attack')
 
-cmd_md.add_argument('--memory_cap', type=int, default=16,
+cmd_md.add_argument('--memory_cap', type=int, default=32,
                     help='The memory capability of DQN.')
 cmd_md.add_argument('--lr', type=float, default=0.01,
                     help='The learning rate of DQN.')
@@ -300,7 +300,7 @@ def _main():
                     info)
                 )
                 if dqn.memory_counter > args.memory_cap:
-                    dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
+                    dqn.learn(args.memory_cap, 32, N_STATES=state.shape[0])
                 if done:
                     # check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     # if check_label == 0:
