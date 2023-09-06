@@ -123,7 +123,7 @@ class MalScan(BasicClassifier):
         for adj in graph:
             check_flag = torch.diag(adj) == 0.
             print(check_flag)
-            if np.all(check_flag):
+            if torch.all(check_flag):
                 print('Debug: ', adj[~check_flag])
                 exit(-1)
             tmp_adj = torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float()
