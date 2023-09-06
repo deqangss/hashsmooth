@@ -119,6 +119,13 @@ class MalScan(BasicClassifier):
         # A = torch.eye(adj_size, adj_size).to(graph.device).float().repeat(bs, 1, 1) - (alpha * graph.float())
         # L = torch.linalg.solve(A, b).squeeze(-1)
         b = torch.ones((adj_size, 1), device=adj_dense.device) * float(beta)
+
+        for adj in graph:
+            tmp_adj = torch.linalg.solve(torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
+            print(tmp_adj.shape)
+            print(tmp_adj)
+
+
         L = torch.stack([torch.linalg.solve(
             torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
                          for
