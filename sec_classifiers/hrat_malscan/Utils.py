@@ -53,7 +53,7 @@ def katz_feature(graph, sen_idx, alpha=0.1, beta=1.0, normalized=True, weight=No
     return feature
 
 
-def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False, max_v=10.):
+def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False):
     file_name = triple_path + "/" + sha256 + ".npy"
     triple = []
 
@@ -61,8 +61,8 @@ def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False, max_v
         print("loading")
         triple = np.load(file_name)
         if triple.shape[0] < adjacent_matrix.shape[0]:
-            triple = trans2triple_rw(
-                adjacent_matrix, sha256, triple_path, overwrite=True, max_v=max_v)
+            triple = trans2tripletrans2triple_rw(
+                adjacent_matrix, sha256, triple_path, overwrite=True)
     else:
         node_num = adjacent_matrix.shape[1]
         # triple = []
@@ -81,7 +81,7 @@ def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False, max_v
         adjacent_matrix = sparse.coo_matrix(adjacent_matrix.toarray())
         r, c = adjacent_matrix.row, adjacent_matrix.col
         pos = np.vstack([r, c]).T
-        pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1).clip(0., max_v)
+        pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1)
         r, c = np.where(adjacent_matrix.toarray() == 0)
         pos = np.vstack([r, c]).T
         pos_zero_element = np.concatenate([pos, np.zeros((len(pos), 1), dtype=int)], axis=-1)
@@ -115,7 +115,7 @@ def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False, max_v
     return triple
 
 
-def trans2triple(adjacent_matrix, max_v=10.):
+def trans2triple(adjacent_matrix):
     # triple = []
     # node_number = adjacent_matrix.shape[0]
     # if type(adjacent_matrix) is sparse.coo_matrix:
@@ -129,7 +129,7 @@ def trans2triple(adjacent_matrix, max_v=10.):
     adjacent_matrix = sparse.coo_matrix(adjacent_matrix.toarray())
     r, c = adjacent_matrix.row, adjacent_matrix.col
     pos = np.vstack([r, c]).T
-    pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1).clip(0, max_v)
+    pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1)
     r, c = np.where(adjacent_matrix.toarray() == 0)
     pos = np.vstack([r, c]).T
     pos_zero_element = np.concatenate([pos, np.zeros((len(pos), 1), dtype=int)], axis=-1)

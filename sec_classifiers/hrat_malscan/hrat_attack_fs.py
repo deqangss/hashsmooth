@@ -358,6 +358,7 @@ def _main():
 
         dqn.save(args.dataset_dir + '/hrat-dpn-model')
 
+
 def get_feature_rpst(file_pkl):
     feature_dict, label, sha256s = file_pkl
     pargs = [(feature_dict[sha256]['adjacent_matrix'], feature_dict[sha256]['sensitive_api_list']) for sha256 in

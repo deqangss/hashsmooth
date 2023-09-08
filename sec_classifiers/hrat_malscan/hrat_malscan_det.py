@@ -110,7 +110,7 @@ class MalScan(BasicClassifier):
 
     @staticmethod
     def _katz_feature(adj_dense: torch.Tensor, x_sensitive_dix: np.ndarray, adj_size: int,
-                      alpha=0.101, beta=1.0, normalized=True):
+                      alpha=0.1, beta=1.0, normalized=True):
         # if not adj_dense.is_sparse:
         # adj_dense = torch.squeeze(adj_dense)
         graph = adj_dense.permute([0, 2, 1])
@@ -120,7 +120,7 @@ class MalScan(BasicClassifier):
         # L = torch.linalg.solve(A, b).squeeze(-1)
         b = torch.ones((adj_size, 1), device=adj_dense.device) * float(beta)
         L = torch.stack([torch.linalg.solve(
-            torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float(), b).squeeze()
+            torch.eye(adj_size, adj_size, device=adj_dense.device).float() - alpha * adj.float().clamp(0., 1.), b).squeeze()
                          for
                          adj in graph])
 
