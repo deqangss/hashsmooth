@@ -118,3 +118,39 @@ def guess_file_name(folder, name):
     file_names = os.listdir(folder)
     rtn_name = [n for n in file_names if name in n]
     return rtn_name
+
+
+def retrive_files_set(base_dir, dir_ext, file_ext):
+    """
+    get file paths given the directory
+    :param base_dir: basic directory
+    :param dir_ext: directory append at the rear of base_dir
+    :param file_ext: file extension
+    :return: set of file paths. Avoid the repetition
+    """
+    def get_file_name(root_dir, file_ext):
+
+        for dir_path, dir_names, file_names in os.walk(root_dir):
+            for file_name in file_names:
+                _ext = file_ext
+                if os.path.splitext(file_name)[1] == _ext:
+                    yield os.path.join(dir_path, file_name)
+                elif '.' not in file_ext:
+                    _ext = '.' + _ext
+
+                    if os.path.splitext(file_name)[1] == _ext:
+                        yield os.path.join(dir_path,file_name)
+                    else:
+                        pass
+                else:
+                    pass
+
+    if file_ext is not None:
+        file_exts = file_ext.split("|")
+    else:
+        file_exts = ['']
+    file_path_set = set()
+    for ext in file_exts:
+        file_path_set = file_path_set | set(get_file_name(os.path.join(base_dir, dir_ext), ext))
+
+    return file_path_set
