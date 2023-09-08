@@ -120,7 +120,7 @@ class CFGModifierEnvConstraints(object):
                     reward = -3.0
             else:
                 if reward == 0 and node_info == [-1, -1, -1]:
-                    reward = -1.0
+                    reward = -3.0
         return self.state, reward, done, node_info, self.cur_graph
 
     def reset(self):
