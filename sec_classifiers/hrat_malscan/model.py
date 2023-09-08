@@ -76,7 +76,7 @@ class DQN(object):
         # self.loss_func = nn.MSELoss()
         self.loss_func = nn.SmoothL1Loss()
 
-    def choose_action(self, x, actions_num, EPSILON=0.8):
+    def choose_action(self, x, actions_num, EPSILON=0.6):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
         x = torch.unsqueeze(x.float(), 0).to(self.device)
         # input only one sample
