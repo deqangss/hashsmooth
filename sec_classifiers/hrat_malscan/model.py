@@ -72,7 +72,8 @@ class DQN(object):
 
         self.memory_counter = 0  # for storing memory
         self.memory = np.zeros((memory_capacity, states_dim * 2 + 5))  # initialize memory
-        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
+        # self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
+        self.optimizer = optim.AdamW(self.eval_net.parameters(), lr=learning_rate, amsgrad=True)
         # self.loss_func = nn.MSELoss()
         self.loss_func = nn.SmoothL1Loss()
 
