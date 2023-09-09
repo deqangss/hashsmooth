@@ -83,7 +83,6 @@ class DQN(object):
         with torch.no_grad():
             if np.random.uniform() < EPSILON:
                 action_type = self.eval_net.forward(x)
-                print("pred: ", action_type)
                 action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
             else:  # random
                 action = np.random.randint(actions_num)
