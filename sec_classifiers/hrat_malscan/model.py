@@ -18,7 +18,7 @@ class Net(nn.Module):
         self.out = nn.Linear(50, actions_num)
         # self.out.weight.data.normal_(0, 0.1)  # initialization
         self.act = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.fc1(x)
@@ -26,8 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        return self.softmax(actions_value)
-        # return actions_value
+        # return self.softmax(actions_value)
+        return actions_value
 
 
 class DQN(object):
@@ -80,10 +80,10 @@ class DQN(object):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
         x = torch.unsqueeze(x.float(), 0).to(self.device)
         # input only one sample
-        self.eval_net.eval()
         with torch.no_grad():
             if np.random.uniform() < EPSILON:
                 action_type = self.eval_net.forward(x)
+                print("pred: ", action_type)
                 action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
             else:  # random
                 action = np.random.randint(actions_num)
@@ -114,7 +114,6 @@ class DQN(object):
         b_state_new = torch.FloatTensor(b_memory[:, -N_STATES:]).to(self.device)
 
         # q_eval w.r.t the action in experience
-        self.eval_net.train()
         q_eval = self.eval_net(b_state).gather(1, b_action)  # shape (batch, 1)
         q_next = self.target_net(b_state_new).detach()  # detach from graph, don't backpropagate
         q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
