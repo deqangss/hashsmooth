@@ -284,6 +284,7 @@ def _main():
                     action_type = np.random.randint(ACTION_NUM)
                 else:
                     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
+                action_type = 0
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 if type(action_type) is np.ndarray:
                     action_type = action_type[0]
