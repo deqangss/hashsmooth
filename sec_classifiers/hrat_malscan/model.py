@@ -73,8 +73,8 @@ class DQN(object):
         self.memory_counter = 0  # for storing memory
         self.memory = np.zeros((memory_capacity, states_dim * 2 + 5))  # initialize memory
         self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
-        self.loss_func = nn.MSELoss()
-        # self.loss_func = nn.SmoothL1Loss()
+        # self.loss_func = nn.MSELoss()
+        self.loss_func = nn.SmoothL1Loss()
 
     def choose_action(self, x, actions_num, EPSILON=0.8):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
