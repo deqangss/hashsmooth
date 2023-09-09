@@ -26,8 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        # return self.softmax(actions_value)
-        return actions_value
+        return self.softmax(actions_value)
+        # return actions_value
 
 
 class DQN(object):
@@ -76,7 +76,7 @@ class DQN(object):
         # self.loss_func = nn.MSELoss()
         self.loss_func = nn.SmoothL1Loss()
 
-    def choose_action(self, x, actions_num, EPSILON=0.6):
+    def choose_action(self, x, actions_num, EPSILON=0.8):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
         x = torch.unsqueeze(x.float(), 0).to(self.device)
         # input only one sample
