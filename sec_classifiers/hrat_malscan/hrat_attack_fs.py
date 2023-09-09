@@ -33,7 +33,7 @@ cmd_md = argparse.ArgumentParser(description='arguments for hrat attack')
 
 cmd_md.add_argument('--memory_cap', type=int, default=16,
                     help='The memory capability of DQN.')
-cmd_md.add_argument('--lr', type=float, default=0.00001,
+cmd_md.add_argument('--lr', type=float, default=0.001,
                     help='The learning rate of DQN.')
 cmd_md.add_argument('--steep', type=float, default=1.,
                     help='The hyper-parameter of surrogate KNN.')

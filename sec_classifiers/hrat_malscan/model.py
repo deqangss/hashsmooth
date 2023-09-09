@@ -26,8 +26,7 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        # return self.softmax(actions_value)
-        return actions_value
+        return self.softmax(actions_value)
 
 
 class DQN(object):
@@ -72,10 +71,8 @@ class DQN(object):
 
         self.memory_counter = 0  # for storing memory
         self.memory = np.zeros((memory_capacity, states_dim * 2 + 5))  # initialize memory
-        # self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
-        self.optimizer = torch.optim.AdamW(self.eval_net.parameters(), lr=learning_rate, amsgrad=True)
-        # self.loss_func = nn.MSELoss()
-        self.loss_func = nn.SmoothL1Loss()
+        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
+        self.loss_func = nn.MSELoss()
 
     def choose_action(self, x, actions_num, EPSILON=0.8):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
