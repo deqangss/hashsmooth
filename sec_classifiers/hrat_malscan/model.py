@@ -26,8 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        return self.softmax(actions_value)
-        # return actions_value
+        # return self.softmax(actions_value)
+        return actions_value
 
 
 class DQN(object):
