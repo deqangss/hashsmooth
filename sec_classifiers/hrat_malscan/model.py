@@ -12,11 +12,11 @@ class Net(nn.Module):
     def __init__(self, states_dim, actions_num):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(states_dim, 1000)
-        # self.fc1.weight.data.normal_(0, 0.1)  # initialization
+        self.fc1.weight.data.normal_(0, 0.1)  # initialization
         self.fc2 = nn.Linear(1000, 50)
-        # self.fc2.weight.data.normal_(0, 0.1)  # initialization
+        self.fc2.weight.data.normal_(0, 0.1)  # initialization
         self.out = nn.Linear(50, actions_num)
-        # self.out.weight.data.normal_(0, 0.1)  # initialization
+        self.out.weight.data.normal_(0, 0.1)  # initialization
         self.act = nn.ReLU()
         self.softmax = nn.Softmax(dim=1)
 
@@ -26,8 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        return self.softmax(actions_value)
-        # return actions_value
+        # return self.softmax(actions_value)
+        return actions_value
 
 
 class DQN(object):
@@ -83,6 +83,7 @@ class DQN(object):
         with torch.no_grad():
             if np.random.uniform() < EPSILON:
                 action_type = self.eval_net.forward(x)
+                print(action_type)
                 action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
             else:  # random
                 action = np.random.randint(actions_num)
