@@ -122,7 +122,7 @@ class DQN(object):
         b_reward = torch.FloatTensor(b_memory[:, N_STATES + 4:N_STATES + 5]).to(self.device)
         b_state_new = torch.FloatTensor(b_memory[:, -N_STATES:]).to(self.device)
         # q_eval w.r.t the action in experience
-        q_eval = self.eval_net(b_state).gather(1, b_action)  # shape (batch, 1)
+        q_eval = self.eval_net(b_state.clamp(0, 1)).gather(1, b_action)  # shape (batch, 1)
         with torch.no_grad():
             q_next = self.target_net(b_state_new)  # detach from graph, don't backpropagate
         # q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
