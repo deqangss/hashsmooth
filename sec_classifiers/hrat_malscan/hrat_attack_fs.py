@@ -300,8 +300,7 @@ def _main():
                     info)
                 )
                 if dqn.memory_counter > args.memory_cap:
-                    # dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
-                    pass
+                    dqn.learn(args.memory_cap, 16, N_STATES=state.shape[0])
                 if done:
                     # check_label = malscan.predict(state_, test_mal_adj.shape[0], device=device)
                     # if check_label == 0:
