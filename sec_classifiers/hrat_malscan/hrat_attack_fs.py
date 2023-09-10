@@ -280,11 +280,10 @@ def _main():
             ep_r = 0
             count = 0
             while True:
-                # if dqn.memory_counter <= args.memory_cap:
-                #     action_type = np.random.randint(ACTION_NUM)
-                # else:
-                #     action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
-                action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
+                if dqn.memory_counter <= args.memory_cap:
+                    action_type = np.random.randint(ACTION_NUM)
+                else:
+                    action_type = dqn.choose_action(state, actions_num=ACTION_NUM)
                 state_, reward, done, info, cur_graph = env.step(action=action_type)
                 if type(action_type) is np.ndarray:
                     action_type = action_type[0]
