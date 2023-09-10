@@ -74,8 +74,10 @@ class DQN(object):
 
         self.memory_counter = 0  # for storing memory
         self.memory = np.zeros((memory_capacity, states_dim * 2 + 5))  # initialize memory
-        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
-        self.loss_func = nn.MSELoss()
+        # self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=learning_rate)
+        # self.loss_func = nn.MSELoss()
+        self.optimizer = torch.optim.AdamW(self.eval_net.parameters(), lr=learning_rate, amsgrad=True)
+        self.loss_func = nn.SmoothL1Loss()
 
     def choose_action(self, x, actions_num, EPSILON=0.8):
         # x = torch.unsqueeze(torch.FloatTensor(x), 0)
@@ -119,17 +121,17 @@ class DQN(object):
         b_action = torch.LongTensor(b_memory[:, N_STATES:N_STATES + 1].astype(int)).to(self.device) # action dimension: 4 []
         b_reward = torch.FloatTensor(b_memory[:, N_STATES + 4:N_STATES + 5]).to(self.device)
         b_state_new = torch.FloatTensor(b_memory[:, -N_STATES:]).to(self.device)
-
         # q_eval w.r.t the action in experience
         q_eval = self.eval_net(b_state).gather(1, b_action)  # shape (batch, 1)
         with torch.no_grad():
-            q_next = self.target_net(b_state_new).detach()  # detach from graph, don't backpropagate
-
+            q_next = self.target_net(b_state_new)  # detach from graph, don't backpropagate
         q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
         loss = self.loss_func(q_eval, q_target)
 
         self.optimizer.zero_grad()
         loss.backward()
+        # In-place gradient clipping
+        torch.nn.utils.clip_grad_value_(self.eval_net.parameters(), 100.)
         self.optimizer.step()
 
     def save(self, save_dir):
