@@ -26,7 +26,8 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = self.act(x)
         actions_value = self.out(x)
-        return self.softmax(actions_value)
+        # return self.softmax(actions_value)
+        return actions_value
 
 
 class DQN(object):
@@ -80,6 +81,7 @@ class DQN(object):
         # input only one sample
         if np.random.uniform() < EPSILON:
             action_type = self.eval_net.forward(x)
+            print(action_type)
             action_type = torch.max(action_type, 1)[1].data.cpu().numpy()
         else:  # random
             action = np.random.randint(actions_num)
