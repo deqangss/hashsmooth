@@ -103,14 +103,14 @@ class DQN(object):
 
     def learn(self, MEMORY_CAPACITY, BATCH_SIZE, N_STATES, TARGET_REPLACE_ITER=10, GAMMA=0.9):
         # target parameter update
-        # if (self.learn_step_counter + 1) % TARGET_REPLACE_ITER == 0:
-        #     self.target_net.load_state_dict(self.eval_net.state_dict())
+        if (self.learn_step_counter + 1) % TARGET_REPLACE_ITER == 0:
+            self.target_net.load_state_dict(self.eval_net.state_dict())
 
-        target_net_state_dict = self.target_net.state_dict()
-        eval_net_state_dict = self.eval_net.state_dict()
-        for key in eval_net_state_dict:
-            target_net_state_dict[key] = eval_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
-        self.target_net.load_state_dict(target_net_state_dict)
+        # target_net_state_dict = self.target_net.state_dict()
+        # eval_net_state_dict = self.eval_net.state_dict()
+        # for key in eval_net_state_dict:
+        #     target_net_state_dict[key] = eval_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
+        # self.target_net.load_state_dict(target_net_state_dict)
 
         self.learn_step_counter += 1
 
@@ -125,7 +125,8 @@ class DQN(object):
         q_eval = self.eval_net(b_state).gather(1, b_action)  # shape (batch, 1)
         with torch.no_grad():
             q_next = self.target_net(b_state_new)  # detach from graph, don't backpropagate
-        q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
+        # q_target = b_reward + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1)  # shape (batch, 1)
+        q_target = b_reward
         loss = self.loss_func(q_eval, q_target)
 
         self.optimizer.zero_grad()
