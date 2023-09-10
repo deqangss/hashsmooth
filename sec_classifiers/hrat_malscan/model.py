@@ -103,14 +103,14 @@ class DQN(object):
 
     def learn(self, MEMORY_CAPACITY, BATCH_SIZE, N_STATES, TARGET_REPLACE_ITER=10, GAMMA=0.9):
         # target parameter update
-        # if self.learn_step_counter % TARGET_REPLACE_ITER == 0:
-        #     self.target_net.load_state_dict(self.eval_net.state_dict())
+        if (self.learn_step_counter + 1) % TARGET_REPLACE_ITER == 0:
+            self.target_net.load_state_dict(self.eval_net.state_dict())
 
-        target_net_state_dict = self.target_net.state_dict()
-        eval_net_state_dict = self.eval_net.state_dict()
-        for key in eval_net_state_dict:
-            target_net_state_dict[key] = eval_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
-        self.target_net.load_state_dict(target_net_state_dict)
+        # target_net_state_dict = self.target_net.state_dict()
+        # eval_net_state_dict = self.eval_net.state_dict()
+        # for key in eval_net_state_dict:
+        #     target_net_state_dict[key] = eval_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
+        # self.target_net.load_state_dict(target_net_state_dict)
 
         self.learn_step_counter += 1
 
@@ -131,7 +131,7 @@ class DQN(object):
         self.optimizer.zero_grad()
         loss.backward()
         # In-place gradient clipping
-        # torch.nn.utils.clip_grad_value_(self.eval_net.parameters(), 100.)
+        torch.nn.utils.clip_grad_value_(self.eval_net.parameters(), 100.)
         self.optimizer.step()
 
     def save(self, save_dir):
