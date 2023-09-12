@@ -251,7 +251,7 @@ class HashSmooth(BasicClassifier):
         else:
             return top2[0]
 
-    def train(self):
+    def fit(self):
         pass
 
     def get_num_subhashcodes(self, n_subfeatures, number_of_hashcodes):

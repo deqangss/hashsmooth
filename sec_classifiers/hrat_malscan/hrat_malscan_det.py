@@ -23,7 +23,7 @@ class MalScan(BasicClassifier):
     def eval(self):
         pass
 
-    def train(self):
+    def fit(self):
         pass
 
     def predict(self, x: (np.ndarray, torch.Tensor), adj_size: int, top_k=1, x_sensitive_dix=None,

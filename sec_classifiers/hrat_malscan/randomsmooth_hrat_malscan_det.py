@@ -155,7 +155,7 @@ class RandomSmooth4MalScan(RandomSmooth):
     def eval(self):
         pass
 
-    def train(self):
+    def fit(self):
         pass
 
     def certify(self, x: np.ndarray, label: int, n_selection: int, n_estimation: int, k_per_instance: (float, int),

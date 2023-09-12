@@ -73,7 +73,8 @@ class Dataset(torch.utils.data.Dataset):
         if label is None:
             return torch.utils.data.DataLoader(data, **data_params)
         elif isinstance(label, (list, np.ndarray, torch.Tensor)):
-            return DatasetTorch(data, label)
+            return torch.utils.data.DataLoader(
+                DatasetTorch(data, label), **data_params)
         else:
             raise ValueError
 

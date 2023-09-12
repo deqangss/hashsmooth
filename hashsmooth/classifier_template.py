@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+import torch
 import warnings
 
 
@@ -16,7 +17,7 @@ class BasicClassifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def train(self):
+    def fit(self):
         raise NotImplementedError
 
     @abstractmethod
