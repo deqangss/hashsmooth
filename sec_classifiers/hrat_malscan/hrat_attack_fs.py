@@ -127,7 +127,7 @@ def _main():
                                          k_per_instance=args.sub_k)
     elif args.model == 'random_malscan':
         input_transfermor = RandomTransformer(keep_per_image=args.sub_k,
-                                              reuse_noise=False,  # time-consuming if set reuse_noise to be false
+                                              reuse_noise=True,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
         train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
         train_x_producer = torch.from_numpy(train_x_train)
