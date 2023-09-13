@@ -130,6 +130,8 @@ def _main():
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
         train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
+        print(train_x_train.shape)
+        exit(0)
         train_x_producer = torch.from_numpy(train_x_train)
         train_y = torch.from_numpy(train_y).to(device)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
