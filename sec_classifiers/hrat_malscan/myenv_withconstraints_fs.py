@@ -581,7 +581,7 @@ class CFGModifierEnvConstraints(object):
                 if current_batch_size <= 0:
                     break
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
-                                                              self.transformer_obj.keep_per_image)
+                                                              self.transformer_obj.k_randomcode)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 dist = torch.cat(

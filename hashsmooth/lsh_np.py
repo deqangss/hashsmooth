@@ -79,7 +79,7 @@ class JaccardLSHTransformer(LSHTransformer):
         super(JaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
         self.offset = 0
 
-    def _map(self, ipt, sub_k_tmp):
+    def _map(self, ipt: np.ndarray, sub_k_tmp):
         """
         map the input to a universal random space
         :param ipt: an array of word indices correspond to a vocabulary
@@ -87,13 +87,20 @@ class JaccardLSHTransformer(LSHTransformer):
         """
         assert isinstance(ipt, np.ndarray)
         assert len(ipt.shape) == 2, f"Expected a batch of vectors (e.g., 2D array), but got {len(ipt.shape)}.\n"
-        if ipt.dtype != int:
-            warnings.warn(f"Convert the {ipt.dtype} input to be unsigned int.\n")
-            ipt = ipt.astype(np.uint32)
-        if np.min(ipt) == 0:
+
+        # get nonzero indices
+        ipt_sp = sp_sparse.csr_matrix(ipt)
+        longest_num_nonzero = max(abs(np.diff(ipt_sp.indptr)))
+        ipt_nonzero_ind = np.zeros((ipt.shape[0], longest_num_nonzero), dtype=int)
+        nonzero_list = np.split(ipt_sp.indices, ipt_sp.indptr)[1:-1]
+        for i, nonzero in enumerate(nonzero_list):
+            i_num = len(nonzero)
+            ipt_nonzero_ind[i, :i_num] = nonzero
+
+        if np.min(ipt_nonzero_ind) == 0:
             self.offset = 1
-        ipt += self.offset
-        r, c = ipt.shape
+        ipt_nonzero_ind += self.offset
+        r, c = ipt_nonzero_ind.shape
         k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
         _x, _y = self._init_permutations(k, r)  # keep the same data format
         # hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
@@ -103,23 +110,26 @@ class JaccardLSHTransformer(LSHTransformer):
         #     hash_code_tmp = (ipt_columnwise.astype(np.uint64) * np.tile(_x, (r, 1)).astype(
         #         np.uint64) + _y) % _mersenne_primer
         #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
-
-        ipt_ext = ipt[:, None, :]  # shape: r, 1, c
+        ipt_ext = ipt_nonzero_ind[:, None, :]  # shape: r, 1, c
         hash_code_tmp = (ipt_ext.astype(np.uint64) * _x[..., None].astype(np.uint64) + _y[..., None]) % _mersenne_primer
         hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
-        return hash_codes, (_x, _y)
+        return hash_codes, (_x, _y), ipt
 
     def _inverse_map(self, hash_codes_mapped):
         """
         map hash codes back into the input space
         :param hash_codes_mapped: pair of hash codes and permutations
         """
-        hash_codes, permutations = hash_codes_mapped
+        hash_codes, permutations, ipt = hash_codes_mapped
         assert hash_codes.dtype == np.uint32
         _x, _y = permutations
-        return np.mod(
+        indices_tran = np.mod(
             (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
             _mersenne_primer) - self.offset
+        ipt_tran = np.zeros_like(ipt)
+        n_instances = ipt.shape[0]
+        ipt_tran[np.arange(n_instances)[:, None], indices_tran] = ipt[np.arange(n_instances)[:, None], indices_tran]
+        return ipt_tran
 
     def _init_permutations(self, sub_k: int, r: int):
         """
@@ -539,7 +549,6 @@ def test_jaccard_dist():
     i: int = 1
     while i <= 10:
         input_transf = jaccard_lsh.transform(input_array)
-        print(input_transf)
         assert set(input_transf.flatten()).issubset(set(input_array.flatten()))
         i += 1
 
@@ -564,5 +573,5 @@ def test_w_jaccard_lsh():
 
 if __name__ == "__main__":
     # test_pstable_dist()
-    # test_jaccard_dist()
-    test_w_jaccard_lsh()
+    test_jaccard_dist()
+    # test_w_jaccard_lsh()

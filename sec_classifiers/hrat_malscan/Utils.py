@@ -81,7 +81,7 @@ def trans2triple_rw(adjacent_matrix, sha256, triple_path, overwrite=False):
         adjacent_matrix = sparse.coo_matrix(adjacent_matrix.toarray())
         r, c = adjacent_matrix.row, adjacent_matrix.col
         pos = np.vstack([r, c]).T
-        pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1)
+        pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None].clip(0, 1)], axis=-1)
         r, c = np.where(adjacent_matrix.toarray() == 0)
         pos = np.vstack([r, c]).T
         pos_zero_element = np.concatenate([pos, np.zeros((len(pos), 1), dtype=int)], axis=-1)
@@ -129,7 +129,7 @@ def trans2triple(adjacent_matrix):
     adjacent_matrix = sparse.coo_matrix(adjacent_matrix.toarray())
     r, c = adjacent_matrix.row, adjacent_matrix.col
     pos = np.vstack([r, c]).T
-    pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None]], axis=-1)
+    pos_one_element = np.concatenate([pos, np.array(adjacent_matrix.data)[..., None].clip(0, 1)], axis=-1)
     r, c = np.where(adjacent_matrix.toarray() == 0)
     pos = np.vstack([r, c]).T
     pos_zero_element = np.concatenate([pos, np.zeros((len(pos), 1), dtype=int)], axis=-1)

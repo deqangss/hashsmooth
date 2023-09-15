@@ -60,12 +60,12 @@ class JaccardLSHTransformerTorch(LSHTransformerTorch):
     def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
-            ipt_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
-            elem_indicator = (ipt_np == ipt_tran) & (ipt_tran != self.null_value)
-            elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device(), dtype=ipt.dtype)
-            null_value_torch = torch.ones_like(ipt, device=ipt.device()) * self.null_value
-            null_value_torch[elem_indicator] = 0.
-        return ipt * elem_indicator_torch + null_value_torch
+            ipt_np_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
+            elem_indicator = (ipt_np == ipt_np_tran) & (ipt_np_tran != self.null_value)
+            elem_indicator_torch = torch.from_numpy(elem_indicator).to(ipt.device, dtype=torch.bool)
+            null_value_torch = torch.ones_like(ipt, device=ipt.device) * self.null_value
+            null_value_torch[elem_indicator_torch] = 0.
+        return ipt * elem_indicator_torch.to(ipt.dtype) + null_value_torch
 
     def get_collision_prob(self, distance):
         return self.lsh_np.get_collision_prob(distance)

@@ -27,8 +27,8 @@ class HashSmooth(BasicClassifier):
                  num_of_classes: int,
                  hash_methods: list,
                  n_subfeatures: list,
-                 k_hashcode: int,
-                 max_k: int,
+                 k_hashcode: (int, float),
+                 max_k:int,
                  max_radii: list,
                  n_grids: list,
                  default_mode=True
@@ -40,7 +40,6 @@ class HashSmooth(BasicClassifier):
         :param hash_methods: a list of LSH schemes
         :param n_subfeatures: a list of number of heterogeneous features
         :param k_hashcode: the number of hash functions is utilized to compose transformations
-        :param max_k: the maximum number of hash codes
         :param max_radii: a list of maximum radii
         :param n_grids: number of grids to split the radius
         :param default_mode: use the estimated confidence of the second class or not
@@ -61,12 +60,11 @@ class HashSmooth(BasicClassifier):
             assert all([n_subfeature >= 0 for n_subfeature in n_subfeatures])
         self.n_subfeatures = n_subfeatures
         self.k_hashcode = k_hashcode
+        self.max_k = max_k
         if len(self.n_subfeatures) > 0 and self.n_subfeatures[0] > 0 and self.k_hashcode > 0:
             self.k_subhashcodes = self.get_num_subhashcodes(self.n_subfeatures, self.k_hashcode)
         else:
             self.k_subhashcodes = []
-
-        self.max_k = max_k
 
         if len(max_radii) == 0:
             warnings.warn("Initialization can be conducted in the method of '_calc_radius'.\n")
@@ -201,6 +199,8 @@ class HashSmooth(BasicClassifier):
     np.ndarray, torch.Tensor):
         """
         conduct the input transformation
+        We here leave alternative initialization for 'n_subfeatures' and 'k_subhashcode' because sometimes we just assure
+        them before running the hash transformation instance-specifically.
         """
         assert len(input_vectors.shape) == 2, "Only support 2D array: batch_size x dimension.\n"
         # hash_methods = self.randomized_trans if len(self.randomized_trans) > 0 else hash_methods
@@ -254,21 +254,33 @@ class HashSmooth(BasicClassifier):
     def fit(self):
         pass
 
-    def get_num_subhashcodes(self, n_subfeatures, number_of_hashcodes):
-        assert len(n_subfeatures) > 0
-        n_features = sum(n_subfeatures)
-        assert number_of_hashcodes > 0
-        if isinstance(number_of_hashcodes, float) and 0 < number_of_hashcodes <= 1.:
-            n_hashcodes = math.ceil(n_features * number_of_hashcodes)
+    def get_num_subhashcodes(self, n_subfeatures, k_per_instance):
+        assert isinstance(n_subfeatures, list) and sum(n_subfeatures) > 0
+        assert k_per_instance > 0
+
+        def _get_num_subhashcodes(_k_per_instance):
+            n_features = sum(n_subfeatures)
+            if isinstance(_k_per_instance, float) and 0 < _k_per_instance <= 1.:
+                _k_per_instance = math.ceil(n_features * _k_per_instance)
+            else:
+                _k_per_instance = int(_k_per_instance)
+            k_subhashcodes = []
+            for n_subfeature in n_subfeatures:
+                ratio = float(n_subfeature) / float(n_features)
+                k_subhash = math.ceil(_k_per_instance * ratio)
+                k_subhash = k_subhash if k_subhash >= 2 else 2
+                k_subhashcodes.append(k_subhash)
+            return k_subhashcodes
+
+        if isinstance(k_per_instance, int) and k_per_instance > 1:
+            k_per_instance = min(k_per_instance, self.max_k)
+            k_subhashcodes = _get_num_subhashcodes(k_per_instance)
+        elif isinstance(k_per_instance, float) and 0. < k_per_instance <= 1.:
+            k_hashcode_ = min(math.ceil(sum(n_subfeatures) * k_per_instance), self.max_k)
+            k_subhashcodes = _get_num_subhashcodes(k_hashcode_)
         else:
-            n_hashcodes = int(number_of_hashcodes)
-        n_subhashcodes = []
-        for n_subfeature in n_subfeatures:
-            ratio = float(n_subfeature) / float(n_features)
-            n_subhash = math.ceil(n_hashcodes * ratio)
-            n_subhash = n_subhash if n_subhash >= 2 else 2
-            n_subhashcodes.append(n_subhash)
-        return n_subhashcodes
+            k_subhashcodes = self.k_subhashcodes
+        return k_subhashcodes
 
     def _calc_radius(self, probas, second_probas, k_subhashcodes=[], max_radii=[], n_grids=[]):
         """

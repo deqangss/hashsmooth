@@ -126,14 +126,14 @@ def _main():
         predict_func = functools.partial(malscan.predict, n=args.n_sampling, alpha=args.alpha, n_subfeatures=[],
                                          k_per_instance=args.sub_k)
     elif args.model == 'random_malscan':
-        input_transfermor = RandomTransformer(keep_per_image=args.sub_k,
+        input_transfermor = RandomTransformer(k_randomcode=args.sub_k,
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
         train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
         train_x_producer = torch.from_numpy(train_x_train)
         train_y = torch.from_numpy(train_y).to(device)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
-        malscan = RandomSmooth4MalScan(malscan, number_of_classes=2,
+        malscan = RandomSmooth4MalScan(malscan, num_of_classes=2,
                                        transform_method=input_transfermor,
                                        max_k=args.sub_k,
                                        default_mode=True
@@ -410,7 +410,7 @@ def get_rpst_randomtran(train_x, tran_func_obj, batch_size, device):
             break
         batch_train_x = train_x[current_idx: current_idx + batch_size]
         feature_x.append(tran_func_obj.transform(torch.from_numpy(batch_train_x).float().to(device),
-                                                 tran_func_obj.keep_per_image).cpu().numpy())
+                                                 tran_func_obj.k_randomcode).cpu().numpy())
         current_idx += batch_size
     return np.vstack(feature_x)
 

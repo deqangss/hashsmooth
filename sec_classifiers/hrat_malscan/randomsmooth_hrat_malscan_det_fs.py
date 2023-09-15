@@ -10,32 +10,32 @@ from hashsmooth.utils_hash import lower_confidence_interval
 
 
 class RandomTransformer(object):
-    def __init__(self, keep_per_image, reuse_noise=False, seed=0):
+    def __init__(self, k_randomcode, reuse_noise=False, seed=0):
         """
         codes are came from https://github.com/alevine0/randomizedAblation
         """
-        self.keep_per_image = keep_per_image
+        self.k_randomcode = k_randomcode
         self.reuse_noise = reuse_noise
         self.seed = seed
 
-    def transform(self, batch: torch.Tensor, keep_per_image: int) -> torch.tensor:
+    def transform(self, batch: torch.Tensor, k_randomcode=0) -> torch.tensor:
         """
         the method warks as the method of 'random_mask_batch_one_sample' in randmozedAblation repository
         :return: transfored input
         """
-        self.keep_per_image = keep_per_image if keep_per_image > 0 else self.keep_per_image
+        self.k_randomcode = k_randomcode if k_randomcode > 0 else self.k_randomcode
         flat = batch.reshape(batch.shape[0], -1)
         out_c1 = torch.zeros(flat.shape, dtype=flat.dtype).cuda()
         out_c2 = torch.zeros(flat.shape, dtype=flat.dtype).cuda()
 
         if (self.reuse_noise):
             ones = torch.ones(flat.shape[1]).cuda()
-            idx = torch.multinomial(ones, self.keep_per_image)
-            # idx = np.random.choice(flat.shape[1], self.keep_per_image, replace=False)
+            idx = torch.multinomial(ones, self.k_randomcode)
+            # idx = np.random.choice(flat.shape[1], self.k_randomcode, replace=False)
             out_c1[:, idx] = flat[:, idx]
             # out_c2[:, idx] = 1. - flat[:, idx]
         else:
-            idx = self._batch_choose(flat.shape[1], self.keep_per_image, flat.shape[0])
+            idx = self._batch_choose(flat.shape[1], self.k_randomcode, flat.shape[0])
             idx_range = torch.arange(idx.shape[0]).cuda().unsqueeze(0).t()
             out_c1[(idx_range, idx)] = flat[(idx_range, idx)]
             # out_c2[(idx_range, idx)] = 1. - flat[(idx_range, idx)]
@@ -71,10 +71,10 @@ class RandomTransformer(object):
 class RandomSmooth(BasicClassifier):
     ABSTAIN = -1
 
-    def __init__(self, base_classifier, number_of_classes, transform_method, max_k=1000, default_mode=True):
+    def __init__(self, base_classifier, num_of_classes, transform_method, max_k=1000, default_mode=True):
         self.base_classifier = base_classifier
         BasicClassifier.__init__(self, self.base_classifier.batch_size)
-        self.number_of_classes = number_of_classes
+        self.num_of_classes = num_of_classes
         self.transform_method = transform_method
         self.default_mode = default_mode
         self.max_k = max_k
@@ -116,7 +116,7 @@ class RandomSmooth(BasicClassifier):
         expanded = batch.repeat_interleave(n_sampling, 0)  # shape: batch*num_samples x batch.shape[1:]
         masked = self.transform_method.transform(expanded, keep_per_image)
         votes = self.base_classifier.predict(masked)
-        hard = torch.zeros((len(votes), self.number_of_classes)).cuda()
+        hard = torch.zeros((len(votes), self.num_of_classes)).cuda()
         hard.scatter_(1, votes.unsqueeze(1), 1)
         if not is_npy:
             return hard.reshape((batch.shape[0], n_sampling,) + hard.shape[1:]).mean(dim=1)
@@ -145,12 +145,12 @@ class RandomSmooth(BasicClassifier):
 
 
 class RandomSmooth4MalScan(RandomSmooth):
-    def __init__(self, malscan_det: MalScan, number_of_classes: int, transform_method: RandomTransformer,
+    def __init__(self, malscan_det: MalScan, num_of_classes: int, transform_method: RandomTransformer,
                  max_k: int, default_mode: bool):
         """
         Customized RandomSmooth w.r.t. Malscan
         """
-        RandomSmooth.__init__(self, malscan_det, number_of_classes, transform_method, max_k, default_mode)
+        RandomSmooth.__init__(self, malscan_det, num_of_classes, transform_method, max_k, default_mode)
 
     def eval(self):
         pass
@@ -245,4 +245,4 @@ class RandomSmooth4MalScan(RandomSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
-        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.number_of_classes), k_per_instance
+        return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes), k_per_instance
