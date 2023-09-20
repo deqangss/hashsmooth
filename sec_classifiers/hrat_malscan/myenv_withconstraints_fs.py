@@ -528,8 +528,6 @@ class CFGModifierEnvConstraints(object):
 
         def _get_nn_sample(dist):
             is_benign = self.w == 1.
-            print(dist.shape, is_benign.shape)
-            exit(-1)
             ben_dist = dist[:, is_benign]
             if self.top_k > 1:
                 ben_knn_num = self.top_k if self.top_k <= ben_dist.shape[1] else ben_dist.shape[1]
@@ -586,9 +584,11 @@ class CFGModifierEnvConstraints(object):
                                                               self.transformer_obj.k_randomcode)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-                dist = torch.cat(
+                dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
                      self.X_train])
+                print(dist.shape)
+                exit(-1)
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
                 dist_s, w = _get_nn_sample(dist)
