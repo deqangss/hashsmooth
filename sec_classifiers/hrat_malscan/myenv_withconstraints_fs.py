@@ -566,7 +566,7 @@ class CFGModifierEnvConstraints(object):
                     break
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
-                dist = torch.cat(
+                dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 dist_s, w = _get_nn_sample(dist)
@@ -587,8 +587,6 @@ class CFGModifierEnvConstraints(object):
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
                      self.X_train])
-                print(dist.shape)
-                exit(-1)
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
                 dist_s, w = _get_nn_sample(dist)
