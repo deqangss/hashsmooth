@@ -528,6 +528,8 @@ class CFGModifierEnvConstraints(object):
 
         def _get_nn_sample(dist):
             is_benign = self.w == 1.
+            print(dist.shape, is_benign.shape)
+            exit(-1)
             ben_dist = dist[:, is_benign]
             if self.top_k > 1:
                 ben_knn_num = self.top_k if self.top_k <= ben_dist.shape[1] else ben_dist.shape[1]
