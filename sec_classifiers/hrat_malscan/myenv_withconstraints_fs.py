@@ -566,6 +566,8 @@ class CFGModifierEnvConstraints(object):
                     break
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
+                print(feature_tran.shape)
+                exit(-1)
                 dist = torch.cat(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
