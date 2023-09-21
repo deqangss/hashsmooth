@@ -575,8 +575,8 @@ class CFGModifierEnvConstraints(object):
         elif isinstance(self.malware_detector, RandomSmooth4MalScan):
             n_counts = self.n_sampling
             loss = 0
-            for idx in range(n_counts // self.batch_size + 1):
-                current_batch_size = min(self.batch_size, n_counts)
+            for idx in range(n_counts // 1 + 1):
+                current_batch_size = min(1, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
