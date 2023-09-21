@@ -584,6 +584,8 @@ class CFGModifierEnvConstraints(object):
                                                               self.transformer_obj.k_randomcode)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
+                print(feature_tran.shape, len(self.X_train))
+                exit(-1)
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
                      self.X_train])
