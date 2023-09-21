@@ -588,9 +588,8 @@ class CFGModifierEnvConstraints(object):
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
 
                 dist = torch.hstack(
-                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in
-                     self.X_train]).to(feature.device)
-                print(feature_tran.shape, dist.shape)
+                    [torch.sum((feature_tran[:, None, :] - x[None, ...].detach().to(feature.device)).pow(2), -1) for x in
+                     self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
                 dist_s, w = _get_nn_sample(dist)
