@@ -566,8 +566,6 @@ class CFGModifierEnvConstraints(object):
                     break
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
-
-                print(self.X_train[0])
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].detach()).pow(2), -1) for x in self.X_train])
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
@@ -587,7 +585,7 @@ class CFGModifierEnvConstraints(object):
                                                               self.transformer_obj.k_randomcode)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-
+                print(self.X_train[0])
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].detach().to(feature.device)).pow(2), -1) for x in
                      self.X_train])
