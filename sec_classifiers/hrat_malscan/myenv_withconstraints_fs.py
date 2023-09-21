@@ -551,7 +551,6 @@ class CFGModifierEnvConstraints(object):
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
-            print(feature.shape, len(self.X_train))
             dist = torch.cat(
                 [torch.sum((feature.float() - torch.squeeze(x.to(feature.device))).pow(2), 1) for x in self.X_train])
             dist_s, w = _get_nn_sample(dist[None, ...])
@@ -586,7 +585,6 @@ class CFGModifierEnvConstraints(object):
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 print(feature_tran.shape, len(self.X_train))
-                exit(-1)
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
                      self.X_train])
