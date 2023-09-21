@@ -410,7 +410,7 @@ def get_rpst_randomtran(train_x, tran_func_obj, batch_size, device):
     num_x = train_x.shape[0]
     current_idx = 0
     for idx in range(num_x // batch_size + 1):
-        if current_idx >= num_x - 1:
+        if current_idx >= num_x:
             break
         batch_train_x = train_x[current_idx: current_idx + batch_size]
         feature_x.append(tran_func_obj.transform(torch.from_numpy(batch_train_x).float().to(device),
