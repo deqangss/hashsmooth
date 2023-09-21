@@ -129,10 +129,10 @@ def _main():
         input_transfermor = RandomTransformer(k_randomcode=args.sub_k,
                                               reuse_noise=True,  # time-consuming if set reuse_noise to be false
                                               seed=args.seed)
-        train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
-        train_x_producer = torch.from_numpy(train_x_train)
+        train_x_tran = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
+        train_x_producer = torch.from_numpy(train_x_tran)
         train_y = torch.from_numpy(train_y).to(device)
-        print(train_x_train.shape, train_y.shape)
+        print(train_x.shape, train_x_tran.shape, train_y.shape)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, num_of_classes=2,
                                        transform_method=input_transfermor,
