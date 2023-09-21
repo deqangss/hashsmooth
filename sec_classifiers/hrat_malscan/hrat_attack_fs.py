@@ -132,6 +132,7 @@ def _main():
         train_x_train = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
         train_x_producer = torch.from_numpy(train_x_train)
         train_y = torch.from_numpy(train_y).to(device)
+        print(train_x_train.shape, train_y.shape)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, num_of_classes=2,
                                        transform_method=input_transfermor,
