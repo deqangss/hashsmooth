@@ -232,6 +232,8 @@ def _main():
 
         print('\t ==== select the nearest neighbors for optimization ====')
 
+        print(train_x_producer.shape, train_y.shape)
+        exit(-1)
         X_train_list = torch.split(train_x_producer, args.batch_size)
         dist = torch.cat(
             [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
@@ -256,7 +258,6 @@ def _main():
             X_train_sel = torch.vstack([ben_train_x, mal_train_x])
         weight = (2 * (train_y_s != 0) - 1).float()
 
-        print("hererere")
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                  tar_label=1,
                                                                  target_sen_api_idx=test_sensi_idx,
