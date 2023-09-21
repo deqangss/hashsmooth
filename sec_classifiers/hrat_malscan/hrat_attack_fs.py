@@ -255,6 +255,8 @@ def _main():
             train_y_s[:len(ben_train_x)] = 1
             X_train_sel = torch.vstack([ben_train_x, mal_train_x])
         weight = (2 * (train_y_s != 0) - 1).float()
+
+        print("hererere")
         env = myenv_withconstraints_fs.CFGModifierEnvConstraints(target_graph=test_mal_triple,
                                                                  tar_label=1,
                                                                  target_sen_api_idx=test_sensi_idx,
