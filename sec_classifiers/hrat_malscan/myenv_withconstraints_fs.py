@@ -567,7 +567,7 @@ class CFGModifierEnvConstraints(object):
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
                 dist = torch.hstack(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in self.X_train])
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...]).pow(2), -1) for x in self.X_train]).to(feature.device)
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 dist_s, w = _get_nn_sample(dist)
                 loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
@@ -576,8 +576,8 @@ class CFGModifierEnvConstraints(object):
             n_counts = self.n_sampling
             loss = 0
             _dist = []
-            for idx in range(n_counts // 1 + 1):
-                current_batch_size = min(1, n_counts)
+            for idx in range(n_counts // self.batch_size + 1):
+                current_batch_size = min(self.batch_size, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
@@ -585,12 +585,10 @@ class CFGModifierEnvConstraints(object):
                                                               self.transformer_obj.k_randomcode)
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
-                print(feature_tran.shape, len(self.X_train))
 
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...]).pow(2), -1) for x in
                      self.X_train]).to(feature.device)
-                print(dist.shape)
 
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
