@@ -588,8 +588,8 @@ class CFGModifierEnvConstraints(object):
                 print(feature_tran.shape, len(self.X_train))
 
                 dist = torch.hstack(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
-                     self.X_train])
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...]).pow(2), -1) for x in
+                     self.X_train]).to(feature.device)
                 print(dist.shape)
 
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
