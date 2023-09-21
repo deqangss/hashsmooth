@@ -575,6 +575,7 @@ class CFGModifierEnvConstraints(object):
         elif isinstance(self.malware_detector, RandomSmooth4MalScan):
             n_counts = self.n_sampling
             loss = 0
+            _dist = []
             for idx in range(n_counts // 1 + 1):
                 current_batch_size = min(1, n_counts)
                 n_counts -= current_batch_size
@@ -585,9 +586,12 @@ class CFGModifierEnvConstraints(object):
                 # total_time = time.time() - start_time
                 # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
                 print(feature_tran.shape, len(self.X_train))
+
                 dist = torch.hstack(
                     [torch.sum((feature_tran[:, None, :] - x[None, ...].to(feature.device)).pow(2), -1) for x in
                      self.X_train])
+                print(dist.shape)
+
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
                 dist_s, w = _get_nn_sample(dist)
