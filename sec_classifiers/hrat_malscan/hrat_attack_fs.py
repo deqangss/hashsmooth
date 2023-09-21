@@ -132,7 +132,6 @@ def _main():
         train_x_tran = get_rpst_randomtran(train_x, input_transfermor, args.batch_size, device)
         train_x_producer = torch.from_numpy(train_x_tran)
         train_y = torch.from_numpy(train_y).to(device)
-        print(train_x.shape, train_x_tran.shape, train_y.shape)
         malscan = MalScan(train_x_producer, train_y, args.batch_size)
         malscan = RandomSmooth4MalScan(malscan, num_of_classes=2,
                                        transform_method=input_transfermor,
@@ -232,9 +231,6 @@ def _main():
             continue
 
         print('\t ==== select the nearest neighbors for optimization ====')
-
-        print(train_x_producer.shape, train_y.shape)
-        exit(-1)
         X_train_list = torch.split(train_x_producer, args.batch_size)
         dist = torch.cat(
             [torch.sum((test_mal_representation.float() - torch.squeeze(x.to(device))).pow(2), 1) for x in
