@@ -567,7 +567,7 @@ class CFGModifierEnvConstraints(object):
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
                 dist = torch.hstack(
-                    [torch.sum((feature_tran[:, None, :] - x[None, ...].detach()).pow(2), -1) for x in self.X_train])
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in self.X_train]).to(feature.device)
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 dist_s, w = _get_nn_sample(dist)
                 loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
