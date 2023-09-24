@@ -124,8 +124,6 @@ class DrebinNN(BasicClassifier):
             losses, accuracies = [], []
             for i_batch, (x_train, y_train) in enumerate(train_x_y):
                 x_train, y_train = x_train.to(device), y_train.to(device)
-                print(y_train)
-                exit(-1)
                 optimizer.zero_grad()
                 logits = self.model(x_train)
                 loss_train = self.criterion(logits, y_train.to(torch.long))
@@ -149,6 +147,7 @@ class DrebinNN(BasicClassifier):
                     logits = self.model(x_val)
                     acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
                     print(logits.argmax(dim=-1), y_val, x_val.size()[0])
+                    exit(-1)
                     acc_val /= x_val.size()[0]
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
