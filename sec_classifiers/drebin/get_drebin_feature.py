@@ -124,8 +124,6 @@ def get_drebin(pargs):
         hardware_list, \
         intentfilter_list = get_feature_xml(apk_path)
 
-        print("okokok")
-
         # get dex features
         pmap = AxplorerMapping()
         used_permission_list, \
@@ -143,6 +141,8 @@ def get_drebin(pargs):
         data_dict['restricted_api_list'] = restricted_api_list
         data_dict['suspicious_api_list'] = suspicious_api_list
         data_dict['url_list'] = url_list
+
+        print("okokok")
 
         drebin_utils.dump_feature(data_dict, feature_save_path)
         return 1, feature_save_path
