@@ -134,6 +134,7 @@ class DrebinNN(BasicClassifier):
                 losses.append(loss_train)
 
                 if i_batch == 200:
+                    print('train: ', accuracies)
                     avg_acc_val = []
                     for x_val, y_val in validation_x_y:
                         x_val, y_val = x_val.to(device), y_val.to(device)
