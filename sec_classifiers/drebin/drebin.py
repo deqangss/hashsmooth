@@ -107,7 +107,7 @@ class DrebinNN(BasicClassifier):
             torch.nn.ReLU(),
             torch.nn.Linear(200, 200),
             torch.nn.ReLU(),
-            torch.nn.Dropout(0.6),
+            # torch.nn.Dropout(0.4),
             torch.nn.Linear(200, self.num_classes)
         )
 
