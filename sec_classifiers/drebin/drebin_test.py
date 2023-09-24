@@ -56,6 +56,7 @@ logger.addHandler(utils.ErrorHandler)
 
 def _main():
     args = cmd_md.parse_args()
+    logger.info(vars(args))
     if not os.path.exists(args.save_path):
         utils.mkdir(args.save_path)
 
