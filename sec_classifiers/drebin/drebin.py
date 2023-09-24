@@ -133,7 +133,7 @@ class DrebinNN(BasicClassifier):
                 accuracies.append(accuray_train)
                 losses.append(loss_train)
 
-                if i_batch == 200:
+                if i_batch == 97:
                     print('train: ', accuracies)
                     avg_acc_val = []
                     for x_val, y_val in validation_x_y:
