@@ -146,6 +146,7 @@ class DrebinNN(BasicClassifier):
 
                     logits = self.model(x_val)
                     acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                    print(logits.argmax(dim=-1), y_val, x_val.size()[0])
                     acc_val /= x_val.size()[0]
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
