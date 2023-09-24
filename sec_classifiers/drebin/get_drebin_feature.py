@@ -437,8 +437,7 @@ def get_drebin_features(file_dir=None, feature_save_dir=None, overwrite=True) ->
     feature_files = []
     pargs = [(apk_path, os.path.join(feature_save_dir, os.path.splitext(os.path.basename(apk_path))[0]), overwrite) for
              apk_path in apk_paths]
-    # n_proc = 1 if multiprocessing.cpu_count() - 2 <= 1 else multiprocessing.cpu_count() - 2
-    n_proc = 1
+    n_proc = 1 if multiprocessing.cpu_count() - 2 <= 1 else multiprocessing.cpu_count() - 2
     with multiprocessing.Pool(n_proc) as pool:
         for idx, res in enumerate(pool.imap(get_drebin, pargs)):
             if res[0]:
