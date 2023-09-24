@@ -1,0 +1,1 @@
+python -m sec_classifiers.drebin.get_drebin_feature --dataset_dir /path/to/dataset_directory --feature_dir path/to/save/feature_directory/hashsmooth-drebin
