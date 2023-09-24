@@ -122,7 +122,7 @@ class DrebinNN(BasicClassifier):
         for i in range(epochs):
             self.model.train()
             losses, accuracies = [], []
-            for i_batch, (x_train, y_train) in enumerate(validation_x_y):
+            for i_batch, (x_train, y_train) in enumerate(train_x_y):
                 x_train, y_train = x_train.to(device), y_train.to(device)
                 optimizer.zero_grad()
                 logits = self.model(x_train)

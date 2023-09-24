@@ -757,8 +757,8 @@ def _main():
 
     insertion, removal = get_vocab_constrains(feature_save_dir)
 
-    validation_np_x, validation_y = feature_preprocess(validation_x, validation_y, feature_save_dir, args.overwrite)
-    test_np_x, test_y = feature_preprocess(test_x, test_y, feature_save_dir, args.overwrite)
+    validation_np_x, validation_y = feature_preprocess(validation_x, validation_y, feature_save_dir, False)
+    test_np_x, test_y = feature_preprocess(test_x, test_y, feature_save_dir, False)
 
     utils.dump_pickle((train_np_x, train_y), path=os.path.join(feature_save_dir, 'train.pkl'))
     utils.dump_pickle((validation_np_x, validation_y), path=os.path.join(feature_save_dir, 'validation.pkl'))
