@@ -126,7 +126,7 @@ class DrebinNN(BasicClassifier):
                 x_train, y_train = x_train.to(device), y_train.to(device)
                 optimizer.zero_grad()
                 logits = self.model(x_train)
-                loss_train = self.criterion(logits, y_train.to(torch.float))
+                loss_train = self.criterion(logits, y_train.to(torch.long))
                 loss_train.backward()
                 optimizer.step()
                 accuray_train = (logits.argmax(dim=-1) == y_train).sum().item() / x_train.shape[0]
@@ -140,6 +140,7 @@ class DrebinNN(BasicClassifier):
                         logits = self.model(x_val)
                         acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
                         acc_val /= x_val.size()[0]
+                        print(acc_val)
                         avg_acc_val.append(acc_val)
                     avg_acc_val = np.mean(avg_acc_val)
                     print("validata: ", avg_acc_val)
