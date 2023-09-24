@@ -1,1 +1,7 @@
 python -m sec_classifiers.drebin.get_drebin_feature --dataset_dir /path/to/dataset_directory --feature_dir path/to/save/feature_directory/hashsmooth-drebin
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "svm" --smooth "none" --cuda --epochs 200 --lr 0.01
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "dnn" --smooth "none" --cuda --epochs 200 --lr 0.001
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "svm" --smooth "random" --cuda --sub_k 16 --epochs 200 --lr 0.01
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "dnn" --smooth "random" --cuda --sub_k 16 --epochs 200 --lr 0.001
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "svm" --smooth "hash" --cuda --sub_k 16 --epochs 200 --lr 0.01
+python -m sec_classifiers.drebin.drebin_test --dataset_dir /path/to/dataset_directory/drebin --dataset_name drebin --model "dnn" --smooth "hash" --cuda --sub_k 16 --epochs 200 --lr 0.001
