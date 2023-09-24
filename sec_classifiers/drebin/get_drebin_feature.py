@@ -142,8 +142,6 @@ def get_drebin(pargs):
         data_dict['suspicious_api_list'] = suspicious_api_list
         data_dict['url_list'] = url_list
 
-        print("okokok")
-
         drebin_utils.dump_feature(data_dict, feature_save_path)
         return 1, feature_save_path
     except Exception as e:
