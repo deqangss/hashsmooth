@@ -133,33 +133,44 @@ class DrebinNN(BasicClassifier):
                 accuracies.append(accuray_train)
                 losses.append(loss_train)
 
+                if i_batch == 200:
+                    for x_val, y_val in validation_x_y:
+                        x_val, y_val = x_val.to(device), y_val.to(device)
+
+                        logits = self.model(x_val)
+                        acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                        acc_val /= x_val.size()[0]
+                        avg_acc_val.append(acc_val)
+                    avg_acc_val = np.mean(avg_acc_val)
+                    print("validata: ", avg_acc_val)
+
                 if verbose:
                     print(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
 
-            # self.model.eval()
+            self.model.eval()
             avg_acc_val = []
-            with torch.no_grad():
-                for x_val, y_val in validation_x_y:
-                    x_val, y_val = x_val.to(device), y_val.to(device)
+            # with torch.no_grad():
+            for x_val, y_val in validation_x_y:
+                x_val, y_val = x_val.to(device), y_val.to(device)
 
-                    logits = self.model(x_val)
-                    acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                    print(torch.unique(x_val), logits.argmax(dim=-1), y_val, x_val.size()[0])
-                    exit(-1)
-                    acc_val /= x_val.size()[0]
-                    avg_acc_val.append(acc_val)
-                avg_acc_val = np.mean(avg_acc_val)
+                logits = self.model(x_val)
+                acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                print(torch.unique(x_val), logits.argmax(dim=-1), y_val, x_val.size()[0])
+                exit(-1)
+                acc_val /= x_val.size()[0]
+                avg_acc_val.append(acc_val)
+            avg_acc_val = np.mean(avg_acc_val)
 
-                if avg_acc_val >= best_avg_acc:
-                    best_avg_acc = avg_acc_val
-                    best_epoch = i
-                    torch.save(self.model.state_dict(), self.model_save_path)
-                    print(f'Model saved at path: {self.model_save_path}')
+            if avg_acc_val >= best_avg_acc:
+                best_avg_acc = avg_acc_val
+                best_epoch = i
+                torch.save(self.model.state_dict(), self.model_save_path)
+                print(f'Model saved at path: {self.model_save_path}')
 
-                if verbose:
-                    print(
-                        f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+            if verbose:
+                print(
+                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         logits = self.model(x)
