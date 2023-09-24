@@ -112,7 +112,6 @@ def get_drebin(pargs):
     apk_path, feature_save_path, overwrite = pargs
     try:
         assert os.path.exists(apk_path)
-        print("okok")
         if not overwrite and os.path.exists(feature_save_path):
             return 1, feature_save_path
         data_dict = {}
@@ -124,6 +123,8 @@ def get_drebin(pargs):
         broadcast_receiver_list, \
         hardware_list, \
         intentfilter_list = get_feature_xml(apk_path)
+
+        print("okokok")
 
         # get dex features
         pmap = AxplorerMapping()
