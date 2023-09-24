@@ -41,7 +41,7 @@ cmd_md.add_argument('--alpha', type=float, default=0.05,
                     help='Significance level of hypotheses testing.')
 cmd_md.add_argument('--n_sampling', type=int, default=100,
                     help='Number of sampling times for estimating the predictive label.')
-cmd_md.add_argument('--save_path', type=str, default='./results',
+cmd_md.add_argument('--save_path', type=str, default='',
                     help='Folder path to save results.')
 cmd_md.add_argument('--model', type=str, default='drebin_svm',
                     choices=['svm', 'dnn'],
