@@ -292,7 +292,7 @@ class HashSmooth(BasicClassifier):
         threshold = (probas - second_probas) / 2.
         bound_mesh, radii_mesh = self._get_radius_grid(probas, None, k_subhashcodes, max_radii, n_grids)
         # select the radius corresponding to the estimated bound smaller than the threshold
-        pos_sel = np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold).squeeze()
+        pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
         pos_sel = np.maximum(0, pos_sel - 1)
         radii = radii_mesh[range(batch_size), pos_sel]
         return radii
@@ -456,7 +456,7 @@ class HashSmooth(BasicClassifier):
         :return: bounds
         """
         assert regions.shape[1] == 3
-        assert np.all(0. <= confidence_ests <= 1.)
+        assert np.all(0. <= confidence_ests) and np.all(confidence_ests <= 1.)
         if not is_sort:
             sorted_regions = sorted(
                 list(regions), key=lambda a: a[2], reverse=True)
