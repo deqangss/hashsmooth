@@ -124,6 +124,8 @@ class DrebinNN(BasicClassifier):
             losses, accuracies = [], []
             for i_batch, (x_train, y_train) in enumerate(train_x_y):
                 x_train, y_train = x_train.to(device), y_train.to(device)
+                print(y_train)
+                exit(-1)
                 optimizer.zero_grad()
                 logits = self.model(x_train)
                 loss_train = self.criterion(logits, y_train.to(torch.long))
