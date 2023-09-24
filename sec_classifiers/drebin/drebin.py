@@ -129,12 +129,18 @@ class DrebinNN(BasicClassifier):
                 loss_train = self.criterion(logits, y_train.to(torch.long))
                 loss_train.backward()
                 optimizer.step()
-                if i_batch == 5:
-                    print(logits.argmax(dim=-1), y_train)
-                    exit(-1)
                 accuray_train = (logits.argmax(dim=-1) == y_train).sum().item() / x_train.shape[0]
                 accuracies.append(accuray_train)
                 losses.append(loss_train)
+
+                if i_batch == 5:
+                    for x_val, y_val in validation_x_y:
+                        x_val, y_val = x_val.to(device), y_val.to(device)
+
+                        logits = self.model(x_val)
+                        acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                        print(torch.unique(x_val), logits.argmax(dim=-1), y_val, x_val.size()[0])
+                        exit(-1)
 
                 if verbose:
                     print(
@@ -148,7 +154,7 @@ class DrebinNN(BasicClassifier):
 
                     logits = self.model(x_val)
                     acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                    print(logits.argmax(dim=-1), y_val, x_val.size()[0])
+                    print(torch.unique(x_val), logits.argmax(dim=-1), y_val, x_val.size()[0])
                     exit(-1)
                     acc_val /= x_val.size()[0]
                     avg_acc_val.append(acc_val)
