@@ -133,19 +133,6 @@ class DrebinNN(BasicClassifier):
                 accuracies.append(accuray_train)
                 losses.append(loss_train)
 
-                if i_batch == 97:
-                    print('train: ', accuracies)
-                    avg_acc_val = []
-                    for x_val, y_val in validation_x_y:
-                        x_val, y_val = x_val.to(device), y_val.to(device)
-                        logits = self.model(x_val)
-                        acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                        acc_val /= x_val.size()[0]
-                        print(acc_val)
-                        avg_acc_val.append(acc_val)
-                    avg_acc_val = np.mean(avg_acc_val)
-                    print("validata: ", avg_acc_val)
-
                 if verbose:
                     print(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
@@ -158,8 +145,6 @@ class DrebinNN(BasicClassifier):
 
                 logits = self.model(x_val)
                 acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                print(torch.unique(x_val), logits.argmax(dim=-1), y_val, x_val.size()[0])
-                exit(-1)
                 acc_val /= x_val.size()[0]
                 avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
