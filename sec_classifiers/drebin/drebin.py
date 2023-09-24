@@ -107,7 +107,7 @@ class DrebinNN(BasicClassifier):
             torch.nn.ReLU(),
             torch.nn.Linear(200, 200),
             torch.nn.ReLU(),
-            # torch.nn.Dropout(0.4),
+            torch.nn.Dropout(0.6),
             torch.nn.Linear(200, self.num_classes)
         )
 
@@ -129,7 +129,8 @@ class DrebinNN(BasicClassifier):
                 loss_train = self.criterion(logits, y_train.to(torch.long))
                 loss_train.backward()
                 optimizer.step()
-
+                print(logits.argmax(dim=-1), y_train)
+                exit(-1)
                 accuray_train = (logits.argmax(dim=-1) == y_train).sum().item() / x_train.shape[0]
                 accuracies.append(accuray_train)
                 losses.append(loss_train)
