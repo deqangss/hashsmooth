@@ -12,6 +12,9 @@ from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_in
 
 binom_test = np.vectorize(binom_test)
 
+logger = utils.logging.getLogger("drebin-library")
+logger.addHandler(utils.ErrorHandler)
+
 
 class DrebinSVM(BasicClassifier):
     def __init__(self, input_dim: int, num_classes=2, batch_size=64, model_save_dir=''):
@@ -63,15 +66,13 @@ class DrebinSVM(BasicClassifier):
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
 
+                logger.info(
+                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
                 if avg_acc_val >= best_avg_acc:
                     best_avg_acc = avg_acc_val
                     best_epoch = i
                     torch.save(self.model.state_dict(), self.model_save_path)
-                    print(f'Model saved at path: {self.model_save_path}')
-
-                if verbose:
-                    print(
-                        f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                    logger.info(f'Model saved at path: {self.model_save_path}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         logits = self.model(x)
@@ -139,25 +140,24 @@ class DrebinNN(BasicClassifier):
 
             self.model.eval()
             avg_acc_val = []
-            # with torch.no_grad():
-            for x_val, y_val in validation_x_y:
-                x_val, y_val = x_val.to(device), y_val.to(device)
+            with torch.no_grad():
+                for x_val, y_val in validation_x_y:
+                    x_val, y_val = x_val.to(device), y_val.to(device)
 
-                logits = self.model(x_val)
-                acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                acc_val /= x_val.size()[0]
-                avg_acc_val.append(acc_val)
-            avg_acc_val = np.mean(avg_acc_val)
+                    logits = self.model(x_val)
+                    acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                    acc_val /= x_val.size()[0]
+                    avg_acc_val.append(acc_val)
+                avg_acc_val = np.mean(avg_acc_val)
 
-            if avg_acc_val >= best_avg_acc:
-                best_avg_acc = avg_acc_val
-                best_epoch = i
-                torch.save(self.model.state_dict(), self.model_save_path)
-                print(f'Model saved at path: {self.model_save_path}')
-
-            if verbose:
-                print(
+                logger.info(
                     f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+
+                if avg_acc_val >= best_avg_acc:
+                    best_avg_acc = avg_acc_val
+                    best_epoch = i
+                    torch.save(self.model.state_dict(), self.model_save_path)
+                    logger.info(f'Model saved at path: {self.model_save_path}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         logits = self.model(x)
@@ -192,7 +192,7 @@ class RandomSmooth4Drebin(RandomSmooth):
         RandomSmooth.__init__(self, drebin_clf_model, num_of_classes, transform_method, max_k, default_mode)
         self.model_save_dir = model_save_dir
         utils.mkdir(self.model_save_dir)
-        self.model_save_path = os.path.join(self.model_save_dir, 'model.ckpt')
+        self.model_save_path = os.path.join(self.model_save_dir, 'model_{}.ckpt'.format(self.transform_method.k_randomcode))
 
     def eval(self):
         self.base_classifier.model.eval()
@@ -248,15 +248,14 @@ class RandomSmooth4Drebin(RandomSmooth):
                     avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
 
+            logger.info(
+                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+
             if avg_acc_val >= best_avg_acc:
                 best_avg_acc = avg_acc_val
                 best_epoch = i
                 torch.save(self.base_classifier.model.state_dict(), self.model_save_path)
-                print(f'Model saved at path: {self.model_save_path}')
-
-            if verbose:
-                print(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                logger.info(f'Model saved at path: {self.model_save_path}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         y_votes, _2 = self.sample_funcs(x, n_sampling)
@@ -347,7 +346,7 @@ class HashSmooth4Drebin(HashSmooth):
 
         self.model_save_dir = model_save_dir
         utils.mkdir(self.model_save_dir)
-        self.model_save_path = os.path.join(self.model_save_dir, 'model.ckpt')
+        self.model_save_path = os.path.join(self.model_save_dir, 'model_{}.ckpt'.format(self.max_k))
 
     def eval(self):
         self.base_classifier.model.eval()
@@ -397,15 +396,14 @@ class HashSmooth4Drebin(HashSmooth):
                     avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
 
+            logger.info(
+                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+
             if avg_acc_val >= best_avg_acc:
                 best_avg_acc = avg_acc_val
                 best_epoch = i
                 torch.save(self.base_classifier.model.state_dict(), self.model_save_path)
-                print(f'Model saved at path: {self.model_save_path}')
-
-            if verbose:
-                print(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                logger.info(f'Model saved at path: {self.model_save_path}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         y_votes = self.sample_funcs(x, n_sampling)
