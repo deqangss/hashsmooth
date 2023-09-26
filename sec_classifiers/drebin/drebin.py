@@ -66,13 +66,14 @@ class DrebinSVM(BasicClassifier):
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
 
-                logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
                 if avg_acc_val >= best_avg_acc:
                     best_avg_acc = avg_acc_val
                     best_epoch = i
                     torch.save(self.model.state_dict(), self.model_save_path)
                     logger.info(f'Model saved at path: {self.model_save_path}')
+
+                logger.info(
+                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         logits = self.model(x)
@@ -150,14 +151,14 @@ class DrebinNN(BasicClassifier):
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
 
-                logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
-
                 if avg_acc_val >= best_avg_acc:
                     best_avg_acc = avg_acc_val
                     best_epoch = i
                     torch.save(self.model.state_dict(), self.model_save_path)
                     logger.info(f'Model saved at path: {self.model_save_path}')
+
+                logger.info(
+                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         logits = self.model(x)
@@ -248,14 +249,14 @@ class RandomSmooth4Drebin(RandomSmooth):
                     avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
 
-            logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
-
             if avg_acc_val >= best_avg_acc:
                 best_avg_acc = avg_acc_val
                 best_epoch = i
                 torch.save(self.base_classifier.model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
+
+            logger.info(
+                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         y_votes, _2 = self.sample_funcs(x, n_sampling)
@@ -396,14 +397,14 @@ class HashSmooth4Drebin(HashSmooth):
                     avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
 
-            logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
-
             if avg_acc_val >= best_avg_acc:
                 best_avg_acc = avg_acc_val
                 best_epoch = i
                 torch.save(self.base_classifier.model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
+
+            logger.info(
+                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         y_votes = self.sample_funcs(x, n_sampling)
