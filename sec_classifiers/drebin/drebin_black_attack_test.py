@@ -122,7 +122,7 @@ def _main():
                                                                    'hash_{}_model'.format(args.model))
                                        )
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
-        classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling, batch_size=args.batch_size)
+        classifier.get_confidence = functools.partial(classifier.get_confidence, n_sampling=args.n_sampling)
     elif args.smooth == 'random':
         input_transfermor = RandomTransformer(k_randomcode=args.sub_k, reuse_noise=True, seed=args.seed)
         classifier = RandomSmooth4Drebin(classifier, num_of_classes=2, transform_method=input_transfermor,
@@ -131,8 +131,8 @@ def _main():
                                          model_save_dir=os.path.join(args.save_path,
                                                                      'random_{}_model'.format(args.model)))
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
-        classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling,
-                                                k_per_instance=args.sub_k, batch_size=args.batch_size)
+        classifier.get_confidence = functools.partial(classifier.get_confidence, n_sampling=args.n_sampling,
+                                                      k_per_instance=args.sub_k)
     else:
         pass
 
@@ -179,7 +179,8 @@ def _main():
     advs = np.vstack(advs)
     adv_prediction = np.concatenate(adv_prediction)
     adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
-    logger.info("Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
+    logger.info(
+        "Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
     np.savez(os.path.join(dataset.dataset_path, 'adv.npz'), adv=advs)
 
 

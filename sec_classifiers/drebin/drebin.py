@@ -84,11 +84,11 @@ class DrebinSVM(BasicClassifier):
     def load_model(self):
         self.model.load_state_dict(torch.load(self.model_save_path))
 
-    def get_loss(self, x:torch.Tensor, label: int):
+    def get_loss(self, x: torch.Tensor, label: int):
         logits = self.model(x)
         return self.criterion(logits.view(-1), label.float())
 
-    def get_confidence(self, x:torch.Tensor):
+    def get_confidence(self, x: torch.Tensor):
         logits = self.model(x)
         return torch.sigmoid(logits)
 
@@ -202,7 +202,8 @@ class RandomSmooth4Drebin(RandomSmooth):
         RandomSmooth.__init__(self, drebin_clf_model, num_of_classes, transform_method, max_k, default_mode)
         self.model_save_dir = model_save_dir
         utils.mkdir(self.model_save_dir)
-        self.model_save_path = os.path.join(self.model_save_dir, 'model_{}.ckpt'.format(self.transform_method.k_randomcode))
+        self.model_save_path = os.path.join(self.model_save_dir,
+                                            'model_{}.ckpt'.format(self.transform_method.k_randomcode))
 
     def eval(self):
         self.base_classifier.model.eval()
@@ -280,6 +281,10 @@ class RandomSmooth4Drebin(RandomSmooth):
         pred[abstain_flag] = RandomSmooth.ABSTAIN
         return pred
 
+    def get_confidence(self, x: torch.Tensor, n_sampling: int, k_per_instance: (int, float)):
+        y_votes, _1 = self.sample_funcs(x, n_sampling, k_per_instance)
+        return torch.softmax(y_votes.float(), dim=-1)
+
     def load_model(self):
         self.base_classifier.model.load_state_dict(torch.load(self.model_save_path))
 
@@ -320,11 +325,25 @@ class RandomSmooth4Drebin(RandomSmooth):
             k_per_instance = min(math.ceil(len(x) * k_per_instance), self.max_k)
         votes = torch.zeros((x.shape[0], self.num_of_classes), dtype=torch.long, device=x.device)
         with torch.no_grad():
-            for i in range(n):
-                mask_x = self.transform_method.transform(x, k_per_instance)
-                logits = self.base_classifier.model(mask_x)
-                pred_batch = self.get_output(logits).to(torch.int64)
-                votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
+            if x.shape[0] > 1:
+                for i in range(n):
+                    mask_x = self.transform_method.transform(x, k_per_instance)
+                    logits = self.base_classifier.model(mask_x)
+                    pred_batch = self.get_output(logits).to(torch.int64)
+                    votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
+            else:
+                batch_size = 64
+                for idx in range(n // batch_size + 1):
+                    current_batch_size = min(batch_size, n)
+                    n -= current_batch_size
+                    if current_batch_size <= 0:
+                        break
+                    mask_x = self.transform_method.transform(torch.tile(x, (current_batch_size, 1)),
+                                                             k_per_instance)
+                    logits = self.base_classifier.model(mask_x)
+                    pred_batch = self.get_output(logits).to(torch.int64)
+                    votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0, keepdim=True)
+
         return votes, k_per_instance
 
 
@@ -401,7 +420,7 @@ class HashSmooth4Drebin(HashSmooth):
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
 
-                    y_votes = self.sample_funcs(x_val,  n_sampling)
+                    y_votes = self.sample_funcs(x_val, n_sampling)
                     y_pred = y_votes.argmax(dim=-1)
                     acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
                     avg_acc_val.append(acc_val)
@@ -438,6 +457,10 @@ class HashSmooth4Drebin(HashSmooth):
             mask_x = self.transform_wrapper(x)
             loss += self.base_classifier.get_loss(mask_x, label)
         return loss
+
+    def get_confidence(self, x: torch.Tensor, n_sampling: int):
+        y_votes = self.sample_funcs(x, n_sampling)
+        return torch.softmax(y_votes.float(), dim=-1)
 
     def certify(self, x: np.ndarray, labels: np.ndarray, n_selection: int, n_estimation: int,
                 k_per_instance: (float, int),
@@ -482,11 +505,24 @@ class HashSmooth4Drebin(HashSmooth):
     def sample_funcs(self, x: torch.Tensor, n):
         votes = torch.zeros((x.shape[0], self.num_of_classes), dtype=torch.long, device=x.device)
         with torch.no_grad():
-            for i in range(n):
-                x_train_mask = self.transform_wrapper(x)
-                logits = self.base_classifier.model(x_train_mask)
-                pred_batch = self.get_output(logits).to(torch.int64)
-                votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
+            if x.shape[0] > 1:
+                for i in range(n):
+                    x_train_mask = self.transform_wrapper(x)
+                    logits = self.base_classifier.model(x_train_mask)
+                    pred_batch = self.get_output(logits).to(torch.int64)
+                    votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
+            else:
+                batch_size = 64
+                for idx in range(n // batch_size + 1):
+                    current_batch_size = min(batch_size, n)
+                    n -= current_batch_size
+                    if current_batch_size <= 0:
+                        break
+                    mask_x = self.transform_wrapper(torch.tile(x, (current_batch_size, 1)))
+                    logits = self.base_classifier.model(mask_x)
+                    pred_batch = self.get_output(logits).to(torch.int64)
+                    votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0,
+                                       keepdim=True)
         return votes
 
     def get_output(self, logits: torch.Tensor):
