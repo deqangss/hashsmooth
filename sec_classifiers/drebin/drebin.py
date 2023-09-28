@@ -76,6 +76,7 @@ class DrebinSVM(BasicClassifier):
                     f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
+        self.eval()
         logits = self.model(x)
         x_preds = (logits.data > 0.5).view(-1).to(torch.int)
         return x_preds
@@ -86,6 +87,10 @@ class DrebinSVM(BasicClassifier):
     def get_loss(self, x:torch.Tensor, label: int):
         logits = self.model(x)
         return self.criterion(logits.view(-1), label.float())
+
+    def get_confidence(self, x:torch.Tensor):
+        logits = self.model(x)
+        return torch.sigmoid(logits)
 
     def certify(self, x: np.ndarray, label: (int, np.ndarray)):
         raise NotImplementedError
@@ -161,6 +166,7 @@ class DrebinNN(BasicClassifier):
                     f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
+        self.eval()
         logits = self.model(x)
         x_preds = logits.argmax(dim=-1).to(torch.int)
         return x_preds
@@ -171,6 +177,9 @@ class DrebinNN(BasicClassifier):
     def get_loss(self, x: torch.Tensor, label: int):
         logits = self.model(x)
         return self.criterion(logits, label.to(torch.long))
+
+    def get_confidence(self, x: torch.Tensor):
+        return torch.softmax(self.model(x), dim=-1)
 
     def certify(self, x: np.ndarray, label: (int, np.ndarray)):
         raise NotImplementedError
@@ -259,6 +268,7 @@ class RandomSmooth4Drebin(RandomSmooth):
                 f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
+        self.eval()
         y_votes, _2 = self.sample_funcs(x, n_sampling)
 
         top2 = y_votes.argsort(dim=-1, descending=True)[:, :2]
@@ -407,6 +417,7 @@ class HashSmooth4Drebin(HashSmooth):
                 f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
+        self.eval()
         y_votes = self.sample_funcs(x, n_sampling)
 
         top2 = y_votes.argsort(dim=-1, descending=True)[:, :2]
