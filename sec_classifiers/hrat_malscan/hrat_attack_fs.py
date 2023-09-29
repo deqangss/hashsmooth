@@ -98,8 +98,7 @@ def _main():
         train_x, train_y = train_x_y['train_x'], train_x_y['train_y']
         val_x_y = np.load(val_x_y_path)
         val_x, val_y = val_x_y['val_x'], val_x_y['val_y']
-    print(train_x.shape)
-    exit(-1)
+
     if args.model == 'malscan':
         train_x_producer = torch.from_numpy(train_x)  # train_x_producer = dataset.get_dataloader(train_x)
         train_y = torch.from_numpy(train_y).to(device)
