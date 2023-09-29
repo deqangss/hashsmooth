@@ -53,7 +53,7 @@ class DrebinSVM(BasicClassifier):
 
                 if verbose:
                     logger.info(
-                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
+                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}%.')
 
             self.model.eval()
             avg_acc_val = []
@@ -73,7 +73,7 @@ class DrebinSVM(BasicClassifier):
                     logger.info(f'Model saved at path: {self.model_save_path}')
 
                 logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                    f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         self.eval()
@@ -142,7 +142,7 @@ class DrebinNN(BasicClassifier):
 
                 if verbose:
                     logger.info(
-                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
+                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}%.')
 
             self.model.eval()
             avg_acc_val = []
@@ -163,7 +163,7 @@ class DrebinNN(BasicClassifier):
                     logger.info(f'Model saved at path: {self.model_save_path}')
 
                 logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                    f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         self.eval()
@@ -232,20 +232,19 @@ class RandomSmooth4Drebin(RandomSmooth):
             losses, accuracies = [], []
             for i_batch, (x_train, y_train) in enumerate(train_x_y):
                 x_train, y_train = x_train.to(device), y_train.to(device)
-                x_train_mask = self.transform_method.transform(x_train)
-
                 optimizer.zero_grad()
+                x_train_mask = self.transform_method.transform(x_train)
                 loss_train = self.base_classifier.get_loss(x_train_mask, y_train)
-                loss_train.backward()
-                optimizer.step()
-                losses.append(loss_train)
                 with torch.no_grad():
                     logits = self.base_classifier.model(x_train_mask)
                     accuracy_train = (self.get_output(logits) == y_train).sum().item() / x_train.size()[0]
                     accuracies.append(accuracy_train)
+                loss_train.backward()
+                optimizer.step()
+                losses.append(loss_train)
                 if verbose:
                     logger.info(
-                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}')
+                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}%.')
 
             self.base_classifier.model.eval()
             avg_acc_val = []
@@ -255,7 +254,6 @@ class RandomSmooth4Drebin(RandomSmooth):
                     y_votes, _1 = self.sample_funcs(x_val, n_sampling)
                     y_pred = y_votes.argmax(dim=-1)
                     acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
-                    acc_val /= x_val.size()[0]
                     avg_acc_val.append(acc_val)
             avg_acc_val = np.mean(avg_acc_val)
 
@@ -266,7 +264,7 @@ class RandomSmooth4Drebin(RandomSmooth):
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         self.eval()
@@ -412,7 +410,7 @@ class HashSmooth4Drebin(HashSmooth):
                     accuracies.append(accuracy_train)
                 if verbose:
                     logger.info(
-                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}')
+                        f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}%.')
 
             self.base_classifier.model.eval()
             avg_acc_val = []
@@ -433,7 +431,7 @@ class HashSmooth4Drebin(HashSmooth):
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f} | The best validation accuracy: {best_avg_acc * 100:.2f} at epoch: {best_epoch}')
+                f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: np.ndarray, n_sampling: int, alpha: float):
         self.eval()
