@@ -52,7 +52,7 @@ class DrebinSVM(BasicClassifier):
                 losses.append(loss_train)
 
                 if verbose:
-                    print(
+                    logger.info(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
 
             self.model.eval()
@@ -141,7 +141,7 @@ class DrebinNN(BasicClassifier):
                 losses.append(loss_train)
 
                 if verbose:
-                    print(
+                    logger.info(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}')
 
             self.model.eval()
@@ -244,7 +244,7 @@ class RandomSmooth4Drebin(RandomSmooth):
                     accuracy_train = (self.get_output(logits) == y_train).sum().item() / x_train.size()[0]
                     accuracies.append(accuracy_train)
                 if verbose:
-                    print(
+                    logger.info(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}')
 
             self.base_classifier.model.eval()
@@ -411,7 +411,7 @@ class HashSmooth4Drebin(HashSmooth):
                     accuracy_train = (self.get_output(logits) == y_train).sum().item() / x_train.size()[0]
                     accuracies.append(accuracy_train)
                 if verbose:
-                    print(
+                    logger.info(
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}')
 
             self.base_classifier.model.eval()
