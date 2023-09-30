@@ -33,7 +33,8 @@ class DrebinSVM(BasicClassifier):
             validation_x_y: torch.utils.data.dataloader,
             epochs=1000, learning_rate=0.001, penaty_factor=0.01, device='cpu', verbose=False):
         nbatches = len(train_x_y)
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        # optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         best_avg_acc = 0.
         for i in range(epochs):
             self.model.train()
@@ -218,14 +219,9 @@ class RandomSmooth4Drebin(RandomSmooth):
 
     def fit(self, train_x_y: torch.utils.data.dataloader,
             validation_x_y: torch.utils.data.dataloader,
-            epochs=100, learning_rate=0.001, n_sampling=100, device='cpu', verbose=False):
+            epochs=100, learning_rate=0.001, penaty_factor=0.01, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
-        if isinstance(self.base_classifier, DrebinSVM):
-            optimizer = torch.optim.SGD(self.base_classifier.model.parameters(), lr=learning_rate)
-        elif isinstance(self.base_classifier, DrebinNN):
-            optimizer = torch.optim.Adam(self.base_classifier.model.parameters(), lr=learning_rate)
-        else:
-            raise TypeError("Expect 'DrebinSVM' or 'DrebinNN'.")
+        optimizer = torch.optim.Adam(self.base_classifier.model.parameters(), lr=learning_rate)
         best_avg_acc = 0.
         for i in range(epochs):
             self.base_classifier.model.train()
@@ -235,6 +231,9 @@ class RandomSmooth4Drebin(RandomSmooth):
                 optimizer.zero_grad()
                 x_train_mask = self.transform_method.transform(x_train)
                 loss_train = self.base_classifier.get_loss(x_train_mask, y_train)
+                if isinstance(self.base_classifier, DrebinSVM):
+                    weight = self.base_classifier.model.weight.squeeze()
+                    loss_train += penaty_factor * torch.sum(weight * weight)
                 with torch.no_grad():
                     logits = self.base_classifier.model(x_train_mask)
                     accuracy_train = (self.get_output(logits) == y_train).sum().item() / x_train.size()[0]
