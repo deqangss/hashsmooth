@@ -139,7 +139,7 @@ def _main():
                                        default_mode=True
                                        )
         predict_func = functools.partial(malscan.predict, n=args.n_sampling, alpha=args.alpha,
-                                         k_per_instance=args.sub_k, top_k=3)
+                                         k_per_instance=args.sub_k)
     else:
         raise ValueError("Choose either of 'malscan', 'random_smooth', and 'hash_malscan'.\n")
 
