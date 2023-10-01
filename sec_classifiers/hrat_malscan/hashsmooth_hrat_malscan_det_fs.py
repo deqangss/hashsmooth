@@ -157,7 +157,7 @@ class HashSmooth4MalScan(HashSmooth):
                     malscan_features = self.transform_wrapper(torch.tile(x[None, ...], (current_batch_size, 1)),
                                                               n_subfeatures, k_subhashcodes).squeeze()
                 else:
-                    malscan_features = x[None, ...]
+                    malscan_features = torch.tile(x[None, ...], (self.num_of_classes, 1))
                     warnings.warn("No senstive apis.")
 
                 pred_batch = self.base_classifier.predict(malscan_features,
@@ -177,6 +177,4 @@ class HashSmooth4MalScan(HashSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
-        print(preds)
-        print(np.concatenate(preds).squeeze())
         return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes), k_subhashcodes
