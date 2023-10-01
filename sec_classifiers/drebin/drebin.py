@@ -44,8 +44,8 @@ class DrebinSVM(BasicClassifier):
                 optimizer.zero_grad()
                 logits = self.model(x_train)
                 loss_train = self.criterion(logits.view(-1), y_train.float())
-                weight = self.model.weight.squeeze()
-                loss_train += penaty_factor * torch.sum(weight * weight)
+                # weight = self.model.weight.squeeze()
+                # loss_train += penaty_factor * torch.sum(weight * weight)
                 loss_train.backward()
                 optimizer.step()
                 accuray_train = ((logits.data > 0.5).view(-1) == y_train).sum().item() / x_train.size()[0]
