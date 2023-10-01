@@ -177,4 +177,6 @@ class HashSmooth4MalScan(HashSmooth):
             #                                     )
             # assert isinstance(pred, np.ndarray), "Expected numpy array, but got {}.\n".format(type(pred))
             preds.append(pred_batch)
+        print(preds)
+        print(np.concatenate(preds).squeeze())
         return np.bincount(np.concatenate(preds).squeeze(), minlength=self.num_of_classes), k_subhashcodes
