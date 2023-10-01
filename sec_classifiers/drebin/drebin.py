@@ -231,11 +231,6 @@ class RandomSmooth4Drebin(RandomSmooth):
                 optimizer.zero_grad()
                 x_train_mask = self.transform_method.transform(x_train)
                 loss_train = self.base_classifier.get_loss(x_train_mask, y_train)
-                # if isinstance(self.base_classifier, DrebinSVM):
-                #     weight = self.base_classifier.model.weight.squeeze()
-                #     loss_train += penaty_factor * torch.sum(weight * weight)
-                # else:
-                #     pass
                 with torch.no_grad():
                     logits = self.base_classifier.model(x_train_mask)
                     accuracy_train = (self.get_output(logits) == y_train).sum().item() / x_train.size()[0]
