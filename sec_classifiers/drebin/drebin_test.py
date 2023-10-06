@@ -128,9 +128,37 @@ def _main():
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(test_x_y[1])
-    accuracy = (test_x_y[1] == y_prediction).sum() / float(len(y_prediction))
-    logger.info("Model of {} achieves the accuracy: {:.4f}%".format(args.model, accuracy * 100))
 
+    outlier_indicator = y_prediction[:] == -1
+    y_true = test_x_y[1][~outlier_indicator]
+    y_true = test_x_y[1][~outlier_indicator]
+    y_pred = y_prediction[~outlier_indicator]
+    accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_true, y_pred)
+    logger.info('Filter out outlier:')
+    logger.info("Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100, b_accuracy * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
+
+    y_prediction[outlier_indicator] = 1 # treat as malware
+    accuracy, b_accuracy, fnr, fpr, f1 = measurement(test_x_y[1], y_prediction)
+    logger.info('Set outlier as malware prediction:')
+    logger.info(
+        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100,
+                                                                                        b_accuracy * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
+
+
+def measurement(_y_true, _y_pred):
+    from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, balanced_accuracy_score
+    accuracy = accuracy_score(_y_true, _y_pred)
+    b_accuracy = balanced_accuracy_score(_y_true, _y_pred)
+    tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
+    fpr = fp / float(tn + fp)
+    fnr = fn / float(tp + fn)
+    f1 = f1_score(_y_true, _y_pred, average='binary')
+
+    return accuracy, b_accuracy, fnr, fpr, f1
 
 if __name__ == "__main__":
     _main()
