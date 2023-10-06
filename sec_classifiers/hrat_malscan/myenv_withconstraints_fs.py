@@ -479,53 +479,6 @@ class CFGModifierEnvConstraints(object):
 
     def get_gradient(self, graph):
         # calculate the grade of each edge
-        triple_copy = graph.copy()
-        tmpz = torch.from_numpy(triple_copy).float().to(self.device)
-        triple_torch = Variable(tmpz, requires_grad=True)
-        feature = MalScan.get_extra_feature(triple_torch,
-                                            self.sen_api_idx,
-                                            adj_size=self.adj_size,
-                                            is_sp2dense=True,
-                                            device=self.device)
-        # feature = self.getDegreeCentrality(triple_torch, self.sen_api_idx).to(device)
-        #
-        # densegraph = self.to_adjmatrix(triple_torch)
-        # feature_katz = self.katz_feature_torch(densegraph, self.sen_api_idx).to(device)
-        # feature = torch.cat((feature, np.squeeze(feature_katz)), 0)
-
-        loss = self.get_loss(feature)
-        loss.backward()
-
-        tmp = triple_torch.grad.data.cpu().numpy()
-        grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp[:, 2:]), 1)
-        return grad
-
-    def get_gradient2(self, graph, is_dense=False):
-        # calculate the grade of each edge
-        # start_time = time.time()
-        graph_dense = torch.sparse_coo_tensor(graph[:, :2].T,
-                                              graph[:, 2],
-                                              size=(self.adj_size, self.adj_size)
-                                              ).to_dense().float().to(self.device)
-        graph_dense.requires_grad = True
-        feature = MalScan.get_extra_feature(graph_dense,
-                                            self.sen_api_idx,
-                                            adj_size=self.adj_size,
-                                            is_sp2dense=False,
-                                            device=self.device).float()
-        loss = self.get_loss(feature)
-        loss.backward()
-        if not is_dense:
-            tmp = graph_dense.grad.data.to_sparse()
-            triple = torch.hstack([tmp.indices().t(), tmp.values()[:, None]])
-            diag_indicator = triple[:, 0] == triple[:, 1]
-            triple = triple[~diag_indicator]
-            return triple.cpu().numpy()
-        else:
-            return graph_dense.grad.data
-
-    def get_loss(self, feature):
-
         def _get_nn_sample(dist):
             is_benign = self.w == 1.
             ben_dist = dist[:, is_benign]
@@ -548,6 +501,22 @@ class CFGModifierEnvConstraints(object):
             mal_w = self.w[is_mal][mal_idx_s]
             return torch.hstack([ben_dist_s, mal_dist_s]), torch.hstack([ben_w, mal_w])
 
+        triple_copy = graph.copy()
+        tmpz = torch.from_numpy(triple_copy).float().to(self.device)
+        triple_torch = Variable(tmpz, requires_grad=True)
+        feature = MalScan.get_extra_feature(triple_torch,
+                                            self.sen_api_idx,
+                                            adj_size=self.adj_size,
+                                            is_sp2dense=True,
+                                            device=self.device)
+        # feature = self.getDegreeCentrality(triple_torch, self.sen_api_idx).to(device)
+        #
+        # densegraph = self.to_adjmatrix(triple_torch)
+        # feature_katz = self.katz_feature_torch(densegraph, self.sen_api_idx).to(device)
+        # feature = torch.cat((feature, np.squeeze(feature_katz)), 0)
+
+        # get loss
+        # loss = self.get_loss(feature)
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
@@ -556,9 +525,14 @@ class CFGModifierEnvConstraints(object):
             dist_s, w = _get_nn_sample(dist[None, ...])
             loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
             loss = torch.reshape(loss, (1, -1)).contiguous()
+            loss.backward()
+
+            tmp = triple_torch.grad.data.cpu().numpy()
+            grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp[:, 2:]), 1)
+            return grad
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
             n_counts = self.n_sampling
-            loss = 0
+            tmp_grad = 0.
             for idx in range(n_counts // self.batch_size + 1):
                 current_batch_size = min(self.batch_size, n_counts)
                 n_counts -= current_batch_size
@@ -567,14 +541,20 @@ class CFGModifierEnvConstraints(object):
                 feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
                                                               self.transformer_obj.sub_k)
                 dist = torch.hstack(
-                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in self.X_train]).to(feature.device)
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in
+                     self.X_train]).to(feature.device)
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 dist_s, w = _get_nn_sample(dist)
-                loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
-            loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
+                loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss.backward(retain_graph=True)
+                tmp_grad += triple_torch.grad.data.cpu().numpy()
+                triple_torch.grad.zero_()
+            grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp_grad[:, 2:]), 1)
+            return grad
         elif isinstance(self.malware_detector, RandomSmooth4MalScan):
             n_counts = self.n_sampling
-            loss = 0
+            tmp_grad = 0.
             _dist = []
             for idx in range(n_counts // self.batch_size + 1):
                 current_batch_size = min(self.batch_size, n_counts)
@@ -591,11 +571,132 @@ class CFGModifierEnvConstraints(object):
                 # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
                 # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
                 dist_s, w = _get_nn_sample(dist)
-                loss += torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
-            loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
+                loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss.backward(retain_graph=True)
+                tmp_grad += triple_torch.grad.data.cpu().numpy()
+                triple_torch.grad.zero_()
+            grad = np.concatenate((triple_torch.cpu()[:, :2].data.numpy(), tmp_grad[:, 2:]), 1)
+            return grad
         else:
             raise TypeError
-        return loss
+
+
+    def get_gradient2(self, graph, is_dense=False):
+        # calculate the grade of each edge
+        # start_time = time.time()
+        def _get_nn_sample(dist):
+            is_benign = self.w == 1.
+            ben_dist = dist[:, is_benign]
+            if self.top_k > 1:
+                ben_knn_num = self.top_k if self.top_k <= ben_dist.shape[1] else ben_dist.shape[1]
+            else:
+                min_value, _ = torch.min(ben_dist, dim=-1, keepdim=True)
+                ben_knn_num = torch.max(torch.sum(ben_dist.isclose(min_value), dim=-1))
+            ben_dist_s, ben_idx_s = torch.topk(ben_dist, k=ben_knn_num, largest=False, dim=-1)
+            ben_w = self.w[is_benign][ben_idx_s]
+
+            is_mal = self.w == -1.
+            mal_dist = dist[:, is_mal]
+            if self.top_k > 1:
+                mal_knn_num = self.top_k if self.top_k <= mal_dist.shape[1] else mal_dist.shape[1]
+            else:
+                min_value, _ = torch.min(mal_dist, dim=-1, keepdim=True)
+                mal_knn_num = torch.max(torch.sum(mal_dist.isclose(min_value), dim=-1))
+            mal_dist_s, mal_idx_s = torch.topk(mal_dist, k=mal_knn_num, largest=False, dim=-1)
+            mal_w = self.w[is_mal][mal_idx_s]
+            return torch.hstack([ben_dist_s, mal_dist_s]), torch.hstack([ben_w, mal_w])
+
+        graph_dense = torch.sparse_coo_tensor(graph[:, :2].T,
+                                              graph[:, 2],
+                                              size=(self.adj_size, self.adj_size)
+                                              ).to_dense().float().to(self.device)
+        graph_dense.requires_grad = True
+        feature = MalScan.get_extra_feature(graph_dense,
+                                            self.sen_api_idx,
+                                            adj_size=self.adj_size,
+                                            is_sp2dense=False,
+                                            device=self.device).float()
+        if isinstance(self.malware_detector, MalScan):
+            feature = torch.reshape(feature, (1, -1))
+            # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
+            dist = torch.cat(
+                [torch.sum((feature.float() - torch.squeeze(x.to(feature.device))).pow(2), 1) for x in self.X_train])
+            dist_s, w = _get_nn_sample(dist[None, ...])
+            loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
+            loss = torch.reshape(loss, (1, -1)).contiguous()
+            loss.backward()
+
+            if not is_dense:
+                tmp = graph_dense.grad.data.to_sparse()
+                triple = torch.hstack([tmp.indices().t(), tmp.values()[:, None]])
+                diag_indicator = triple[:, 0] == triple[:, 1]
+                triple = triple[~diag_indicator]
+                return triple.cpu().numpy()
+            else:
+                return graph_dense.grad.data
+        elif isinstance(self.malware_detector, HashSmooth4MalScan):
+            n_counts = self.n_sampling
+            grad = 0.
+            for idx in range(n_counts // self.batch_size + 1):
+                current_batch_size = min(self.batch_size, n_counts)
+                n_counts -= current_batch_size
+                if current_batch_size <= 0:
+                    break
+                feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
+                                                              self.transformer_obj.sub_k)
+                dist = torch.hstack(
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in
+                     self.X_train]).to(feature.device)
+                # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
+                dist_s, w = _get_nn_sample(dist)
+                loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
+                loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss.backward(retain_graph=True)
+                grad += graph_dense.grad.data
+                graph_dense.grad.zero_()
+            if not is_dense:
+                tmp = grad.to_sparse()
+                triple = torch.hstack([tmp.indices().t(), tmp.values()[:, None]])
+                diag_indicator = triple[:, 0] == triple[:, 1]
+                triple = triple[~diag_indicator]
+                return triple.cpu().numpy()
+            else:
+                return grad
+        elif isinstance(self.malware_detector, RandomSmooth4MalScan):
+            n_counts = self.n_sampling
+            grad = 0.
+            _dist = []
+            for idx in range(n_counts // self.batch_size + 1):
+                current_batch_size = min(self.batch_size, n_counts)
+                n_counts -= current_batch_size
+                if current_batch_size <= 0:
+                    break
+                feature_tran = self.transformer_obj.transform(torch.tile(feature[None, ...], (current_batch_size, 1)),
+                                                              self.transformer_obj.k_randomcode)
+                # total_time = time.time() - start_time
+                # print("cost time 1-1-1: seconds {:.4}.".format(total_time))
+                dist = torch.hstack(
+                    [torch.sum((feature_tran[:, None, :].cpu() - x[None, ...].detach()).pow(2), -1) for x in
+                     self.X_train]).to(feature.device)
+                # dist = torch.sum((torch.squeeze(X_train.to(self.device)) - torch.squeeze(feature.float())).pow(2.), 1)
+                # loss += torch.sum(self.w * (torch.sigmoid(self.steep * dist)))
+                dist_s, w = _get_nn_sample(dist)
+                loss = torch.sum(w * (torch.sigmoid(self.steep * dist_s)))
+                loss = torch.reshape(loss, (1, -1)).contiguous()
+                loss.backward(retain_graph=True)
+                grad += graph_dense.grad.data
+                graph_dense.grad.zero_()
+            if not is_dense:
+                tmp = grad.to_sparse()
+                triple = torch.hstack([tmp.indices().t(), tmp.values()[:, None]])
+                diag_indicator = triple[:, 0] == triple[:, 1]
+                triple = triple[~diag_indicator]
+                return triple.cpu().numpy()
+            else:
+                return grad
+        else:
+            raise TypeError
 
     def check_state_exist(self, state):
         if state not in self.q_table.index:
