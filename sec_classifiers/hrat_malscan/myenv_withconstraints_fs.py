@@ -71,7 +71,7 @@ class CFGModifierEnvConstraints(object):
         self.device = device
         self.batch_size = batch_size
         if isinstance(X_train, torch.Tensor):
-            self.X_train = torch.split(torch.squeeze(X_train), self.batch_size)
+            self.X_train = torch.split(torch.squeeze(X_train), 2)
         elif isinstance(X_train, torch.utils.data.dataloader.DataLoader):
             self.X_train = X_train
         else:
