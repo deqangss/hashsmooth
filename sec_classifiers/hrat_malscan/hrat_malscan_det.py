@@ -49,9 +49,9 @@ class MalScan(BasicClassifier):
                                                             device)
             malscan_feature = malscan_feature if len(malscan_feature.shape) == 2 else malscan_feature[None, ...]
             dist = torch.cat(
-                [torch.sum((malscan_feature[:, None, :].cpu() - x_batch[None, ...]).pow(2.), -1) for x_batch in
+                [torch.sum((malscan_feature[:, None, :] - x_batch[None, ...].to(device)).pow(2.), -1) for x_batch in
                  self.train_x], dim=1
-            ).to(device)
+            )
             if top_k > 1:
                 ind = torch.argsort(dist)
                 label = self.train_y[ind[:, :top_k]].cpu().numpy()
