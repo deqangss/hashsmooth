@@ -517,7 +517,7 @@ class CFGModifierEnvConstraints(object):
 
         # get loss
         # loss = self.get_loss(feature)
-        _batch_size = 32
+        _batch_size = 25
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
@@ -618,7 +618,7 @@ class CFGModifierEnvConstraints(object):
                                             adj_size=self.adj_size,
                                             is_sp2dense=False,
                                             device=self.device).float()
-        _batch_size = 32
+        _batch_size = 25
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
