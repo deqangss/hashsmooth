@@ -71,7 +71,7 @@ class CFGModifierEnvConstraints(object):
         self.device = device
         self.batch_size = batch_size
         if isinstance(X_train, torch.Tensor):
-            self.X_train = torch.split(torch.squeeze(X_train), 2)
+            self.X_train = torch.split(torch.squeeze(X_train), self.batch_size)
         elif isinstance(X_train, torch.utils.data.dataloader.DataLoader):
             self.X_train = X_train
         else:
@@ -533,8 +533,8 @@ class CFGModifierEnvConstraints(object):
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
             n_counts = self.n_sampling
             tmp_grad = 0.
-            for idx in range(n_counts // self.batch_size + 1):
-                current_batch_size = min(self.batch_size, n_counts)
+            for idx in range(n_counts // _batch_size + 1):
+                current_batch_size = min(_batch_size, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
@@ -556,8 +556,8 @@ class CFGModifierEnvConstraints(object):
             n_counts = self.n_sampling
             tmp_grad = 0.
             _dist = []
-            for idx in range(n_counts // self.batch_size + 1):
-                current_batch_size = min(self.batch_size, n_counts)
+            for idx in range(n_counts // _batch_size + 1):
+                current_batch_size = min(_batch_size, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
@@ -617,6 +617,7 @@ class CFGModifierEnvConstraints(object):
                                             adj_size=self.adj_size,
                                             is_sp2dense=False,
                                             device=self.device).float()
+        _batch_size = 16
         if isinstance(self.malware_detector, MalScan):
             feature = torch.reshape(feature, (1, -1))
             # dist = (torch.sum(feature.float() - np.squeeze(X_train.float()), 1)).pow(2)
@@ -638,8 +639,8 @@ class CFGModifierEnvConstraints(object):
         elif isinstance(self.malware_detector, HashSmooth4MalScan):
             n_counts = self.n_sampling
             grad = 0.
-            for idx in range(n_counts // self.batch_size + 1):
-                current_batch_size = min(self.batch_size, n_counts)
+            for idx in range(n_counts // _batch_size + 1):
+                current_batch_size = min(_batch_size, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
@@ -669,8 +670,8 @@ class CFGModifierEnvConstraints(object):
             n_counts = self.n_sampling
             grad = 0.
             _dist = []
-            for idx in range(n_counts // self.batch_size + 1):
-                current_batch_size = min(self.batch_size, n_counts)
+            for idx in range(n_counts // _batch_size + 1):
+                current_batch_size = min(_batch_size, n_counts)
                 n_counts -= current_batch_size
                 if current_batch_size <= 0:
                     break
