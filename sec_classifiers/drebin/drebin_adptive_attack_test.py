@@ -134,9 +134,7 @@ def _main():
     for idx, (test_x_batch, test_y_batch) in enumerate(test_mal_producer):
         test_x_batch, test_y_batch = test_x_batch.to(device), test_y_batch.to(device)
         adv_x = pgdl1.perturb(classifier, test_x_batch, test_y_batch, steps=args.steps, verbose=True)
-
-        print(torch.sum(torch.abs(adv_x - test_x_batch), dim=-1))
-
+        # print(torch.sum(torch.abs(adv_x - test_x_batch), dim=-1))
         adv_y_pred = classifier.predict(adv_x).cpu().numpy()
         adv_prediction.append(adv_y_pred)
         adv.append(adv_x.cpu().numpy())
