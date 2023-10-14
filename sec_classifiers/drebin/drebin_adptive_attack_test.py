@@ -58,6 +58,7 @@ logger.addHandler(utils.ErrorHandler)
 
 def _main():
     args = atta_argparse.parse_args()
+    assert args.save_path != '', "Expect a saving path."
     if not os.path.exists(args.save_path):
         utils.mkdir(args.save_path)
 
@@ -141,8 +142,18 @@ def _main():
     adv = np.vstack(adv)
     adv_prediction = np.concatenate(adv_prediction)
     adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
-    logger.info("Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
-    np.savez(os.path.join(dataset.dataset_path, 'adv.npz'), adv=adv)
+    logger.info(
+        "Model of {} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
+            args.model,
+            args.smooth,
+            adv_accuracy * 100,
+            args.steps
+            ))
+    # save
+    if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
+        utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
+    np.savez(os.path.join(dataset.dataset_path, 'adv-examples', '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.steps)),
+             adv=adv)
 
 
 if __name__ == "__main__":

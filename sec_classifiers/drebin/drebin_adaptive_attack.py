@@ -10,9 +10,9 @@
 import torch
 import torch.nn.functional as F
 
-from tools import utils
-logger = utils.logging.getLogger("pgdl1-attack-core")
-logger.addHandler(utils.ErrorHandler)
+# from tools import utils
+# logger = utils.logging.getLogger("pgdl1-attack-core")
+# logger.addHandler(utils.ErrorHandler)
 
 
 EXP_OVER_FLOW = 1e-30
@@ -85,7 +85,7 @@ class PGDl1(object):
             done = pred_y != label
             worst_x[done] = adv_x[done]
             if verbose:
-                logger.info("Attack step {} with accuracy {:.2f}%.\n".format(t+1, 100 - done.sum().item()/float(len(done)) * 100))
+                print("Attack step {} with accuracy {:.2f}%.\n".format(t+1, 100 - done.sum().item()/float(len(done)) * 100))
             if torch.all(done):
                 break
         worst_x[~done] = adv_x[~done]
