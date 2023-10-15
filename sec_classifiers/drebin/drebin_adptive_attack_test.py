@@ -126,7 +126,8 @@ def _main():
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y)
     accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
-    logger.info("Model of {} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, accuracy * 100))
+    logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.sub_k,
+                                                                                               accuracy * 100))
 
     # attack
     constraints = np.load(os.path.join(dataset.dataset_path, 'constraints.npz'))
@@ -143,8 +144,9 @@ def _main():
     adv_prediction = np.concatenate(adv_prediction)
     adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
     logger.info(
-        "Model of {} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
+        "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
             args.model,
+            args.sub_k,
             args.smooth,
             adv_accuracy * 100,
             args.steps
