@@ -311,7 +311,7 @@ class RandomSmooth4Drebin(RandomSmooth):
             prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
 
             radius = self.population_radius_for_majority(np.array(prob_underlined)[..., None],
-                                                         n_estimation,
+                                                         x[0].size,
                                                          k_per_instance)
 
             radius[(c_pred != labels).cpu().numpy()] = RandomSmooth.ABSTAIN
@@ -488,7 +488,7 @@ class HashSmooth4Drebin(HashSmooth):
         else:
             c_pred_runnerup = counts_selection.argsort()[:, -2]
             n_targeted_runnerup = counts_estimation[c_pred_runnerup]
-            prob_upperlined = upper_confidence_interval(n_targeted_runnerup, c_pred_runnerup, alpha)
+            prob_upperlined = upper_confidence_interval(n_targeted_runnerup, n_estimation, alpha)
             abstain_indicator = prob_underlined <= prob_upperlined
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
             radii = np.ones_like(c_pred, dtype=object)
