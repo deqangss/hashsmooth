@@ -28,7 +28,7 @@ class HashSmooth(BasicClassifier):
                  hash_methods: list,
                  n_subfeatures: list,
                  k_hashcode: (int, float),
-                 max_k:int,
+                 max_k: int,
                  max_radii: list,
                  n_grids: list,
                  default_mode=True
@@ -148,11 +148,12 @@ class HashSmooth(BasicClassifier):
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
             radii = np.ones_like(c_pred, dtype=object)
             radii[abstain_indicator] = 0.
-            radii[abstain_indicator] = self._calc_radius(prob_underlined[abstain_indicator], prob_upperlined,
-                                                         k_subhashcodes,
-                                                         max_radii,
-                                                         n_grids
-                                                         )
+            radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator],
+                                                          prob_upperlined[~abstain_indicator],
+                                                          k_subhashcodes,
+                                                          max_radii,
+                                                          n_grids
+                                                          )
         return c_pred, radii
 
     def sample_lsh_funcs(self, x: np.ndarray, n_data: int, n_samples: int, n_subfeatures=[], k_hashcode=0):
@@ -196,7 +197,7 @@ class HashSmooth(BasicClassifier):
         return counts, k_subhashcodes
 
     def transform_wrapper(self, input_vectors: (np.ndarray, torch.Tensor), n_subfeatures=[], k_subhashcodes=[]) -> (
-    np.ndarray, torch.Tensor):
+            np.ndarray, torch.Tensor):
         """
         conduct the input transformation
         We here leave alternative initialization for 'n_subfeatures' and 'k_subhashcode' because sometimes we just assure
@@ -252,6 +253,9 @@ class HashSmooth(BasicClassifier):
             return top2[0]
 
     def fit(self):
+        pass
+
+    def eval(self):
         pass
 
     def get_num_subhashcodes(self, n_subfeatures, k_per_instance):
@@ -325,7 +329,7 @@ class HashSmooth(BasicClassifier):
             radii_splitting.append(
                 np.linspace(0, max_radii_calc[0],
                             n_grids[0] + 1))  # int(round(max_radii_calc[0] * self.n_subfeatures[0])) + 1)
-        elif not len(max_radii_calc) <= 1: # for hybrid of hash functions
+        elif not len(max_radii_calc) <= 1:  # for hybrid of hash functions
             # position product,
             for i, max_r in enumerate(max_radii_calc):
                 radii_splitting.append(
