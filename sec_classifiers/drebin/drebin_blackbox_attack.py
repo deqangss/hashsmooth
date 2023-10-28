@@ -264,7 +264,7 @@ class EvolutionAA(object):
                 last_n_best_fits.insert(0, best_fitness)
                 last_n_best_fits = last_n_best_fits[:self.attack_problem.stagnation]
                 if len(last_n_best_fits) == self.attack_problem.stagnation and (
-                        all((np.array(last_n_best_fits) - best_fitness) < 1e-8) or all(
+                        all(abs(np.array(last_n_best_fits) - best_fitness) < 1e-8) or all(
                     np.array(last_n_best_fits) == np.infty)):
                     print('Stagnating terminate!')
                     break
