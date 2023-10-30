@@ -155,7 +155,7 @@ def _main():
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
     np.savez(os.path.join(dataset.dataset_path, 'adv-examples', '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.steps)),
-             adv=adv)
+             adv=adv, mal_pred=adv_prediction)
 
 
 if __name__ == "__main__":

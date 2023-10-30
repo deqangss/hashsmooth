@@ -311,7 +311,7 @@ class RandomSmooth4Drebin(RandomSmooth):
             prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
 
             radius = self.population_radius_for_majority(np.array(prob_underlined)[..., None],
-                                                         x[0].size,
+                                                         x[0].cpu().numpy().size,
                                                          k_per_instance)
 
             radius[(c_pred != labels).cpu().numpy()] = RandomSmooth.ABSTAIN

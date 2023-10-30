@@ -136,6 +136,10 @@ def _main():
     logger.info('\n' + '\n'.join(map(str, radii.tolist())))
     logger.info("Model of {} achieves the certification mean {} and median {} with input dim {}.".format(
         args.model, radius_mean, radius_median, input_dim))
+    if not os.path.exists(os.path.join(dataset.dataset_path, 'cert')):
+        utils.mkdir(os.path.join(dataset.dataset_path, 'cert'))
+    np.savez(os.path.join(dataset.dataset_path, 'cert', '{}_{}_{}_radii.npz'.format(args.model, args.smooth, args.sub_k)),
+             radii=radii)
 
 
 if __name__ == "__main__":
