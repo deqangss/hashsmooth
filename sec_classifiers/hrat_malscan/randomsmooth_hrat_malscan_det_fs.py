@@ -133,9 +133,7 @@ class RandomSmooth(BasicClassifier):
         done = torch.zeros(count, dtype=torch.uint8)
         radii = torch.zeros(count, dtype=torch.long)
         radius = 0
-        print(scores_of_true.shape)
         lhs = (1.5 - scores_of_true).squeeze(1)
-        print(lhs)
         while (done.sum() < count):
             rhs = math.factorial(size - radius) * math.factorial(size - keep) / (
                     math.factorial(size) * math.factorial(size - keep - radius))
