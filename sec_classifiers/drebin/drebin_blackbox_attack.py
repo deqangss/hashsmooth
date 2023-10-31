@@ -99,9 +99,9 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         adv_x_init = np.clip(self.original_x[None, ...] + self.benign_samples_as_seed, lower_bound, upper_bound)
         _conf = self.classifier.get_confidence(
             torch.from_numpy(adv_x_init).to(self.device).float()).detach().cpu().numpy()
-        if len(_conf.shape) == 1:
+        if _conf.shape[1] == 1:
             pass
-        elif len(_conf.shape) == 2:
+        elif _conf.shape[1] == 2:
             _conf = _conf[:, 1]  # targeted attack
         else:
             raise ValueError
@@ -127,10 +127,12 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         x_constrained = self.get_adv_x(individual)
         x_constrained_tensor = torch.from_numpy(x_constrained[None, ...]).to(self.device).float()
         confidence = self.classifier.get_confidence(x_constrained_tensor)
-        if len(confidence.squeeze()) == 2:
+        if confidence.shape[1] == 1:
+            confidence = confidence[0, 0]
+        elif confidence.shape[1] == 2:
             confidence = confidence[0, 1]  # targeted attack
         else:
-            confidence = confidence.squeeze()
+            raise ValueError
         l1_norm = torch.sum(
             torch.abs(x_constrained_tensor - torch.from_numpy(self.original_x).to(self.device).float()))
 
