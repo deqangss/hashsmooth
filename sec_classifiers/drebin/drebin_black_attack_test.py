@@ -172,10 +172,10 @@ def _main():
     advs, adv_prediction = [], []
     for idx, (mal_x, mal_y) in enumerate(zip(mal_test_x, mal_test_y)):
         adv_x = ea_attack.perturb(mal_x, verbose=True)
-        print(np.sum(np.abs(adv_x - mal_x), axis=-1))
         adv_y_pred = classifier.predict(torch.from_numpy(adv_x[None, ...]).to(device).float()).cpu().numpy()
         adv_prediction.append(adv_y_pred)
         advs.append(adv_x)
+        print(np.sum(np.abs(adv_x - mal_x), axis=-1), adv_y_pred)
     advs = np.vstack(advs)
     adv_prediction = np.concatenate(adv_prediction)
     adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
