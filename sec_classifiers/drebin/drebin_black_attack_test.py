@@ -40,7 +40,7 @@ atta_argparse.add_argument('--cx_prob', type=float, default=0.5,
                            help='cross-over probability in EA.')
 atta_argparse.add_argument('--mut_prob', type=float, default=0.5,
                            help='mutation probability in EA.')
-atta_argparse.add_argument('--flip_prob', type=float, default=0.1,
+atta_argparse.add_argument('--flip_prob', type=float, default=0.001,
                            help='mutation probability for an individual.')
 atta_argparse.add_argument('--tour_selection_k', type=int, default=100,
                            help='number of selected individuals for produce offspring.')
