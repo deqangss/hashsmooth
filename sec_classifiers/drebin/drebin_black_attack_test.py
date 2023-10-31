@@ -24,7 +24,7 @@ np.random.seed(23456)
 
 atta_argparse = argparse.ArgumentParser(description='arguments for evolution attack')
 
-atta_argparse.add_argument('--iterations', type=int, default=100,
+atta_argparse.add_argument('--iterations', type=int, default=1000,
                            help='number of iterations.')
 atta_argparse.add_argument('--n_repetition', type=int, default=2,
                            help='repeat the evolution algorithm (EA) attack.')
