@@ -100,7 +100,7 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         _conf = self.classifier.get_confidence(
             torch.from_numpy(adv_x_init).to(self.device).float()).detach().cpu().numpy()
         if _conf.shape[1] == 1:
-            pass
+            _conf = _conf[:, 0]
         elif _conf.shape[1] == 2:
             _conf = _conf[:, 1]  # targeted attack
         else:
