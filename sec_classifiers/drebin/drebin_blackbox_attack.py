@@ -283,7 +283,12 @@ class EvolutionAA(object):
             best_t = tools.selBest(all_best_ind, 1)[0]
             adv_x = self.attack_problem.get_adv_x(best_t)
             adv_conf = self.attack_problem.classifier.get_confidence(torch.from_numpy(adv_x[None, ...]).to(self.attack_problem.device).float())
-            adv_conf = adv_conf[0, 1]
+            if adv_conf.shape[1] == 1:
+                adv_conf = adv_conf[0, 0]
+            elif _conf.shape[1] == 2:
+                adv_conf = adv_conf[0, 1]  # targeted attack
+            else:
+                raise ValueError
             if adv_conf < 0.5:
                 print("Attack success")
                 print('perturbations', np.sum(np.abs(adv_x - self.attack_problem.original_x)))
