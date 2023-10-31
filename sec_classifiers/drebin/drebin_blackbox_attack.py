@@ -200,13 +200,13 @@ class EvolutionAA(object):
 
         toolbox = base.Toolbox()
         # toolbox.register("attr_bool", random.randint, 0, 1)
-        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.9, 0.1])
+        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.5, 0.5])
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, self.attack_problem.input_dim)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
         toolbox.register('evaluate', self.attack_problem.get_fitness)
         toolbox.register('mate', tools.cxTwoPoint)
-        toolbox.register('mutate', tools.mutFlipBit, indpb=0.01)
+        toolbox.register('mutate', tools.mutFlipBit, indpb=self.individual_flip_prob)
         toolbox.register('select', tools.selTournament, tournsize=self.tour_selection_k)
 
         stats_res = tools.Statistics()
