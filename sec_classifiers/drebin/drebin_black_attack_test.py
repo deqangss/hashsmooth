@@ -24,7 +24,7 @@ np.random.seed(23456)
 
 atta_argparse = argparse.ArgumentParser(description='arguments for evolution attack')
 
-atta_argparse.add_argument('--iterations', type=int, default=100,
+atta_argparse.add_argument('--iterations', type=int, default=30,
                            help='number of iterations.')
 atta_argparse.add_argument('--n_repetition', type=int, default=5,
                            help='repeat the evolution algorithm (EA) attack.')
@@ -32,15 +32,15 @@ atta_argparse.add_argument('--population_size', type=int, default=1000,
                            help='population size.')
 atta_argparse.add_argument('--penalty', type=float, default=1e-3,
                            help='penalty factor for l1 regularization.')
-atta_argparse.add_argument('--stagnation', type=int, default=10,
+atta_argparse.add_argument('--stagnation', type=int, default=8,
                            help='terminate the EA when number of the same result occurance.')
 atta_argparse.add_argument('--benign_seed_num', type=int, default=30,
                            help='number of benign samples to initialize the starting point.')
 atta_argparse.add_argument('--cx_prob', type=float, default=0.5,
                            help='cross-over probability in EA.')
-atta_argparse.add_argument('--mut_prob', type=float, default=0.3,
+atta_argparse.add_argument('--mut_prob', type=float, default=0.5,
                            help='mutation probability in EA.')
-atta_argparse.add_argument('--flip_prob', type=float, default=0.01,
+atta_argparse.add_argument('--flip_prob', type=float, default=0.1,
                            help='mutation probability for an individual.')
 atta_argparse.add_argument('--tour_selection_k', type=int, default=100,
                            help='number of selected individuals for produce offspring.')
@@ -64,7 +64,7 @@ atta_argparse.add_argument('--n_sampling', type=int, default=100,
                            help='Number of sampling times for estimating the predictive label.')
 atta_argparse.add_argument('--save_path', type=str, default='./results',
                            help='Folder path to save results.')
-atta_argparse.add_argument('--model', type=str, default='drebin_svm',
+atta_argparse.add_argument('--model', type=str, default='svm',
                            choices=['svm', 'dnn'],
                            help="model type, choose from 'svm' and 'dnn'.\n")
 atta_argparse.add_argument('--smooth', type=str, default='none',
@@ -182,6 +182,12 @@ def _main():
     logger.info(
         "Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
     np.savez(os.path.join(dataset.dataset_path, 'adv.npz'), adv=advs)
+    # save
+    if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples-ea')):
+        utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples-ea'))
+    np.savez(os.path.join(dataset.dataset_path, 'adv-examples-ea',
+                          '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.steps)),
+             adv=advs, mal_pred=adv_prediction)
 
 
 if __name__ == "__main__":
