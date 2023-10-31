@@ -24,13 +24,13 @@ np.random.seed(23456)
 
 atta_argparse = argparse.ArgumentParser(description='arguments for evolution attack')
 
-atta_argparse.add_argument('--iterations', type=int, default=30,
+atta_argparse.add_argument('--iterations', type=int, default=100,
                            help='number of iterations.')
-atta_argparse.add_argument('--n_repetition', type=int, default=5,
+atta_argparse.add_argument('--n_repetition', type=int, default=2,
                            help='repeat the evolution algorithm (EA) attack.')
 atta_argparse.add_argument('--population_size', type=int, default=1000,
                            help='population size.')
-atta_argparse.add_argument('--penalty', type=float, default=1e-3,
+atta_argparse.add_argument('--penalty', type=float, default=0.0002,
                            help='penalty factor for l1 regularization.')
 atta_argparse.add_argument('--stagnation', type=int, default=8,
                            help='terminate the EA when number of the same result occurance.')

@@ -99,7 +99,13 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         adv_x_init = np.clip(self.original_x[None, ...] + self.benign_samples_as_seed, lower_bound, upper_bound)
         _conf = self.classifier.get_confidence(
             torch.from_numpy(adv_x_init).to(self.device).float()).detach().cpu().numpy()
-        _conf = _conf[:, 1]  # targeted attack
+        if len(_conf.shape) == 1:
+            pass
+        elif len(_conf.shape) == 2:
+            _conf = _conf[:, 1]  # targeted attack
+        else:
+            raise ValueError
+
         _toward_success = _conf < 0.5
         if np.any(_toward_success):
             diff_pertb_init = np.sum(np.abs(adv_x_init - x[None, ...]), axis=-1)[_toward_success]
