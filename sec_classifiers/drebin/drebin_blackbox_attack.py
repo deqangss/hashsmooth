@@ -136,6 +136,7 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         l1_norm = torch.sum(
             torch.abs(x_constrained_tensor - torch.from_numpy(self.original_x).to(self.device).float()))
 
+        print(confidence, l1_norm)
         fitness_value = confidence + self.penalty_regularizer * l1_norm
         self.confidences_.append(confidence.data.item())
         self.sizes_.append(l1_norm.data.item())
