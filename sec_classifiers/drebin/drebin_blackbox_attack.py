@@ -201,8 +201,8 @@ class EvolutionAA(object):
         creator.create("Individual", list, fitness=creator.FitnessMin)
 
         toolbox = base.Toolbox()
-        toolbox.register("attr_bool", random.randint, 0, 1)
-        # toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.5, 0.5])
+        # toolbox.register("attr_bool", random.randint, 0, 1)
+        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.98, 0.02])
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, self.attack_problem.input_dim)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
