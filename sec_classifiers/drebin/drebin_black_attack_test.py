@@ -24,13 +24,13 @@ np.random.seed(23456)
 
 atta_argparse = argparse.ArgumentParser(description='arguments for evolution attack')
 
-atta_argparse.add_argument('--iterations', type=int, default=200,
+atta_argparse.add_argument('--iterations', type=int, default=100,
                            help='number of iterations.')
 atta_argparse.add_argument('--n_repetition', type=int, default=2,
                            help='repeat the evolution algorithm (EA) attack.')
-atta_argparse.add_argument('--population_size', type=int, default=10000,
+atta_argparse.add_argument('--population_size', type=int, default=1000,
                            help='population size.')
-atta_argparse.add_argument('--penalty', type=float, default=0.0002,
+atta_argparse.add_argument('--penalty', type=float, default=0.001,
                            help='penalty factor for l1 regularization.')
 atta_argparse.add_argument('--stagnation', type=int, default=8,
                            help='terminate the EA when number of the same result occurance.')
@@ -38,11 +38,11 @@ atta_argparse.add_argument('--benign_seed_num', type=int, default=30,
                            help='number of benign samples to initialize the starting point.')
 atta_argparse.add_argument('--cx_prob', type=float, default=0.5,
                            help='cross-over probability in EA.')
-atta_argparse.add_argument('--mut_prob', type=float, default=0.5,
+atta_argparse.add_argument('--mut_prob', type=float, default=0.3,
                            help='mutation probability in EA.')
-atta_argparse.add_argument('--flip_prob', type=float, default=0.00,
+atta_argparse.add_argument('--flip_prob', type=float, default=0.01,
                            help='mutation probability for an individual.')
-atta_argparse.add_argument('--tour_selection_k', type=int, default=1000,
+atta_argparse.add_argument('--tour_selection_k', type=int, default=100,
                            help='number of selected individuals for produce offspring.')
 # atta_argparse.add_argument('--real', action='store_true', default=False,
 #                            help='whether produce the perturbed apks.')

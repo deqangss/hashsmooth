@@ -136,8 +136,9 @@ class EABlackBoxEvasionProblem(BlackBoxProblem):
         l1_norm = torch.sum(
             torch.abs(x_constrained_tensor - torch.from_numpy(self.original_x).to(self.device).float()))
 
-        print(confidence, l1_norm)
+        # print(confidence, '---', l1_norm)
         fitness_value = confidence + self.penalty_regularizer * l1_norm
+        # + self.penalty_regularizer * l1_norm
         self.confidences_.append(confidence.data.item())
         self.sizes_.append(l1_norm.data.item())
         self.fitness_.append(fitness_value.data.item())
@@ -179,7 +180,7 @@ class EvolutionAA(object):
                  cx_prob: float = 0.5,
                  mut_prob: float = 0.3,
                  individual_flip_prob: float = 0.01,
-                 tour_selection_k : int = 10,
+                 tour_selection_k : int = 100,
                  n_repetition: int = 5,
                  ):
         self.attack_problem = attack_problem
@@ -200,8 +201,8 @@ class EvolutionAA(object):
         creator.create("Individual", list, fitness=creator.FitnessMin)
 
         toolbox = base.Toolbox()
-        # toolbox.register("attr_bool", random.randint, 0, 1)
-        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.98, 0.02])
+        toolbox.register("attr_bool", random.randint, 0, 1)
+        # toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.5, 0.5])
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, self.attack_problem.input_dim)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
@@ -278,6 +279,11 @@ class EvolutionAA(object):
                     np.array(last_n_best_fits) == np.infty)):
                     print('Stagnating terminate!')
                     break
+                for best_ind in hall_of_fame:
+                    adv_x = self.attack_problem.get_adv_x(np.array(best_ind))
+                    adv_conf = self.attack_problem.classifier.get_confidence(
+                        torch.from_numpy(adv_x[None, ...]).to('cuda:0').float())
+                    print('adv confidence: ', adv_conf)
             # confidences, fitness, sizes = self.attack_problem._export_internal_results(slice_indices)
             # self.attack_problem.confidences_ = _pad_sequence_with_last(confidences, self.attack_problem.iterations)
             # self.attack_problem.fitness_ = _pad_sequence_with_last(fitness, self.attack_problem.iterations)
@@ -287,7 +293,7 @@ class EvolutionAA(object):
             adv_conf = self.attack_problem.classifier.get_confidence(torch.from_numpy(adv_x[None, ...]).to(self.attack_problem.device).float())
             if adv_conf.shape[1] == 1:
                 adv_conf = adv_conf[0, 0]
-            elif _conf.shape[1] == 2:
+            elif adv_conf.shape[1] == 2:
                 adv_conf = adv_conf[0, 1]  # targeted attack
             else:
                 raise ValueError
