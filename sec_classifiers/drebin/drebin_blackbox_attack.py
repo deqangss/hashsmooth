@@ -279,11 +279,6 @@ class EvolutionAA(object):
                     np.array(last_n_best_fits) == np.infty)):
                     print('Stagnating terminate!')
                     break
-                for best_ind in hall_of_fame:
-                    adv_x = self.attack_problem.get_adv_x(np.array(best_ind))
-                    adv_conf = self.attack_problem.classifier.get_confidence(
-                        torch.from_numpy(adv_x[None, ...]).to('cuda:0').float())
-                    print('adv confidence: ', adv_conf)
             # confidences, fitness, sizes = self.attack_problem._export_internal_results(slice_indices)
             # self.attack_problem.confidences_ = _pad_sequence_with_last(confidences, self.attack_problem.iterations)
             # self.attack_problem.fitness_ = _pad_sequence_with_last(fitness, self.attack_problem.iterations)
