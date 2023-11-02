@@ -33,8 +33,8 @@ class DrebinSVM(BasicClassifier):
             validation_x_y: torch.utils.data.dataloader,
             epochs=1000, learning_rate=0.001, penaty_factor=0.01, device='cpu', verbose=False):
         nbatches = len(train_x_y)
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
-        # optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        # optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         best_avg_acc = 0.
         for i in range(epochs):
             self.model.train()
