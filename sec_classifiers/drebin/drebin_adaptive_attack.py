@@ -69,7 +69,11 @@ class PGDl1(object):
         # self.padding_mask = torch.sum(adv_x, dim=-1, keepdim=True) > 1  # we set a graph contains two apis at least
         model.eval()
         pred_y = model.predict(adv_x)
-        done = pred_y != label
+        if hasattr(model, 'ABSTAIN'):
+            done = pred_y != label & pred_y != -1
+        else:
+            done = pred_y != label
+
         worst_x[done] = adv_x[done]
         for t in range(steps):
             var_adv_x = torch.autograd.Variable(adv_x, requires_grad=True)
@@ -82,7 +86,10 @@ class PGDl1(object):
             adv_x = torch.clamp(adv_x + perturbation * direction, min=0., max=1.)
 
             pred_y = model.predict(adv_x)
-            done = pred_y != label
+            if hasattr(model, 'ABSTAIN'):
+                done = pred_y != label & pred_y != -1
+            else:
+                done = pred_y != label
             worst_x[done] = adv_x[done]
             if verbose:
                 print("Attack step {} with accuracy {:.2f}%.\n".format(t+1, 100 - done.sum().item()/float(len(done)) * 100))
