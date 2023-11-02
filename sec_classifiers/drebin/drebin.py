@@ -33,8 +33,8 @@ class DrebinSVM(BasicClassifier):
             validation_x_y: torch.utils.data.dataloader,
             epochs=1000, learning_rate=0.001, penaty_factor=0.01, device='cpu', verbose=False):
         nbatches = len(train_x_y)
-        # optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        # optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
         best_avg_acc = 0.
         for i in range(epochs):
             self.model.train()
@@ -48,7 +48,7 @@ class DrebinSVM(BasicClassifier):
                 # loss_train += penaty_factor * torch.sum(weight * weight)
                 loss_train.backward()
                 optimizer.step()
-                accuray_train = ((logits.data > 0.5).view(-1) == y_train).sum().item() / x_train.size()[0]
+                accuray_train = ((logits.data > 0.).view(-1) == y_train).sum().item() / x_train.size()[0]
                 accuraies.append(accuray_train)
                 losses.append(loss_train)
 
@@ -62,7 +62,7 @@ class DrebinSVM(BasicClassifier):
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
                     logits = self.model(x_val)
-                    acc_val = ((logits.data > 0.5).view(-1) == y_val).sum().item()
+                    acc_val = ((logits.data > 0.).view(-1) == y_val).sum().item()
                     acc_val /= x_val.size()[0]
                     avg_acc_val.append(acc_val)
                 avg_acc_val = np.mean(avg_acc_val)
@@ -79,7 +79,7 @@ class DrebinSVM(BasicClassifier):
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         self.eval()
         logits = self.model(x)
-        x_preds = (logits.data > 0.5).view(-1).to(torch.int)
+        x_preds = (logits.data > 0.).view(-1).to(torch.int)
         return x_preds
 
     def load_model(self):
@@ -211,7 +211,7 @@ class RandomSmooth4Drebin(RandomSmooth):
 
     def get_output(self, logits: torch.Tensor):
         if isinstance(self.base_classifier, DrebinSVM):
-            return (logits.data > 0.5).view(-1)
+            return (logits.data > 0.).view(-1)
         elif isinstance(self.base_classifier, DrebinNN):
             return logits.argmax(dim=-1)
         else:
@@ -525,7 +525,7 @@ class HashSmooth4Drebin(HashSmooth):
 
     def get_output(self, logits: torch.Tensor):
         if isinstance(self.base_classifier, DrebinSVM):
-            return (logits.data > 0.5).view(-1)
+            return (logits.data > 0.).view(-1)
         elif isinstance(self.base_classifier, DrebinNN):
             return logits.argmax(dim=-1)
         else:

@@ -123,6 +123,7 @@ def _main():
                                        )
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
         classifier.get_confidence = functools.partial(classifier.get_confidence, n_sampling=args.n_sampling)
+        name_suffix = args.sub_k
     elif args.smooth == 'random':
         input_transfermor = RandomTransformer(k_randomcode=args.sub_k, reuse_noise=True, seed=args.seed)
         classifier = RandomSmooth4Drebin(classifier, num_of_classes=2, transform_method=input_transfermor,
@@ -133,7 +134,9 @@ def _main():
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
         classifier.get_confidence = functools.partial(classifier.get_confidence, n_sampling=args.n_sampling,
                                                       k_per_instance=args.sub_k)
+        name_suffix = args.sub_k
     else:
+        name_suffix = ''
         pass
 
     # test
@@ -142,6 +145,8 @@ def _main():
     for idx, (test_x_batch, test_y_batch) in enumerate(test_mal_producer):
         test_x_batch = test_x_batch.to(device)
         y_pred = classifier.predict(test_x_batch).cpu().numpy()
+        y_conf = classifier.get_confidence(test_x_batch).detach().cpu().numpy()
+        print(y_pred, y_conf)
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y)
@@ -171,7 +176,7 @@ def _main():
                             n_repetition=args.n_repetition)
     advs, adv_prediction = [], []
     for idx, (mal_x, mal_y) in enumerate(zip(mal_test_x, mal_test_y)):
-        adv_x = ea_attack.perturb(mal_x, verbose=True)
+        adv_x = ea_attack.perturb(mal_x, mal_y, verbose=True)
         adv_y_pred = classifier.predict(torch.from_numpy(adv_x[None, ...]).to(device).float()).cpu().numpy()
         adv_prediction.append(adv_y_pred)
         advs.append(adv_x)
@@ -181,12 +186,11 @@ def _main():
     adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
     logger.info(
         "Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
-    np.savez(os.path.join(dataset.dataset_path, 'adv.npz'), adv=advs)
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples-ea')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples-ea'))
     np.savez(os.path.join(dataset.dataset_path, 'adv-examples-ea',
-                          '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.steps)),
+                          '{}_{}_{}_adv.npz'.format(args.model, name_suffix, args.smooth)),
              adv=advs, mal_pred=adv_prediction)
 
 

@@ -190,12 +190,21 @@ class EvolutionAA(object):
         self.tour_selection_k = tour_selection_k
         self.n_repetition = n_repetition
 
-    def perturb(self, x:np.array, verbose=True):
+    def perturb(self, x:np.array, label, verbose=True):
         """
         perturb feature vectors
         """
         if x is None or x.shape[0] <= 0:
             return []
+        org_pred = self.attack_problem.classifier.predict(
+            torch.from_numpy(x[None, ...]).to(self.attack_problem.device).float())
+        if hasattr(self.attack_problem.classifier, 'ABSTAIN'):
+            done = org_pred != label & org_pred != -1
+        else:
+            done = org_pred != label
+        if np.all(done):
+            print("Attack success trivially")
+            return x
 
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
         creator.create("Individual", list, fitness=creator.FitnessMin)
@@ -285,16 +294,14 @@ class EvolutionAA(object):
             # self.attack_problem.sizes_ = _pad_sequence_with_last(sizes, self.attack_problem.iterations)
             best_t = tools.selBest(all_best_ind, 1)[0]
             adv_x = self.attack_problem.get_adv_x(best_t)
-            adv_conf = self.attack_problem.classifier.get_confidence(torch.from_numpy(adv_x[None, ...]).to(self.attack_problem.device).float())
-            if adv_conf.shape[1] == 1:
-                adv_conf = adv_conf[0, 0]
-            elif adv_conf.shape[1] == 2:
-                adv_conf = adv_conf[0, 1]  # targeted attack
+            adv_pred = self.attack_problem.classifier.predict(
+                torch.from_numpy(adv_x[None, ...]).to(self.attack_problem.device).float())
+            if hasattr(self.attack_problem.classifier, 'ABSTAIN'):
+                done = adv_pred != label & adv_pred != -1
             else:
-                raise ValueError
-            if adv_conf < 0.5:
-                print("Attack success")
-                print('perturbations', np.sum(np.abs(adv_x - self.attack_problem.original_x)))
+                done = adv_pred != label
+            if np.all(done):
+                print("Attack success!")
                 break
         del creator.FitnessMin
         del creator.Individual
