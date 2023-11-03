@@ -202,7 +202,7 @@ class EvolutionAA(object):
             done = org_pred != label & org_pred != -1
         else:
             done = org_pred != label
-        if np.all(done):
+        if torch.all(done):
             print("Attack success trivially")
             return x
 
@@ -300,7 +300,7 @@ class EvolutionAA(object):
                 done = adv_pred != label & adv_pred != -1
             else:
                 done = adv_pred != label
-            if np.all(done):
+            if torch.all(done):
                 print("Attack success!")
                 break
         del creator.FitnessMin

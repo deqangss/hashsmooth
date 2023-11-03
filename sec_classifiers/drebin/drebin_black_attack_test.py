@@ -145,8 +145,6 @@ def _main():
     for idx, (test_x_batch, test_y_batch) in enumerate(test_mal_producer):
         test_x_batch = test_x_batch.to(device)
         y_pred = classifier.predict(test_x_batch).cpu().numpy()
-        y_conf = classifier.get_confidence(test_x_batch).detach().cpu().numpy()
-        print(y_pred, y_conf)
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y)
