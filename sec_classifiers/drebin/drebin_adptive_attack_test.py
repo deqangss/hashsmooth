@@ -142,15 +142,30 @@ def _main():
         adv.append(adv_x.cpu().numpy())
     adv = np.vstack(adv)
     adv_prediction = np.concatenate(adv_prediction)
-    adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
-    logger.info(
-        "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
-            args.model,
-            args.sub_k,
-            args.smooth,
-            adv_accuracy * 100,
-            args.steps
+
+    if hasattr(classifier, 'ABSTAIN'):
+        abstain_flag = adv_y_pred == classifier.ABSTAIN
+    else:
+        abstain_flag = np.array([False] * len(mal_test_y))
+    print(mal_test_y, adv_prediction)
+    # filter out the abstain elements
+    if np.all(abstain_flag):
+        logger.warning("All prediction is abstained.\n")
+    else:
+        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
+        logger.info("All elements {:.0f}, abstained elements {:.0f}, and the remained elements {:.0f}.\n".format(
+            len(y_prediction),
+            np.sum(abstain_flag),
+            len(y_prediction) - np.sum(abstain_flag)
             ))
+        logger.info(
+            "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
+                args.model,
+                args.sub_k,
+                args.smooth,
+                adv_accuracy * 100,
+                args.steps
+                ))
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))

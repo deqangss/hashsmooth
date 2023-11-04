@@ -70,7 +70,7 @@ class PGDl1(object):
         model.eval()
         pred_y = model.predict(adv_x)
         if hasattr(model, 'ABSTAIN'):
-            done = pred_y != label & pred_y != -1
+            done = torch.logical_and(pred_y != label, pred_y != -1)
         else:
             done = pred_y != label
 
@@ -87,7 +87,7 @@ class PGDl1(object):
 
             pred_y = model.predict(adv_x)
             if hasattr(model, 'ABSTAIN'):
-                done = pred_y != label & pred_y != -1
+                done = torch.logical_and(pred_y != label, pred_y != -1)
             else:
                 done = pred_y != label
             worst_x[done] = adv_x[done]
