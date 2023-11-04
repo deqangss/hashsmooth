@@ -144,7 +144,7 @@ def _main():
     adv_prediction = np.concatenate(adv_prediction)
 
     if hasattr(classifier, 'ABSTAIN'):
-        abstain_flag = adv_y_pred == classifier.ABSTAIN
+        abstain_flag = adv_prediction == classifier.ABSTAIN
     else:
         abstain_flag = np.array([False] * len(mal_test_y))
     # filter out the abstain elements
