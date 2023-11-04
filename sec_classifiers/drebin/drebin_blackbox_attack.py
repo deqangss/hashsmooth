@@ -211,7 +211,7 @@ class EvolutionAA(object):
 
         toolbox = base.Toolbox()
         # toolbox.register("attr_bool", random.randint, 0, 1)
-        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.985, 0.015])
+        toolbox.register("attr_bool", np.random.choice, np.arange(2), None, True, [0.998, 0.002])
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, self.attack_problem.input_dim)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
