@@ -147,7 +147,6 @@ def _main():
         abstain_flag = adv_y_pred == classifier.ABSTAIN
     else:
         abstain_flag = np.array([False] * len(mal_test_y))
-    print(mal_test_y, adv_prediction)
     # filter out the abstain elements
     if np.all(abstain_flag):
         logger.warning("All prediction is abstained.\n")
