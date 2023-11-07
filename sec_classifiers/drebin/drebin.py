@@ -477,7 +477,7 @@ class HashSmooth4Drebin(HashSmooth):
 
         if self.default_mode:
             abstain_indicator = prob_underlined <= 0.5
-            print(np.sum(abstain_indicator))
+            print(np.sum(abstain_indicator), np.sum(c_pred))
             import sys
             sys.exit(-1)
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
