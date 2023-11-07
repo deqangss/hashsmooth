@@ -340,7 +340,8 @@ class RandomSmooth4Drebin(RandomSmooth):
                                                              k_per_instance)
                     logits = self.base_classifier.model(mask_x)
                     pred_batch = self.get_output(logits).to(torch.int64)
-                    votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0, keepdim=True)
+                    votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0,
+                                       keepdim=True)
 
         return votes, k_per_instance
 
@@ -471,19 +472,16 @@ class HashSmooth4Drebin(HashSmooth):
 
         c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
+        abstain_indicator = c_pred != labels.cpu().numpy()
 
         # given the estimated probability, we calculate the radius
         prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
 
         if self.default_mode:
-            abstain_indicator = prob_underlined <= 0.5
-            print(np.sum(abstain_indicator), np.sum(c_pred))
-            print(c_pred)
-            import sys
-            sys.exit(-1)
-            c_pred[abstain_indicator] = HashSmooth.ABSTAIN
-            radii = np.ones_like(c_pred, dtype=object)
-            radii[abstain_indicator] = 0.
+            # abstain_indicator = prob_underlined <= 0.5
+            radii = np.zeros_like(c_pred, dtype=object)
+            print(np.sum(abstain_indicator), len(abstain_indicator))
+            radii[abstain_indicator] = HashSmooth.ABSTAIN
             radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator], 0.5,
                                                           [],
                                                           [],
@@ -493,15 +491,16 @@ class HashSmooth4Drebin(HashSmooth):
             c_pred_runnerup = counts_selection.argsort()[:, -2]
             n_targeted_runnerup = counts_estimation[c_pred_runnerup]
             prob_upperlined = upper_confidence_interval(n_targeted_runnerup, n_estimation, alpha)
-            abstain_indicator = prob_underlined <= prob_upperlined
-            c_pred[abstain_indicator] = HashSmooth.ABSTAIN
-            radii = np.ones_like(c_pred, dtype=object)
-            radii[abstain_indicator] = 0.
-            radii[abstain_indicator] = self._calc_radius(prob_underlined[abstain_indicator], prob_upperlined,
-                                                         [],
-                                                         [],
-                                                         []
-                                                         )
+            # abstain_indicator = prob_underlined <= prob_upperlined
+            # c_pred[abstain_indicator] = HashSmooth.ABSTAIN
+            radii = np.zeros_like(c_pred, dtype=object)
+            radii[abstain_indicator] = HashSmooth.ABSTAIN
+            radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator],
+                                                          prob_upperlined[~abstain_indicator],
+                                                          [],
+                                                          [],
+                                                          []
+                                                          )
         return radii
 
     def sample_funcs(self, x: torch.Tensor, n):
