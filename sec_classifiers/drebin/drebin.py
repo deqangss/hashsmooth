@@ -480,7 +480,6 @@ class HashSmooth4Drebin(HashSmooth):
         if self.default_mode:
             # abstain_indicator = prob_underlined <= 0.5
             radii = np.zeros_like(c_pred, dtype=object)
-            print(np.sum(abstain_indicator), len(abstain_indicator))
             radii[abstain_indicator] = HashSmooth.ABSTAIN
             radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator], 0.5,
                                                           [],
