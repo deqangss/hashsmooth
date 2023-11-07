@@ -126,7 +126,7 @@ def _main():
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y)
     accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
-    logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.sub_k,
+    logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.sub_k),
                                                                                                accuracy * 100))
 
     # attack
@@ -168,7 +168,7 @@ def _main():
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
-    np.savez(os.path.join(dataset.dataset_path, 'adv-examples', '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.steps)),
+    np.savez(os.path.join(dataset.dataset_path, 'adv-examples', '{}_{}_{}_adv.npz'.format(args.model, args.smooth + str(args.sub_k), args.steps)),
              adv=adv, mal_pred=adv_prediction)
 
 
