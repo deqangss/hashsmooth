@@ -477,6 +477,9 @@ class HashSmooth4Drebin(HashSmooth):
 
         if self.default_mode:
             abstain_indicator = prob_underlined <= 0.5
+            print(np.sum(abstain_indicator))
+            import sys
+            sys.exit(-1)
             c_pred[abstain_indicator] = HashSmooth.ABSTAIN
             radii = np.ones_like(c_pred, dtype=object)
             radii[abstain_indicator] = 0.
