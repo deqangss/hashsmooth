@@ -93,7 +93,7 @@ def _main():
                                        n_subfeatures=[input_dim],
                                        k_hashcode=args.sub_k,
                                        max_k=args.sub_k,
-                                       max_radii=[0.1],
+                                       max_radii=[0.5],
                                        n_grids=[1000],
                                        default_mode=True,
                                        model_save_dir=os.path.join(args.save_path,
