@@ -276,14 +276,14 @@ class HashSmooth(BasicClassifier):
                 k_subhashcodes.append(k_subhash)
             return k_subhashcodes
 
-        if isinstance(k_per_instance, int) and k_per_instance > 1:
+        if isinstance(k_per_instance, int) and k_per_instance >= 1:
             k_per_instance = min(k_per_instance, self.max_k)
             k_subhashcodes = _get_num_subhashcodes(k_per_instance)
-        elif isinstance(k_per_instance, float) and 0. < k_per_instance <= 1.:
+        elif isinstance(k_per_instance, float) and 0. < k_per_instance < 1.:
             k_hashcode_ = min(math.ceil(sum(n_subfeatures) * k_per_instance), self.max_k)
             k_subhashcodes = _get_num_subhashcodes(k_hashcode_)
         else:
-            k_subhashcodes = self.k_subhashcodes
+            k_subhashcodes = k_per_instance
         return k_subhashcodes
 
     def _calc_radius(self, probas, second_probas, k_subhashcodes=[], max_radii=[], n_grids=[]):
