@@ -383,12 +383,7 @@ class HashSmooth4Drebin(HashSmooth):
     def fit(self, train_x_y: torch.utils.data.dataloader, validation_x_y: torch.utils.data.dataloader,
             epochs=1000, learning_rate=0.001, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
-        if isinstance(self.base_classifier, DrebinSVM):
-            optimizer = torch.optim.SGD(self.base_classifier.model.parameters(), lr=learning_rate)
-        elif isinstance(self.base_classifier, DrebinNN):
-            optimizer = torch.optim.Adam(self.base_classifier.model.parameters(), lr=learning_rate)
-        else:
-            raise TypeError("Expect 'DrebinSVM' or 'DrebinNN'.")
+        optimizer = torch.optim.Adam(self.base_classifier.model.parameters(), lr=learning_rate)
         best_avg_acc = 0.
         for i in range(epochs):
             self.base_classifier.model.train()
