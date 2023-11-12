@@ -469,10 +469,6 @@ class HashSmooth4Drebin(HashSmooth):
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
         abstain_indicator = c_pred != labels.cpu().numpy()
 
-        print(np.sum(abstain_indicator), len(labels), len(labels) - np.sum(abstain_indicator))
-        radii = np.zeros_like(c_pred, dtype=object)
-        return radii
-
         # given the estimated probability, we calculate the radius
         prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
 
