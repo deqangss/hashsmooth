@@ -129,6 +129,8 @@ def _main():
         test_x_batch, test_y_batch = test_x_batch.to(device), test_y_batch.to(device)
         radii_batch = classifier.certify(test_x_batch, test_y_batch)
         radii.append(radii_batch)
+    import sys
+    sys.exit(-1)
     radii = np.concatenate(radii)
     assert len(radii) == len(mal_test_y)
     radius_mean = np.mean(radii.clip(min=0.))
