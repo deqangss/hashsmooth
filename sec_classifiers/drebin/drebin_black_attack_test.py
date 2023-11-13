@@ -94,7 +94,10 @@ def _main():
     mal_test_x = test_x[test_y == 1]
     ben_test_y = test_y[test_y == 0]
     ben_test_x = test_x[test_y == 0]
-    test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
+    test_indices = np.arange(len(mal_test_x))
+    np.random.seed(args.seed)
+    np.random.shuffle(test_indices)
+    test_mal_producer = dataset.get_dataloader(*(mal_test_x[test_indices[:200]], mal_test_y[test_indices[:200]]))
     input_dim = test_x.shape[1]
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
@@ -189,7 +192,7 @@ def _main():
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples-ea'))
     np.savez(os.path.join(dataset.dataset_path, 'adv-examples-ea',
                           '{}_{}_{}_adv.npz'.format(args.model, name_suffix, args.smooth)),
-             adv=advs, mal_pred=adv_prediction)
+             adv=advs, mal_pred=adv_prediction, test_idx=test_indices[:200])
 
 
 if __name__ == "__main__":
