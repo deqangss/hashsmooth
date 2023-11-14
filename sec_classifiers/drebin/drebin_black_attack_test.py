@@ -94,10 +94,14 @@ def _main():
     mal_test_x = test_x[test_y == 1]
     ben_test_y = test_y[test_y == 0]
     ben_test_x = test_x[test_y == 0]
+
     test_indices = np.arange(len(mal_test_x))
     np.random.seed(args.seed)
     np.random.shuffle(test_indices)
-    test_mal_producer = dataset.get_dataloader(*(mal_test_x[test_indices[:200]], mal_test_y[test_indices[:200]]))
+    mal_test_x_sel = mal_test_x[test_indices[:200]]
+    mal_test_y_sel = mal_test_y[test_indices[:200]]
+
+    test_mal_producer = dataset.get_dataloader(*(mal_test_x_sel, mal_test_y_sel))
     input_dim = test_x.shape[1]
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
@@ -150,8 +154,8 @@ def _main():
         y_pred = classifier.predict(test_x_batch).cpu().numpy()
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
-    assert len(y_prediction) == len(mal_test_y)
-    accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
+    assert len(y_prediction) == len(mal_test_y_sel)
+    accuracy = (mal_test_y_sel == y_prediction).sum() / float(len(y_prediction))
     logger.info("Model of {} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, accuracy * 100))
 
     # attack
@@ -176,7 +180,7 @@ def _main():
                             tour_selection_k=args.tour_selection_k,
                             n_repetition=args.n_repetition)
     advs, adv_prediction = [], []
-    for idx, (mal_x, mal_y) in enumerate(zip(mal_test_x, mal_test_y)):
+    for idx, (mal_x, mal_y) in enumerate(zip(mal_test_x_sel, mal_test_y_sel)):
         adv_x = ea_attack.perturb(mal_x, mal_y, verbose=True)
         adv_y_pred = classifier.predict(torch.from_numpy(adv_x[None, ...]).to(device).float()).cpu().numpy()
         adv_prediction.append(adv_y_pred)
@@ -184,7 +188,7 @@ def _main():
         print(np.sum(np.abs(adv_x - mal_x), axis=-1), adv_y_pred)
     advs = np.vstack(advs)
     adv_prediction = np.concatenate(adv_prediction)
-    adv_accuracy = (mal_test_y == adv_prediction).sum() / float(len(adv_prediction))
+    adv_accuracy = (mal_test_y_sel == adv_prediction).sum() / float(len(adv_prediction))
     logger.info(
         "Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
     # save
