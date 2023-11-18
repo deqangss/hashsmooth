@@ -467,30 +467,45 @@ class HashSmooth4Drebin(HashSmooth):
 
         c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
-        abstain_indicator = c_pred != labels.cpu().numpy()
 
         # given the estimated probability, we calculate the radius
         prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
 
         if self.default_mode:
-            # abstain_indicator = prob_underlined <= 0.5
             radii = np.zeros_like(c_pred, dtype=object)
+            abstain_indicator = prob_underlined <= 0.5
             radii[abstain_indicator] = HashSmooth.ABSTAIN
-            radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator], 0.5,
+
+            incorrect_indicator = c_pred != labels.cpu().numpy()
+            incorrect_indicator_true = incorrect_indicator == True
+            if np.any(incorrect_indicator_true):
+                incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[incorrect_indicator_true] ^ abstain_indicator
+                radii[incorrect_indicator] = HashSmooth.ABSTAIN - 1
+            total_abstain_indicator = abstain_indicator | incorrect_indicator
+
+            radii[~total_abstain_indicator] = self._calc_radius(prob_underlined[~total_abstain_indicator], 0.5,
                                                           [],
                                                           [],
                                                           []
                                                           )
         else:
+            radii = np.zeros_like(c_pred, dtype=object)
             c_pred_runnerup = counts_selection.argsort()[:, -2]
             n_targeted_runnerup = counts_estimation[c_pred_runnerup]
             prob_upperlined = upper_confidence_interval(n_targeted_runnerup, n_estimation, alpha)
-            # abstain_indicator = prob_underlined <= prob_upperlined
-            # c_pred[abstain_indicator] = HashSmooth.ABSTAIN
-            radii = np.zeros_like(c_pred, dtype=object)
+            abstain_indicator = prob_underlined <= prob_upperlined
             radii[abstain_indicator] = HashSmooth.ABSTAIN
-            radii[~abstain_indicator] = self._calc_radius(prob_underlined[~abstain_indicator],
-                                                          prob_upperlined[~abstain_indicator],
+
+            incorrect_indicator = c_pred != labels.cpu().numpy()
+            incorrect_indicator_true = incorrect_indicator == True
+            if np.any(incorrect_indicator_true):
+                incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[
+                                                                    incorrect_indicator_true] ^ abstain_indicator
+                radii[incorrect_indicator] = HashSmooth.ABSTAIN - 1
+            total_abstain_indicator = abstain_indicator | incorrect_indicator
+
+            radii[~total_abstain_indicator] = self._calc_radius(prob_underlined[~total_abstain_indicator],
+                                                          prob_upperlined[~total_abstain_indicator],
                                                           [],
                                                           [],
                                                           []
