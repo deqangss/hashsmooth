@@ -70,11 +70,15 @@ class PGDl1(object):
         model.eval()
         pred_y = model.predict(adv_x)
         if hasattr(model, 'ABSTAIN'):
-            done = torch.logical_and(pred_y != label, pred_y != -1)
+            done = torch.logical_and(pred_y != label, pred_y != model.ABSTAIN)
         else:
             done = pred_y != label
 
         worst_x[done] = adv_x[done]
+
+        l1_distance = torch.sum(torch.abs(worst_x[done] - x[done]), axis=-1)
+        print("dubug num 1: ", torch.sum(l1_distance == 0.))
+
         for t in range(steps):
             var_adv_x = torch.autograd.Variable(adv_x, requires_grad=True)
             loss = model.get_loss(var_adv_x, label)
@@ -91,11 +95,17 @@ class PGDl1(object):
             else:
                 done = pred_y != label
             worst_x[done] = adv_x[done]
+
+            l1_distance = torch.sum(torch.abs(worst_x[done] - x[done]), axis=-1)
+            print("dubug num 2: ", torch.sum(l1_distance == 0.))
+
             if verbose:
                 print("Attack step {} with accuracy {:.2f}%.\n".format(t+1, 100 - done.sum().item()/float(len(done)) * 100))
             if torch.all(done):
                 break
         worst_x[~done] = adv_x[~done]
+        l1_distance = torch.sum(torch.abs(worst_x - x), axis=-1)
+        print("dubug num 3: ", torch.sum(l1_distance == 0.))
         return worst_x
 
     def get_perturbation(self, gradients, features, adv_features):
