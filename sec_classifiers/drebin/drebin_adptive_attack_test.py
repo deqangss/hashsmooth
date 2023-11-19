@@ -72,8 +72,8 @@ def _main():
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     _1, _2, test_x_y = dataset.load()
     test_x, test_y = test_x_y
-    mal_test_y = test_y[test_y == 1][:args.batch_size]
-    mal_test_x = test_x[test_y == 1][:args.batch_size]
+    mal_test_y = test_y[test_y == 1]
+    mal_test_x = test_x[test_y == 1]
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
     input_dim = test_x.shape[1]
     if args.model == 'svm':
@@ -149,9 +149,6 @@ def _main():
     adv = np.vstack(adv)
     adv_prediction = np.concatenate(adv_prediction)
 
-    l1_distance = np.sum(np.abs(adv - mal_test_x), axis=-1)
-    print("dubug num: ", np.sum(l1_distance == 0.))
-
     if hasattr(classifier, 'ABSTAIN'):
         abstain_flag = adv_prediction == classifier.ABSTAIN
     else:
@@ -174,7 +171,6 @@ def _main():
                 adv_accuracy * 100,
                 args.steps
                 ))
-    return
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
