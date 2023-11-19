@@ -512,8 +512,7 @@ class HashSmooth4Drebin(HashSmooth):
             incorrect_indicator = c_pred != labels.cpu().numpy()
             incorrect_indicator_true = incorrect_indicator == True
             if np.any(incorrect_indicator_true):
-                incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[
-                                                                    incorrect_indicator_true] ^ abstain_indicator
+                incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[incorrect_indicator_true] ^ abstain_indicator[incorrect_indicator_true]
                 radii[incorrect_indicator] = HashSmooth.ABSTAIN - 1
             total_abstain_indicator = abstain_indicator | incorrect_indicator
 
