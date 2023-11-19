@@ -71,6 +71,7 @@ class PGDl1(object):
         pred_y = model.predict(adv_x)
         if hasattr(model, 'ABSTAIN'):
             done = torch.logical_and(pred_y != label, pred_y != -1)
+            print(torch.sum(done))
         else:
             done = pred_y != label
 
