@@ -480,7 +480,7 @@ class HashSmooth4Drebin(HashSmooth):
 
         if self.default_mode:
             radii = np.zeros_like(c_pred, dtype=object)
-            abstain_indicator = prob_underlined <= 0.5
+            abstain_indicator = prob_underlined < 0.5
             radii[abstain_indicator] = HashSmooth.ABSTAIN
 
             incorrect_indicator = c_pred != labels.cpu().numpy()
