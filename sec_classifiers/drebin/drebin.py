@@ -445,8 +445,14 @@ class HashSmooth4Drebin(HashSmooth):
         count2 = (y_votes[range(x.shape[0]), top2[:, 1]]).cpu().numpy()
 
         pred = top2[:, 0]
-        abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
-        pred[abstain_flag] = RandomSmooth.ABSTAIN
+        prob_underlined = lower_confidence_interval(count1, n_sampling, alpha)
+        if self.default_mode:
+            abstain_indicator = prob_underlined < 0.5
+        else:
+            prob_upperlined = upper_confidence_interval(count2, n_sampling, alpha)
+            abstain_indicator = prob_underlined <= prob_upperlined
+        # abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
+        pred[abstain_indicator] = RandomSmooth.ABSTAIN
         return pred
 
     def load_model(self):
@@ -480,7 +486,7 @@ class HashSmooth4Drebin(HashSmooth):
 
         if self.default_mode:
             radii = np.zeros_like(c_pred, dtype=object)
-            abstain_indicator = prob_underlined < 0.5
+            abstain_indicator = prob_underlined <= 0.5
             radii[abstain_indicator] = HashSmooth.ABSTAIN
 
             incorrect_indicator = c_pred != labels.cpu().numpy()
