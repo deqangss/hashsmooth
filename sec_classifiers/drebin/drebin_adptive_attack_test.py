@@ -127,8 +127,9 @@ def _main():
     assert len(y_prediction) == len(mal_test_y)
     if hasattr(classifier, 'ABSTAIN'):
         abstain_flag = y_prediction == classifier.ABSTAIN
-        print('Abstain ratio: {}.'.format(np.sum(abstain_flag) / float(len(y_prediction))))
-        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction[~abstain_flag]))
+        abstain_ratio = np.sum(abstain_flag) / float(len(y_prediction))
+        print('Abstain ratio: {}.'.format(abstain_ratio))
+        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
     else:
         accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
     logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.sub_k),
@@ -148,6 +149,9 @@ def _main():
     adv = np.vstack(adv)
     adv_prediction = np.concatenate(adv_prediction)
 
+    l1_distance = np.sum(np.abs(adv - mal_test_x), axis=-1)
+    print("dubug num: ", np.sum(l1_distance == 0.))
+
     if hasattr(classifier, 'ABSTAIN'):
         abstain_flag = adv_prediction == classifier.ABSTAIN
     else:
@@ -156,12 +160,12 @@ def _main():
     if np.all(abstain_flag):
         logger.warning("All prediction is abstained.\n")
     else:
-        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
-        logger.info("All elements {:.0f}, abstained elements {:.0f}, and the remained elements {:.0f}.\n".format(
-            len(y_prediction),
-            np.sum(abstain_flag),
-            len(y_prediction) - np.sum(abstain_flag)
-            ))
+        abstain_ratio = np.sum(abstain_flag) / float(len(adv_prediction))
+        print('Abstain ratio: {}.'.format(abstain_ratio))
+        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
+            len(adv_prediction)) + abstain_ratio
+        # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
+        logger.info('Abstain ratio: {}.'.format(abstain_ratio))
         logger.info(
             "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
                 args.model,
@@ -170,6 +174,7 @@ def _main():
                 adv_accuracy * 100,
                 args.steps
                 ))
+    return
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
