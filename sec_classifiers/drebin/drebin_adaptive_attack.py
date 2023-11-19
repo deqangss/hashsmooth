@@ -98,6 +98,7 @@ class PGDl1(object):
                 done = pred_y != label
             worst_x[done] = adv_x[done]
 
+            print(worst_x[first_done].shape)
             l1_distance = torch.sum(torch.abs(worst_x[first_done] - x[first_done]), axis=-1)
             print("dubug num 2: ", torch.sum(l1_distance == 0.))
 
