@@ -482,13 +482,11 @@ class HashSmooth4Drebin(HashSmooth):
             radii = np.zeros_like(c_pred, dtype=object)
             abstain_indicator = prob_underlined <= 0.5
             radii[abstain_indicator] = HashSmooth.ABSTAIN
-            print("debug: abstain num ", np.sum(abstain_indicator))
 
             incorrect_indicator = c_pred != labels.cpu().numpy()
             incorrect_indicator_true = incorrect_indicator == True
             if np.any(incorrect_indicator_true):
                 incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[incorrect_indicator_true] ^ abstain_indicator[incorrect_indicator_true]
-                print("debug: abstain num ", np.sum(incorrect_indicator))
                 radii[incorrect_indicator] = HashSmooth.ABSTAIN - 1
             total_abstain_indicator = abstain_indicator | incorrect_indicator
 
