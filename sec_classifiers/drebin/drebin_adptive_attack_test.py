@@ -125,7 +125,12 @@ def _main():
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y)
-    accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
+    if hasattr(classifier, 'ABSTAIN'):
+        abstain_flag = y_prediction == classifier.ABSTAIN
+        print('Abstain ratio: {}.'.format(np.sum(abstain_flag) / float(len(y_prediction))))
+        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction[~abstain_flag]))
+    else:
+        accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
     logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.sub_k),
                                                                                                accuracy * 100))
 
