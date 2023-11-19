@@ -93,9 +93,11 @@ class PGDl1(object):
 
             pred_y = model.predict(adv_x)
             if hasattr(model, 'ABSTAIN'):
-                done = torch.logical_and(pred_y != label, pred_y != model.ABSTAIN)
+                new_done = torch.logical_and(pred_y != label, pred_y != model.ABSTAIN)
+                done = torch.logical_or(done, new_done)
             else:
-                done = pred_y != label
+                new_done = pred_y != label
+                done = torch.logical_or(done, new_done)
             worst_x[done] = adv_x[done]
 
             print(worst_x[first_done].shape, torch.all(done[first_done]))
