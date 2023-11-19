@@ -76,7 +76,9 @@ class PGDl1(object):
 
         worst_x[done] = adv_x[done]
 
-        l1_distance = torch.sum(torch.abs(worst_x[done] - x[done]), axis=-1)
+
+        first_done = done
+        l1_distance = torch.sum(torch.abs(worst_x[first_done] - x[first_done]), axis=-1)
         print("dubug num 1: ", torch.sum(l1_distance == 0.))
 
         for t in range(steps):
@@ -91,12 +93,12 @@ class PGDl1(object):
 
             pred_y = model.predict(adv_x)
             if hasattr(model, 'ABSTAIN'):
-                done = torch.logical_and(pred_y != label, pred_y != -1)
+                done = torch.logical_and(pred_y != label, pred_y != model.ABSTAIN)
             else:
                 done = pred_y != label
             worst_x[done] = adv_x[done]
 
-            l1_distance = torch.sum(torch.abs(worst_x[done] - x[done]), axis=-1)
+            l1_distance = torch.sum(torch.abs(worst_x[first_done] - x[first_done]), axis=-1)
             print("dubug num 2: ", torch.sum(l1_distance == 0.))
 
             if verbose:
