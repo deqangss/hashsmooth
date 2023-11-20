@@ -128,7 +128,7 @@ def _main():
     if hasattr(classifier, 'ABSTAIN'):
         abstain_flag = y_prediction == classifier.ABSTAIN
         abstain_ratio = np.sum(abstain_flag) / float(len(y_prediction))
-        print('Abstain ratio: {}.'.format(abstain_ratio))
+        logger.info('Abstain ratio: {}.'.format(abstain_ratio))
         accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
     else:
         accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
