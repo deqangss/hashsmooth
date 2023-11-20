@@ -100,8 +100,6 @@ class PGDl1(object):
             if torch.all(done):
                 break
         worst_x[~done] = adv_x[~done]
-        l1_distance = torch.sum(torch.abs(worst_x[done] - x[done]), axis=-1)
-        print('debug-in1: ', torch.sum(l1_distance == 0))
         return worst_x
 
     def get_perturbation(self, gradients, features, adv_features):
