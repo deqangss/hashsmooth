@@ -158,7 +158,6 @@ def _main():
         logger.warning("All prediction is abstained.\n")
     else:
         abstain_ratio = np.sum(abstain_flag) / float(len(adv_prediction))
-        print('Abstain ratio: {}.'.format(abstain_ratio))
         adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
             len(adv_prediction)) + abstain_ratio
         # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
@@ -171,6 +170,10 @@ def _main():
                 adv_accuracy * 100,
                 args.steps
                 ))
+
+    l1_distance = np.sum(np.abs(adv_x - mal_test_x), axis=-1)
+    print('debug: ', np.sum(l1_distance == 0))
+    return
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples'))
