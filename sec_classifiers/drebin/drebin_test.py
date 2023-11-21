@@ -131,10 +131,9 @@ def _main():
 
     outlier_indicator = y_prediction[:] == -1
     y_true = test_x_y[1][~outlier_indicator]
-    y_true = test_x_y[1][~outlier_indicator]
     y_pred = y_prediction[~outlier_indicator]
     accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_true, y_pred)
-    logger.info('Filter out outlier:')
+    logger.info('Filter out outlier: {}.'.format(np.sum(outlier_indicator)))
     logger.info("Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100, b_accuracy * 100))
     MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
     logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
