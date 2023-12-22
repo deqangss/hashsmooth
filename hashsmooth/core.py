@@ -421,7 +421,7 @@ class HashSmooth(BasicClassifier):
             prob_diff = px - px_prime
             return np.column_stack((px, px_prime, prob_diff))
 
-    def _calc_bound(self, regions: np.ndarray, confidence_est: float, duality=True) -> float:
+    def _calc_bound(self, regions: np.ndarray, confidence_est: float, duality=False) -> float:
         """
         calculate a bound w.r.t., the given the probability
         :param regions: an array of (px, px_prime, p_diff)
