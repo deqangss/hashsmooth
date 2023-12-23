@@ -98,8 +98,8 @@ def _main():
     test_indices = np.arange(len(mal_test_x))
     np.random.seed(args.seed)
     np.random.shuffle(test_indices)
-    mal_test_x_sel = mal_test_x[test_indices[:200]]
-    mal_test_y_sel = mal_test_y[test_indices[:200]]
+    mal_test_x_sel = mal_test_x[test_indices[:10]]
+    mal_test_y_sel = mal_test_y[test_indices[:10]]
 
     test_mal_producer = dataset.get_dataloader(*(mal_test_x_sel, mal_test_y_sel))
     input_dim = test_x.shape[1]
@@ -155,8 +155,15 @@ def _main():
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(mal_test_y_sel)
-    accuracy = (mal_test_y_sel == y_prediction).sum() / float(len(y_prediction))
-    logger.info("Model of {} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, accuracy * 100))
+    if hasattr(classifier, 'ABSTAIN'):
+        abstain_flag = y_prediction == classifier.ABSTAIN
+        abstain_ratio = np.sum(abstain_flag) / float(len(y_prediction))
+        logger.info('Abstain ratio: {}.'.format(abstain_ratio))
+        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
+    else:
+        accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
+    logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.sub_k),
+                                                                                               accuracy * 100))
 
     # attack
     constraints = np.load(os.path.join(dataset.dataset_path, 'constraints.npz'))
@@ -183,14 +190,34 @@ def _main():
     for idx, (mal_x, mal_y) in enumerate(zip(mal_test_x_sel, mal_test_y_sel)):
         adv_x = ea_attack.perturb(mal_x, mal_y, verbose=True)
         adv_y_pred = classifier.predict(torch.from_numpy(adv_x[None, ...]).to(device).float()).cpu().numpy()
+        print("outer adv pred: ", adv_y_pred)
         adv_prediction.append(adv_y_pred)
         advs.append(adv_x)
         print(np.sum(np.abs(adv_x - mal_x), axis=-1), adv_y_pred)
     advs = np.vstack(advs)
     adv_prediction = np.concatenate(adv_prediction)
-    adv_accuracy = (mal_test_y_sel == adv_prediction).sum() / float(len(adv_prediction))
-    logger.info(
-        "Model of {} achieves the accuracy on adversarial test dataset: {:.4f}%".format(args.model, adv_accuracy * 100))
+    if hasattr(classifier, 'ABSTAIN'):
+        abstain_flag = adv_prediction == classifier.ABSTAIN
+    else:
+        abstain_flag = np.array([False] * len(mal_test_y))
+        # filter out the abstain elements
+    if np.all(abstain_flag):
+        logger.warning("All prediction is abstained.\n")
+    else:
+        abstain_ratio = np.sum(abstain_flag) / float(len(adv_prediction))
+        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
+            len(adv_prediction)) + abstain_ratio
+        # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
+        logger.info('Abstain ratio: {}.'.format(abstain_ratio))
+        logger.info(
+            "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack.".format(
+                args.model,
+                args.sub_k,
+                args.smooth,
+                adv_accuracy * 100,
+            ))
+    import sys
+    sys.exit(-1)
     # save
     if not os.path.exists(os.path.join(dataset.dataset_path, 'adv-examples-ea')):
         utils.mkdir(os.path.join(dataset.dataset_path, 'adv-examples-ea'))

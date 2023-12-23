@@ -297,6 +297,7 @@ class EvolutionAA(object):
             adv_pred = self.attack_problem.classifier.predict(
                 torch.from_numpy(adv_x[None, ...]).to(self.attack_problem.device).float())
             if hasattr(self.attack_problem.classifier, 'ABSTAIN'):
+                print("adv_pred:", adv_pred)
                 done = adv_pred != label & adv_pred != -1
             else:
                 done = adv_pred != label
