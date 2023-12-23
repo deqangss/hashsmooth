@@ -159,9 +159,9 @@ def _main():
         abstain_flag = y_prediction == classifier.ABSTAIN
         abstain_ratio = np.sum(abstain_flag) / float(len(y_prediction))
         logger.info('Abstain ratio: {}.'.format(abstain_ratio))
-        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
+        accuracy = (mal_test_y_sel[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
     else:
-        accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
+        accuracy = (mal_test_y_sel == y_prediction).sum() / float(len(y_prediction))
     logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.sub_k),
                                                                                                accuracy * 100))
 
@@ -199,13 +199,13 @@ def _main():
     if hasattr(classifier, 'ABSTAIN'):
         abstain_flag = adv_prediction == classifier.ABSTAIN
     else:
-        abstain_flag = np.array([False] * len(mal_test_y))
+        abstain_flag = np.array([False] * len(mal_test_y_sel))
         # filter out the abstain elements
     if np.all(abstain_flag):
         logger.warning("All prediction is abstained.\n")
     else:
         abstain_ratio = np.sum(abstain_flag) / float(len(adv_prediction))
-        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
+        adv_accuracy = (mal_test_y_sel[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
             len(adv_prediction)) + abstain_ratio
         # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
         logger.info('Abstain ratio: {}.'.format(abstain_ratio))
