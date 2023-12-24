@@ -323,7 +323,7 @@ class EditLSHTransformer(LSHTransformer):
         """
         assert len(ipt.shape) == 2
         # convert the sequence indices to kmer strings, e.g.,: 1,2,3 --> 1,2;2,3 (kmer_size = 2)
-        kmer_batch = array2kmer(ipt)
+        kmer_batch = array2kmer(ipt, size=self.kmer_size)
         # quantify the kmer strings
         kmer_quantification = str_quantifying(kmer_batch)
         # print("max:", np.max(kmer_quantification))
@@ -332,19 +332,23 @@ class EditLSHTransformer(LSHTransformer):
         self.hashcode2input_dict.update([(k, v) for k, v in zip(kmer_quantification.flatten(), kmer_batch.flatten())])
         curr_len = len(self.hashcode2input_dict.items())
         # conduct mapping: need positions for retaining the sequential relationship
-        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
-        _x, _y = self._init_permutations(sub_k)
         r, c = kmer_quantification.shape
-        hash_codes = np.ones(shape=(r, sub_k), dtype=np.uint32) * _mersenne_primer
-        positions = np.zeros(shape=(r, sub_k), dtype=np.uint32)
-        # the same as that of jaccard LSH, note: there are duplications for each instance
-        for idx_c in range(c):
-            last_hash_codes = hash_codes
-            kmer_q_columnwise = kmer_quantification[:, idx_c:idx_c + 1]
-            hash_code_tmp = (kmer_q_columnwise.astype(np.uint64) * np.tile(_x, (r, 1)).astype(
-                np.uint64) + _y) % _mersenne_primer
-            hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
-            positions[hash_codes < last_hash_codes] = idx_c  # update positions
+        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        _x, _y = self._init_permutations(sub_k, r)
+        # hash_codes = np.ones(shape=(r, sub_k), dtype=np.uint32) * _mersenne_primer
+        # positions = np.zeros(shape=(r, sub_k), dtype=np.uint32)
+        # # the same as that of jaccard LSH, note: there are duplications for each instance
+        # for idx_c in range(c):
+        #     last_hash_codes = hash_codes
+        #     kmer_q_columnwise = kmer_quantification[:, idx_c:idx_c + 1]
+        #     hash_code_tmp = (kmer_q_columnwise.astype(np.uint64) * _x.astype(
+        #         np.uint64) + _y) % _mersenne_primer
+        #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
+        #     positions[hash_codes < last_hash_codes] = idx_c  # update positions
+        ipt_ext = kmer_quantification[:, None, :]
+        hash_code_tmp = (ipt_ext.astype(np.uint64) * _x[..., None].astype(np.uint64) + _y[..., None]) % _mersenne_primer
+        hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
+        positions = hash_code_tmp.astype(np.uint32).argmin(axis=-1)
         if curr_len > prev_len:
             dump_pickle(self.hashcode2input_dict, self.dict_saving_path)
         # we just need the hash codes, so we stop here and return
@@ -368,21 +372,33 @@ class EditLSHTransformer(LSHTransformer):
         kmer_decode = lambda kmer_end: literal_eval(self.hashcode2input_dict.get(kmer_end))
         kmer_decodings = np.stack(np.vectorize(kmer_decode)(kmer_encodings), axis=-1)
         input_rtn = np.ones(shape=(batch_size_, self.number_of_words), dtype=int) * self.null_value
-        for c_idx in range(sub_k_):
-            for r_idx in range(batch_size_):
-                input_rtn[r_idx, positions[r_idx, c_idx]: positions[r_idx, c_idx] + self.kmer_size] = \
-                    kmer_decodings[r_idx, c_idx]
+        # for c_idx in range(sub_k_):
+        #     for r_idx in range(batch_size_):
+        #         input_rtn[r_idx, positions[r_idx, c_idx]: positions[r_idx, c_idx] + self.kmer_size] = \
+        #             kmer_decodings[r_idx, c_idx]
+        # input_rtn2 = np.ones(shape=(batch_size_, self.number_of_words), dtype=int) * self.null_value
+        all_positions = []
+        for inc in range(self.kmer_size):
+            all_positions.append(positions + inc)
+        all_positions = np.stack(all_positions, axis=-1)
+        assert all_positions.shape == kmer_decodings.shape
+        input_rtn[np.arange(batch_size_)[:, None, None], all_positions] = kmer_decodings
         return input_rtn
 
-    def _init_permutations(self, sub_k):
+    def _init_permutations(self, sub_k: int, r: int):
         """
         generate random numbers for compositing hash functions
         """
-        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, dtype=np.uint32),
-                          self.random_generator_np.randint(0, _mersenne_primer, dtype=np.uint32)) for _ in
+        # return np.array([(self.random_generator_np.randint(1, _mersenne_primer, dtype=np.uint32),
+        #                   self.random_generator_np.randint(0, _mersenne_primer, dtype=np.uint32)) for _ in
+        #                  range(sub_k)],
+        #                 dtype=np.uint32
+        #                 ).T
+        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, (r, ), dtype=np.uint32),
+                          self.random_generator_np.randint(0, _mersenne_primer, (r, ), dtype=np.uint32)) for _ in
                          range(sub_k)],
                         dtype=np.uint32
-                        ).T
+                        ).transpose([1, 2, 0])
 
     def get_collision_prob(self, distance: float):
         """
@@ -571,7 +587,29 @@ def test_w_jaccard_lsh():
         i += 1
 
 
+def test_editdistance_lsh():
+    # each row is a sequence
+    input_seq_array = np.random.randint(1, 100, (2, 100), dtype=int)
+    edit_lsh = EditLSHTransformer(number_of_words=100,
+                                  kmer_size=3,
+                                  sub_k=5,
+                                  null_value=0,
+                                  seed=0
+                                  )
+    i = 1
+    while i <= 10:
+        print(input_seq_array)
+        input_transf = edit_lsh.transform(input_seq_array)
+        print(input_transf)
+        origin_elements = set(input_seq_array.flatten())
+        origin_elements.add(0)
+        assert (set(input_transf.flatten()).issubset(origin_elements))
+        i += 1
+        break
+
+
 if __name__ == "__main__":
     # test_pstable_dist()
-    test_jaccard_dist()
+    # test_jaccard_dist()
     # test_w_jaccard_lsh()
+    test_editdistance_lsh()
