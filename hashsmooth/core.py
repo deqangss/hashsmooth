@@ -294,14 +294,14 @@ class HashSmooth(BasicClassifier):
         """
         batch_size = len(probas)
         threshold = (probas - second_probas) / 2.
-        bound_mesh, radii_mesh = self._get_radius_grid(probas, None, k_subhashcodes, max_radii, n_grids)
+        bound_mesh, radii_mesh = self._get_radius_grid(probas, second_probas, None, k_subhashcodes, max_radii, n_grids)
         # select the radius corresponding to the estimated bound smaller than the threshold
         pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
         pos_sel = np.maximum(0, pos_sel - 1)
         radii = radii_mesh[range(batch_size), pos_sel]
         return radii
 
-    def _get_radius_grid(self, probas: np.ndarray, regions=None, k_subhashcodes=[], max_radii=[], n_grids=[]):
+    def _get_radius_grid(self, probas: np.ndarray, second_probas=None, regions=None, k_subhashcodes=[], max_radii=[], n_grids=[]):
         """
         obtain all bounds regarding the radius from 1 to the maximum radius
         :param probas: batch of probabilities
@@ -314,10 +314,16 @@ class HashSmooth(BasicClassifier):
         n_grids = self.n_grids if len(self.n_grids) > 0 else n_grids
 
         max_proba = np.max(probas)
+        if second_probas is not None:
+            min_proba = np.min(second_probas)
+        else:
+            min_proba = 0.5
         # get maximum radius for each sub-groud of features
         max_radii_calc = []
         for i, k_hashcode in enumerate(k_subhashcodes):
-            max_radius = self._get_max_radius(max_proba, k_hashcode,
+            max_radius = self._get_max_radius(max_proba,
+                                              min_proba,
+                                              k_hashcode,
                                               min_radius=0.,
                                               max_radius=max_radii[i],
                                               n_grid=n_grids[i]
@@ -356,7 +362,7 @@ class HashSmooth(BasicClassifier):
                 bounds4radii[idx_range, idx] = _radii
         return radii4bounds, bounds4radii
 
-    def _get_max_radius(self, max_proba, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
+    def _get_max_radius(self, max_proba, min_proba, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
         """
         Search the maximum radius
         :param min_proba: the minimum probability to estimate the radius
@@ -372,14 +378,14 @@ class HashSmooth(BasicClassifier):
             radius = radii_steps[curr_idx]
             _regions = self._calc_regions(k_hashcode, radius)
             _bound = self._calc_bound(_regions, max_proba)
-            if _bound <= (max_proba - 0.5) / 2.0:
+            if _bound <= (max_proba - min_proba) / 2.0:
                 if lower_idx == curr_idx:
                     break
                 lower_idx = curr_idx
             else:
                 upper_idx = curr_idx
         if abs(radius - max_radius) <= max_radius / n_grid:
-            return self._get_max_radius(max_proba, k_hashcode, max_radius, 2 * max_radius, n_grid)
+            return self._get_max_radius(max_proba, min_proba, k_hashcode, max_radius, 2 * max_radius, n_grid)
         else:
             return radius
 
