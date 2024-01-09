@@ -410,7 +410,9 @@ class EditLSHTransformer(LSHTransformer):
         n_dissim = self.kmer_size * self.number_of_words * distance
         total_n_kmers = self.number_of_words - self.kmer_size + 1
         # warning: the paper, entiled "Locality-sensitive hashing for the edit distance", presents the numerator: total_n_kmers - total_n_kmers*(self.kmer_size + 2)*distance
-        jaccard_sim = (total_n_kmers - n_dissim) / (total_n_kmers + n_dissim)
+        # we assume the $total_n_kmers is fixed. Because the minimum value of f(x)=(n-x) / (n+n_dissim-x) is x=(2*n + n_dissim) / 2,
+        # we set the x=n_dissim to obtain the local minimum value
+        jaccard_sim = (total_n_kmers - n_dissim) / total_n_kmers
         if jaccard_proxy:
             return jaccard_sim
         else:
