@@ -400,7 +400,7 @@ class EditLSHTransformer(LSHTransformer):
                         dtype=np.uint32
                         ).transpose([1, 2, 0])
 
-    def get_collision_prob(self, distance: float):
+    def get_collision_prob(self, distance: float, jaccard_proxy=True):
         """
         we leverage jaccard similarity upon the set of k-mers
         :param distance: normalized edit distance
@@ -409,8 +409,12 @@ class EditLSHTransformer(LSHTransformer):
         # number of dismatched k-mers
         n_dissim = self.kmer_size * self.number_of_words * distance
         total_n_kmers = self.number_of_words - self.kmer_size + 1
+        # warning: the paper, entiled "Locality-sensitive hashing for the edit distance", presents the numerator: total_n_kmers - total_n_kmers*(self.kmer_size + 2)*distance
         jaccard_sim = (total_n_kmers - n_dissim) / (total_n_kmers + n_dissim)
-        return jaccard_sim
+        if jaccard_proxy:
+            return jaccard_sim
+        else:
+            return 1. - distance
 
 
 class PStableLSHTransformer(LSHTransformer):
