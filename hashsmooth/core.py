@@ -296,9 +296,21 @@ class HashSmooth(BasicClassifier):
         threshold = (probas - second_probas) / 2.
         bound_mesh, radii_mesh = self._get_radius_grid(probas, second_probas, None, k_subhashcodes, max_radii, n_grids)
         # select the radius corresponding to the estimated bound smaller than the threshold
-        pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
-        pos_sel = np.maximum(0, pos_sel - 1)
-        radii = radii_mesh[range(batch_size), pos_sel]
+        if len(bound_mesh.shape) == 2:
+            pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
+            pos_sel = np.maximum(0, pos_sel - 1)
+            radii = radii_mesh[range(batch_size), pos_sel]
+        elif len(bound_mesh.shape) == 3:
+            radii = []
+            for idx in range(bound_mesh.shape[2]):
+                sub_bound_mesh = bound_mesh[:, :, idx]
+                sub_radii_mesh = radii_mesh[:, :, idx]
+                pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, sub_bound_mesh, threshold))
+                pos_sel = np.maximum(0, pos_sel - 1)
+                radii.append(sub_radii_mesh[range(batch_size), pos_sel])
+            radii = np.max(np.stack(radii, axis=1), axis=1)
+        else:
+            raise NotImplementedError
         return radii
 
     def _get_radius_grid(self, probas: np.ndarray, second_probas=None, regions=None, k_subhashcodes=[], max_radii=[], n_grids=[]):
@@ -355,11 +367,11 @@ class HashSmooth(BasicClassifier):
             idx_folded = radii_mesh.index(_radii)
             idx = get_position(idx_folded, shape)
             if np.sum(_radii) == 0:
-                radii4bounds[idx_range, idx] = 0.
-                bounds4radii[idx_range, idx] = _radii
+                radii4bounds[(idx_range, *idx)] = 0.
+                bounds4radii[(idx_range, *idx)] = sum(_radii)
             else:
-                radii4bounds[idx_range, idx] = self._calc_bound_batch(regions=region, confidence_ests=probas)
-                bounds4radii[idx_range, idx] = _radii
+                radii4bounds[(idx_range, *idx)] = self._calc_bound_batch(regions=region, confidence_ests=probas)
+                bounds4radii[(idx_range, *idx)] = sum(_radii)
         return radii4bounds, bounds4radii
 
     def _get_max_radius(self, max_proba, min_proba, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
