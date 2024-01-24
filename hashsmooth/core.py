@@ -308,7 +308,7 @@ class HashSmooth(BasicClassifier):
                 pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, sub_bound_mesh, threshold))
                 pos_sel = np.maximum(0, pos_sel - 1)
                 radii.append(sub_radii_mesh[range(batch_size), pos_sel])
-            radii = np.max(np.stack(radii, axis=1), axis=1)
+            radii = np.min(np.stack(radii, axis=1), axis=1)
         else:
             raise NotImplementedError
         return radii
