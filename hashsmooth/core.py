@@ -310,6 +310,7 @@ class HashSmooth(BasicClassifier):
                 radii.append(sub_radii_mesh[range(batch_size), pos_sel])
             radii = np.min(np.stack(radii, axis=1), axis=1)
         else:
+            # Zhekai todo: accommodate the high number of feature difference types, and the dynamic projection may be helpful
             raise NotImplementedError
         return radii
 

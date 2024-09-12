@@ -58,6 +58,7 @@ class JaccardLSHTransformerTorch(LSHTransformerTorch):
         self.lsh_np = JaccardLSHTransformer(sub_k, null_value, seed)
 
     def transform(self, ipt: torch.Tensor, sub_k_tmp: int) -> torch.Tensor:
+        # Zhekai todo: need to adapt to pytorch library totally
         with torch.no_grad():
             ipt_np = ipt.cpu().numpy()
             ipt_np_tran = self.lsh_np.transform(ipt_np, sub_k_tmp)
