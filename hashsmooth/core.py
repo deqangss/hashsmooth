@@ -300,18 +300,21 @@ class HashSmooth(BasicClassifier):
             pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
             pos_sel = np.maximum(0, pos_sel - 1)
             radii = radii_mesh[range(batch_size), pos_sel]
-        elif len(bound_mesh.shape) == 3:
-            radii = []
-            for idx in range(bound_mesh.shape[2]):
-                sub_bound_mesh = bound_mesh[:, :, idx]
-                sub_radii_mesh = radii_mesh[:, :, idx]
-                pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, sub_bound_mesh, threshold))
-                pos_sel = np.maximum(0, pos_sel - 1)
-                radii.append(sub_radii_mesh[range(batch_size), pos_sel])
-            radii = np.min(np.stack(radii, axis=1), axis=1)
         else:
-            # Zhekai todo: accommodate the high number of feature difference types, and the dynamic projection may be helpful
-            raise NotImplementedError
+            if len(bound_mesh.shape) == 3: # this is used in the hashsmooth paper yet a little bit conservative.
+                radii = []
+                for idx in range(bound_mesh.shape[2]):
+                    sub_bound_mesh = bound_mesh[:, :, idx]
+                    sub_radii_mesh = radii_mesh[:, :, idx]
+                    pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, sub_bound_mesh, threshold))
+                    pos_sel = np.maximum(0, pos_sel - 1) # here is a little bit problematic
+                    radii.append(sub_radii_mesh[range(batch_size), pos_sel])
+                radii = np.min(np.stack(radii, axis=1), axis=1)
+            bound_mesh_flatten = bound_mesh.reshape(batch_size, -1)
+            diff_score = bound_mesh_flatten - threshold.reshape(batch_size, -1)
+            diff_score_clip = np.where(diff_score > 0, -np.infty, diff_score)
+            pos_sel = np.argmax(diff_score_clip, axis=1)
+            radii = radii_mesh.reshape(batch_size, -1)[range(batch_size), pos_sel]
         return radii
 
     def _get_radius_grid(self, probas: np.ndarray, second_probas=None, regions=None, k_subhashcodes=[], max_radii=[], n_grids=[]):
@@ -501,3 +504,41 @@ class HashSmooth(BasicClassifier):
             assert np.all(is_extra)
             right_part_values = 1. - (regions[idx_ast + 1][1] / regions[idx_ast + 1][0])
             return left_part_values * right_part_values
+
+
+from hashsmooth import classifier_template
+class NoneClassifier(classifier_template.BasicClassifier):
+    def __init__(self):
+        super(NoneClassifier, self).__init__()
+        pass
+
+    def eval(self):
+        pass
+
+    def fit(self):
+        pass
+
+    def predict(self):
+        pass
+
+if __name__ == '__main__':
+    from hashsmooth import JaccardLSHTransformerTorch
+    input_transformer = JaccardLSHTransformerTorch(sub_k=3,  # initialize this value afterwards
+                                                   null_value=0,
+                                                   seed=2345
+                                                   )
+
+    clf_hash = HashSmooth(NoneClassifier(),
+                          num_of_classes=2,
+                          hash_methods=[input_transformer, input_transformer, input_transformer],
+                          n_subfeatures=[100, 100, 100],
+                          k_hashcode=3,
+                          max_k=3,
+                          max_radii=[],
+                          n_grids=[],
+                          default_mode=True,
+                          )
+    import numpy as np
+    prop_upper = np.random.uniform(0.6, 1, (5,))
+    prop_lower = np.random.uniform(0., 0.4, (5,))
+    clf_hash._calc_radius(prop_upper, prop_lower, k_subhashcodes=[2, 2, 4], max_radii=[0.5, 0.5, 0.5], n_grids=[10, 10, 10])
