@@ -1,0 +1,617 @@
+from abc import ABC, abstractmethod
+import os
+import warnings
+from ast import literal_eval
+import multiprocessing
+import collections
+import numpy as np
+from scipy.stats import gamma
+from scipy import sparse as sp_sparse
+from scipy import integrate
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.exceptions import NotFittedError
+
+from hashsmooth.utils_hash import mod_inverse, array2kmer, str_quantifying
+from hashsmooth.utils import read_pickle, dump_pickle
+from hashsmooth.nn_model import get_simple_fc_model, train_sample_model
+
+_mersenne_primer = int((1 << 31) - 1)  # https://en.wikipedia.org/wiki/Mersenne_prime
+_mersenne_primer_large = int((1 << 61) - 1)
+_current_file_path = os.path.dirname(os.path.realpath(__file__))
+DUMMY_FEAT = '#'
+
+class LSHTransformer(ABC):
+    def __init__(self, sub_k=128, null_value=0, seed=1):
+        """
+        abstract class for LSH transformations
+        :param sub_k: a group of $sub_k$ hash codes
+        :param null_value: an integer to fill the non-sampled positions
+        :param seed: an integer of random seed
+        """
+        assert sub_k >= 0 and isinstance(sub_k, int)
+        assert seed >= 0 and isinstance(seed, int)
+        if sub_k == 0:
+            warnings.warn("Need to reinitialize the number of selected elements.\n")
+        self.sub_k = sub_k
+        self.null_value = null_value
+        self.seed = seed
+        self.random_generator_np = np.random.RandomState(seed=self.seed)
+
+    def transform(self, ipt: np.ndarray, sub_k_tmp=0) -> np.ndarray:
+        """
+        lsh transformation for data points
+        :param ipt: input data, e.g., 2D representation vectors
+        :param sub_k_tmp: an alternative ways to initialize the number of selected elements
+        :return: the transformed input that has the same feature type as that of the input
+        """
+        assert sub_k_tmp >= 0 and isinstance(sub_k_tmp, int)
+        return self._inverse_map(self._map(ipt, sub_k_tmp))  # it should emerge in a pair-wise fashion
+
+    @abstractmethod
+    def _map(self, ipt, sub_k_tmp):
+        """
+        mapping input by a type of LSH functions
+        :param ipt: an input data, e.g., a set of features or a representation vector
+        :param sub_k_tmp: an alternative ways to initialize the number of selected elements
+        """
+        raise NotImplementedError("Not implemented yet.\n")
+
+    @abstractmethod
+    def _inverse_map(self, hash_codes_mapped):
+        """
+        mapping the hash codes back to the input space, on which the classifier takes as input
+        :param hash_codes_mapped: hash codes
+        """
+        raise NotImplementedError("Not implemented yet.\n")
+
+    @abstractmethod
+    def get_collision_prob(self, distance):
+        """
+        get the collision probability for a given distance used by threat models
+        """
+        raise NotImplementedError
+
+
+class JaccardLSHTransformer(LSHTransformer):
+    def __init__(self, sub_k=128, null_value=0, seed=1):
+        """
+        LSH transformations in terms of Jaccard distance
+        We use the universal hashing https://en.wikipedia.org/wiki/Universal_hashing
+        """
+        super(JaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
+        self.offset = 0
+
+    def _map(self, ipt: np.ndarray, sub_k_tmp):
+        """
+        map the input to a universal random space
+        :param ipt: an array of word indices correspond to a vocabulary
+        :param sub_k_tmp: an alternative number of selected elements
+        """
+        assert isinstance(ipt, np.ndarray)
+        assert len(ipt.shape) == 2, f"Expected a batch of vectors (e.g., 2D array), but got {len(ipt.shape)}.\n"
+
+        # get nonzero indices
+        ipt_sp = sp_sparse.csr_matrix(ipt)
+        longest_num_nonzero = max(abs(np.diff(ipt_sp.indptr)))
+        ipt_nonzero_ind = np.zeros((ipt.shape[0], longest_num_nonzero), dtype=int)
+        nonzero_list = np.split(ipt_sp.indices, ipt_sp.indptr)[1:-1]
+        for i, nonzero in enumerate(nonzero_list):
+            i_num = len(nonzero)
+            ipt_nonzero_ind[i, :i_num] = nonzero
+
+        if np.min(ipt_nonzero_ind) == 0:
+            self.offset = 1
+        ipt_nonzero_ind += self.offset
+        r, c = ipt_nonzero_ind.shape
+        k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        _x, _y = self._init_permutations(k, r)  # keep the same data format
+        # hash_codes = np.ones(shape=(r, self.sub_k), dtype=np.uint32) * _mersenne_primer
+        # # In case of long sentence, we split a batch of sentence element-wisely
+        # for idx_c in range(c):
+        #     ipt_columnwise = ipt[:, idx_c:idx_c + 1]
+        #     hash_code_tmp = (ipt_columnwise.astype(np.uint64) * np.tile(_x, (r, 1)).astype(
+        #         np.uint64) + _y) % _mersenne_primer
+        #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
+        ipt_ext = ipt_nonzero_ind[:, None, :]  # shape: r, 1, c
+        hash_code_tmp = (ipt_ext.astype(np.uint64) * _x[..., None].astype(np.uint64) + _y[..., None]) % _mersenne_primer
+        hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
+        return hash_codes, (_x, _y), ipt
+
+    def _inverse_map(self, hash_codes_mapped):
+        """
+        map hash codes back into the input space
+        :param hash_codes_mapped: pair of hash codes and permutations
+        """
+        hash_codes, permutations, ipt = hash_codes_mapped
+        assert hash_codes.dtype == np.uint32
+        _x, _y = permutations
+        indices_tran = np.mod(
+            (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
+            _mersenne_primer) - self.offset
+        ipt_tran = np.zeros_like(ipt)
+        n_instances = ipt.shape[0]
+        ipt_tran[np.arange(n_instances)[:, None], indices_tran] = ipt[np.arange(n_instances)[:, None], indices_tran]
+        return ipt_tran
+
+    def _init_permutations(self, sub_k: int, r: int):
+        """
+        generate random numbers for compositing hash functions
+        """
+        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, (r, ), dtype=np.uint32),
+                          self.random_generator_np.randint(0, _mersenne_primer, (r, ), dtype=np.uint32)) for _ in
+                         range(sub_k)],
+                        dtype=np.uint32
+                        ).transpose([1, 2, 0])
+
+    def get_collision_prob(self, distance: float):
+        assert 0. <= distance <= 1.
+        return 1 - distance
+
+
+class WeightedJaccardLSHTransformer(LSHTransformer):
+    def __init__(self, number_of_words, sub_k=128, null_value=0, seed=1):
+        """
+        LSH transformations in terms of weighted jaccard distance, and please see the link of
+        http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/36928.pdf
+        to get more details.
+        :param number_of_words: number of all words in the vocabulary
+        :param sub_k: number of the hash functions
+        :param null_value: an integer to fill the non-sampled positions
+        :param seed: random seed
+        """
+        super(WeightedJaccardLSHTransformer, self).__init__(sub_k, null_value, seed)
+        self.number_of_words = number_of_words
+        self.type_tar = None
+
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
+        """
+        map the input to hash codes
+        the input contains the corresponding occurrence of each word in the vocabulary
+        I.e., each entity of the input is an integer
+        :param ipt: a batch of input vector
+        :return: $sub_k$ of hash codes
+        """
+        assert isinstance(ipt, (np.ndarray, sp_sparse.spmatrix)), \
+            f"Expected 2D numpy array, but got {type(ipt)}."
+        assert ipt.ndim == 2
+        assert ipt.shape[1] == self.number_of_words, \
+            f"Each instance has the dimension of input as {self.number_of_words}, but got {ipt.shape[1]}."
+
+        is_same_instance = np.all(np.unique(ipt, axis=0) == ipt)
+
+        self.type_tar = ipt.dtype
+        sp_ipt = sp_sparse.csr_matrix(ipt, dtype=np.float32, copy=True)
+        sp_ipt.sort_indices()
+        batch_size = sp_ipt.shape[0]
+        batch_hash_codes = [None for _ in range(batch_size)]
+
+        # obtain the indices of nonzero values
+        r_idx, c_idx = sp_ipt.nonzero()
+
+        # obtain permutations
+        k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+
+        if is_same_instance:
+            rk, beta_k, ln_ck = self._init_permutations(k, batch_size)
+            rk_c_merged = rk[:, r_idx, c_idx]
+            betak_c_merged = beta_k[:, r_idx, c_idx]
+            ln_ck_c_merged = ln_ck[:, r_idx, c_idx]
+        else:
+            # for saving memory and time
+            rk, beta_k, ln_ck = self._init_permutations(k, batch_size, len(r_idx))
+            rk_c_merged = rk
+            betak_c_merged = beta_k
+            ln_ck_c_merged = ln_ck
+
+        try:
+            log_data = np.log(ipt[r_idx, c_idx])  # log_data = np.log(sp_ipt[r_idx, c_idx].A1)
+        except RuntimeWarning as e:
+            print(ipt[r_idx, c_idx])
+            assert ipt[r_idx, c_idx] > 0, ipt[r_idx, c_idx]
+        log_data = np.vstack([log_data] * self.sub_k)  # sub_k x number_of_words
+
+        # intermediates stated in the paper
+        t = np.floor(log_data / rk_c_merged + betak_c_merged)  # sub_k x number_of_words
+        ln_y = (t - betak_c_merged) * rk_c_merged
+        ln_a = ln_ck_c_merged - ln_y - rk_c_merged
+
+        if is_same_instance:
+            # # batchize for a sample
+            batch_ln_a = ln_a.reshape([k, batch_size, -1])
+            batch_argmin = np.argmin(batch_ln_a, axis=-1).transpose([1, 0])  # shape: batch_size x k
+            batch_c_idx = c_idx.reshape([batch_size, -1])
+            batch_k = batch_c_idx[np.arange(batch_size)[:, None], batch_argmin]  # shape: batch_size x k
+            batch_y = np.exp(ln_y).reshape([k, batch_size, -1]).transpose([1, 0, 2])
+            batch_v = batch_y[np.arange(batch_size)[:, None], np.arange(k)[None, :], batch_argmin]
+            batch_hash_codes = np.stack([batch_k, batch_v], axis=-1)
+        else:
+            # obtain the hash codes instance-wisely
+            r_rear_idx = sp_ipt.indptr.tolist()[
+                         1:]  # remove the head idx of first instance for facilitating the implementation
+            r_rear_idx.append(sp_ipt.nnz)
+            instance_head_idx = 0
+            for current_idx in range(ipt.shape[0]):
+                instance_next_idx = r_rear_idx[current_idx]
+
+                # the instance of zero vector is not permitted
+                if instance_head_idx == instance_next_idx:
+                    break
+
+                instance_span = c_idx[instance_head_idx: instance_next_idx]
+                instance_ln_a = ln_a[:, instance_head_idx: instance_next_idx]
+                instance_argmin = np.argmin(instance_ln_a, axis=1)
+                instance_k = instance_span[instance_argmin]
+
+                hash_codes = np.zeros((self.sub_k, 2), dtype=self.type_tar)
+                hash_codes[:, 0] = instance_k
+                # We here make a difference from the paper (using y rather than t) because we need hash values
+                # hash_codes[:, 1] = t[range(self.sub_k), instance_head_idx + instance_argmin]
+                hash_codes[:, 1] = np.exp(ln_y)[range(self.sub_k), instance_head_idx + instance_argmin]
+
+                batch_hash_codes[current_idx] = hash_codes
+                instance_head_idx = instance_next_idx
+            batch_hash_codes = np.array(batch_hash_codes)
+
+
+
+        return batch_hash_codes
+
+    def _inverse_map(self, hash_codes_mapped):
+        """
+        map the hash codes back to the input space
+        :param hash_codes_mapped: a list of hash codes returned by the _amp function
+        """
+        # assert isinstance(hash_codes_mapped, (np.ndarray, list))
+        assert len(hash_codes_mapped) > 0
+        # input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=self.type_tar) * self.null_value
+        # n_proc = 1 if multiprocessing.cpu_count() // 2 <= 1 else multiprocessing.cpu_count() // 2
+        # with multiprocessing.Pool(n_proc) as pool:
+        #     for idx, input_transf in enumerate(pool.imap(_wrapper_w_jaccard, zip(hash_codes_mapped, input_rtn))):
+        #         input_rtn[idx] = input_transf
+
+        # for i, hash_codes in enumerate(hash_codes_mapped):
+        #     input_rtn[i][hash_codes[:, 0].astype(int)] = hash_codes[:, 1]
+        input_rtn = np.ones(shape=(len(hash_codes_mapped), self.number_of_words), dtype=self.type_tar) * self.null_value
+        batch_size, _k, _1 = hash_codes_mapped.shape
+        input_rtn[np.arange(batch_size)[:, None], hash_codes_mapped[..., 0].astype(int)] = hash_codes_mapped[..., 1]
+        return input_rtn
+
+    def _init_permutations(self, sub_k: int, r: int, sp_elemnt_num=None):
+        """
+        generate random numbers for compositing hash functions
+        """
+        if sp_elemnt_num is None:
+            rk = self.random_generator_np.gamma(2., 1., (sub_k, r, self.number_of_words)).astype(float)
+            ln_ck = np.log(self.random_generator_np.gamma(2., 1., (sub_k, r, self.number_of_words))).astype(float)
+            beta_k = self.random_generator_np.uniform(0., 1., (sub_k, r, self.number_of_words)).astype(float)
+        else:
+            rk = self.random_generator_np.gamma(2., 1., (sub_k, sp_elemnt_num)).astype(float)
+            ln_ck = np.log(self.random_generator_np.gamma(2., 1., (sub_k, sp_elemnt_num))).astype(float)
+            beta_k = self.random_generator_np.uniform(0., 1., (sub_k, sp_elemnt_num)).astype(float)
+        return rk, ln_ck, beta_k
+
+    def get_collision_prob(self, distance):
+        assert 0. <= distance <= 1.
+        return 1 - distance
+
+
+def _wrapper_w_jaccard(args):
+    _codes, _transf = args[0], args[1]
+    _transf[_codes[:, 0].astype(int)] = _codes[:, 1]
+    return _transf
+
+
+class EditLSHTransformer(LSHTransformer):
+    def __init__(self, number_of_words, sub_k=128, kmer_size=2, l_chucksize=1, null_value=0, pad_value=1, position_fixed=True, seed=1):
+        """
+        LSH transformations for the edit distance. We leverage the method proposed by the following paper:
+        Guillaume Marçais and others, Locality-sensitive hashing for the edit distance, Bioinformatics, 35(14): https://doi.org/10.1093/bioinformatics/btz354
+        The method is implemented in the manner with our understanding, which may be different from the official version.
+        Please adapt it with caution.
+        :param number_of_words: number of all words in the vocabulary
+        :param sub_k: a group of $sub_k$ hash codes
+        :param kmer_size:token size for splitting a sequence
+        :param l_chucksize: number of kmer to composite a chuck. The default value is $sub_k$, because we do not need it
+        :param null_value: an integer to fill the non-sampled positions
+        :param pad_value: an integer to pad the rear of sampled sequences
+        :param position_fixed: keep the positions of selected elements
+        :param seed: an integer of random seed
+        """
+        super(EditLSHTransformer, self).__init__(sub_k, null_value, seed)
+        self.number_of_words = number_of_words
+        if self.number_of_words >= (1 << 16) - 1:
+            warnings.warn("Too much words triggers the collision.\n")
+        self.kmer_size = kmer_size
+        assert self.kmer_size <= self.number_of_words
+        self.l_chucksize = l_chucksize
+        self.hashcode2input_dict = collections.defaultdict(str)
+        self.dict_saving_path = os.path.join(_current_file_path, "res/hashcodes2input_{}.dict".format(self.kmer_size))
+        if os.path.exists(self.dict_saving_path):
+            self.hashcode2input_dict = read_pickle(self.dict_saving_path)
+        self._x = 1
+        self._y = 0
+        self.pad_value = pad_value
+        self.position_fixed = position_fixed
+
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
+        """
+        the input is a batch of sequences with same dimension
+        :param ipt: 2D numpy.array
+        """
+        assert len(ipt.shape) == 2
+        # convert the sequence indices to kmer strings, e.g.,: 1,2,3 --> 1,2;2,3 (kmer_size = 2)
+        kmer_batch = array2kmer(ipt, size=self.kmer_size)
+        # quantify the kmer strings
+        kmer_quantification = str_quantifying(kmer_batch)
+        # print("max:", np.max(kmer_quantification))
+        # record the mapping for bijection
+        prev_len = len(self.hashcode2input_dict.items())
+        self.hashcode2input_dict.update([(k, v) for k, v in zip(kmer_quantification.flatten(), kmer_batch.flatten())])
+        curr_len = len(self.hashcode2input_dict.items())
+        # conduct mapping: need positions for retaining the sequential relationship
+        r, c = kmer_quantification.shape
+        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        _x, _y = self._init_permutations(sub_k, r)
+        # hash_codes = np.ones(shape=(r, sub_k), dtype=np.uint32) * _mersenne_primer
+        # positions = np.zeros(shape=(r, sub_k), dtype=np.uint32)
+        # # the same as that of jaccard LSH, note: there are duplications for each instance
+        # for idx_c in range(c):
+        #     last_hash_codes = hash_codes
+        #     kmer_q_columnwise = kmer_quantification[:, idx_c:idx_c + 1]
+        #     hash_code_tmp = (kmer_q_columnwise.astype(np.uint64) * _x.astype(
+        #         np.uint64) + _y) % _mersenne_primer
+        #     hash_codes = np.stack([hash_code_tmp.astype(np.uint32), hash_codes]).min(axis=0)
+        #     positions[hash_codes < last_hash_codes] = idx_c  # update positions
+        ipt_ext = kmer_quantification[:, None, :]
+        hash_code_tmp = (ipt_ext.astype(np.uint64) * _x[..., None].astype(np.uint64) + _y[..., None]) % _mersenne_primer
+        hash_codes = hash_code_tmp.astype(np.uint32).min(axis=-1)
+        positions = hash_code_tmp.astype(np.uint32).argmin(axis=-1)
+        if curr_len > prev_len:
+            dump_pickle(self.hashcode2input_dict, self.dict_saving_path)
+        # we just need the hash codes, so we stop here and return
+        return hash_codes, positions, _x, _y
+
+    def _inverse_map(self, hash_codes_mapped) -> np.ndarray:
+        """
+        mapping hash codes (which is returned by the method of '_map') back to the input space.
+        :param hash_codes_mapped: a pair of hash codes, positions, and permutations
+        """
+        if len(self.hashcode2input_dict) <= 0:
+            self.hashcode2input_dict = read_pickle(self.dict_saving_path)
+        assert len(self.hashcode2input_dict) > 0, "No mapping records. Exit!"
+        hash_codes, positions, _x, _y = hash_codes_mapped
+        batch_size_, sub_k_ = hash_codes.shape
+        # assert sub_k_ == self.sub_k
+        assert hash_codes.dtype == np.uint32
+        kmer_encodings = np.mod(
+            (hash_codes.astype(int) - _y.astype(int)) * mod_inverse(_x, _mersenne_primer),
+            _mersenne_primer)
+        kmer_decode = lambda kmer_end: literal_eval(self.hashcode2input_dict.get(kmer_end))
+        if self.kmer_size>1:
+            kmer_decodings = np.stack(np.vectorize(kmer_decode)(kmer_encodings), axis=-1)
+        else:
+            kmer_decodings = np.stack([np.vectorize(kmer_decode)(kmer_encodings)], axis=-1)
+        input_rtn = np.ones(shape=(batch_size_, self.number_of_words), dtype=int) * self.null_value
+        all_positions = []
+        for inc in range(self.kmer_size):
+            all_positions.append(positions + inc)
+        all_positions = np.stack(all_positions, axis=-1)
+        assert all_positions.shape == kmer_decodings.shape
+        input_rtn[np.arange(batch_size_)[:, None, None], all_positions] = kmer_decodings
+
+        if not self.position_fixed:
+            input_rtn_nonzeros = [np.nonzero(arr[:] != self.null_value)[0] for arr in input_rtn]
+            input_rtn_list = [input_rtn[ind, pos] for ind, pos in enumerate(input_rtn_nonzeros)]
+            input_rtn = np.vstack([np.pad(arr, pad_width=(0, self.number_of_words - len(arr)), constant_values=self.pad_value) for \
+                arr in input_rtn_list])
+        return input_rtn
+
+    def _init_permutations(self, sub_k: int, r: int):
+        """
+        generate random numbers for compositing hash functions
+        """
+        return np.array([(self.random_generator_np.randint(1, _mersenne_primer, (r, ), dtype=np.uint32),
+                          self.random_generator_np.randint(0, _mersenne_primer, (r, ), dtype=np.uint32)) for _ in
+                         range(sub_k)],
+                        dtype=np.uint32
+                        ).transpose([1, 2, 0])
+
+    def get_collision_prob(self, distance: float, jaccard_proxy=True):
+        """
+        # similarity on edit distance
+        :param distance: normalized edit distance
+        """
+        assert 0 <= distance <= 1
+        # maximum number of dismatched k-mers (jaccard similarity upon the set of k-mers)
+        n_dissim = self.kmer_size * self.number_of_words * distance
+        total_n_kmers = self.number_of_words - self.kmer_size + 1
+        # warning: the paper presents the numerator: total_n_kmers - total_n_kmers*(self.kmer_size + 2)*distance
+        # we assume the $total_n_kmers is fixed. Because the minimum value of f(x)=(n-x) / (n+n_dissim-x) is x=(2*n + n_dissim) / 2,
+        # we set the x=n_dissim to obtain the local minimum value
+        jaccard_sim_minimum = (total_n_kmers - n_dissim) / total_n_kmers
+        if jaccard_proxy:
+            return jaccard_sim_minimum
+        else:
+            return 1. - distance
+
+
+class PStableLSHTransformer(LSHTransformer):
+    def __init__(self, dimension, r, metric=1, sub_k=128, null_value=0, seed=1):
+        """
+        Codes are adapted from the repository: https://github.com/CharlesLiu7/p-stable-lsh-python,
+        which implements the lsh method proposed in the paper below:
+        Mayur Datar, Nicole Immorlica, Piotr Indyk, and Vahab S. Mirrokni. Locality-sensitive hashing scheme based on p-stable distributions. SCG '04. ACM, New York, NY, USA, 253262.
+        :param dimension: dimension of the input vector
+        :param r: the radius or width stated $r$ in the paper
+        :param metric: the $l_p$ metric measures pertubations (p=1 or p=2)
+        :param sub_k: a group of $sub_k$ hash codes
+        :param null_value: an integer to fill the non-sampled positions
+        :param seed: an integer of random seed
+        """
+        super(PStableLSHTransformer, self).__init__(sub_k, null_value, seed)
+        self.dimension = dimension
+        self.r = r
+        assert isinstance(self.dimension, int) and isinstance(self.r, (int, float))
+        assert self.dimension > 0 and self.r > 0
+        self.metric = metric
+        self.basic_func = None
+        # build a model
+        self.scaler = MinMaxScaler()
+        self.decoder = get_simple_fc_model(self.sub_k, self.dimension)
+
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int) -> np.ndarray:
+        """
+        conduct p-stable distribution based lsh transformations
+        :param ipt: a batch of representation vector
+        """
+        assert len(ipt.shape) == 2 and ipt.shape[1] == self.dimension
+        a, b, self.basic_func = self._init_permutations()
+        hash_codes = np.floor((np.transpose(np.dot(a, np.expand_dims(ipt, -1)).squeeze(), [1, 0]) + b) / self.r)
+
+        return hash_codes
+
+    def _inverse_map(self, hash_codes_mapped):
+        """
+        leverage the auto-encoder strategy. Please train the decoder first.
+        :param hash_codes_mapped: hash codes
+        """
+        try:
+            return self.decoder(self.scaler.transform(hash_codes_mapped))
+        except NotFittedError:
+            raise NotFittedError("Model needs fitting first.\n")
+
+    def _f_gaussion(self, x):
+        """
+        Standard gaussian noises corresponds to parameter x
+        """
+        return np.e ** (-x ** 2 / 2) / np.sqrt(2 * np.pi)
+
+    def _f_cauchy(self, x):
+        """
+        Standard cauchy noises corresponds to parameter x
+        """
+        return 1 / (np.pi * (1 + x ** 2))
+
+    def _init_permutations(self):
+        if self.metric == 2:
+            a = np.array([self.random_generator_np.normal(size=self.dimension) for _ in range(self.sub_k)])
+            b = np.array([self.random_generator_np.uniform(0, self.r) for _ in range(self.sub_k)])
+            return a, b, self._f_gaussion
+        elif self.metric == 1:
+            a = np.array([self.random_generator_np.standard_cauchy(self.dimension) for _ in range(self.sub_k)])
+            b = np.array([self.random_generator_np.uniform(0, self.r) for _ in range(self.sub_k)])
+            return a, b, self._f_cauchy
+        else:
+            raise ValueError(f"Support metric = 1 or 2, but got {self.metric}")
+
+    def train_decoder(self, hash_codes_mapped: np.ndarray, x: np.ndarray):
+        self.scaler.fit(hash_codes_mapped)
+        hash_codes_mapped = self.scaler.transform(hash_codes_mapped)
+        train_sample_model(self.decoder, hash_codes_mapped, x)
+
+    def get_collision_prob(self, distance):
+        p, err = integrate.quad(lambda t: self.pstableProb(t, distance), 0, self.r)
+        return 2 * p
+
+    def _pstable_prob(self, x, d):
+        if self.basic_func is None:
+            if self.metric == 2:
+                self.basic_func = self._f_gaussion
+            elif self.metric == 1:
+                self.basic_func = self._f_cauchy
+            else:
+                raise TypeError
+        else:
+            pass
+        return self.basic_func(x / d) * (1. - x / self.r) / d
+
+
+class HammingLSHTransformer(LSHTransformer):
+    def __init__(self, dimension, sub_k=128, null_value=0, seed=1):
+        """
+        bit sampling method
+        :param dimension: number of words
+        :param sub_k: a group of $sub_k$ hash codes
+        :param null_value: an integer to fill the non-sampled positions
+        :param seed: an integer of random seed
+        """
+        super(HammingLSHTransformer, self).__init__(sub_k, null_value, seed)
+        self.dimension = dimension
+
+    def _map(self, ipt: np.ndarray, sub_k_tmp: int):
+        """
+        sampling multiple bits
+        :param ipt: 2D array
+        """
+        assert len(ipt.shape) == 2
+        if ipt.dtype != int:
+            ipt = ipt.astype(int)
+        assert ((ipt == 0) | (ipt == 1)).all(), "Expect binary array. Exit!\n"
+
+        batch_size = ipt.shape[0]
+        sub_k = self.sub_k if self.sub_k >= sub_k_tmp else sub_k_tmp
+        permutations = np.array([self._init_permutations(sub_k) for _ in range(batch_size)])
+        hash_codes = np.empty(shape=(batch_size, sub_k), dtype=np.ndarray)
+        hash_codes[:] = ipt[np.array(range(batch_size))[:, np.newaxis], permutations]
+        return hash_codes, permutations
+
+    def _inverse_map(self, hash_codes_mapped: np.ndarray):
+        """
+        mapping lsh codes back to the input space
+        """
+        hash_codes, permutations = hash_codes_mapped
+        assert len(hash_codes.shape) == 2
+        batch_size_ = hash_codes.shape[0]
+        input_rtn = np.ones(shape=(batch_size_, self.dimension)) * self.null_value
+        input_rtn[np.array(range(batch_size_))[:, np.newaxis], permutations] = hash_codes
+        return input_rtn
+
+    def _init_permutations(self, sub_k, replace=True):
+        return np.random.choice(self.dimension, sub_k, replace=replace)
+
+    def get_collision_prob(self, distance):
+        assert 0. <= distance <= 1., "Expected the normalized distance.\n"
+        return 1 - distance
+
+
+def test_pstable_dist():
+    np.random.seed(0)
+    x = np.random.uniform(0, 1, (5, 6))
+    pstable_lsh = PStableLSHTransformer(dimension=x.shape[1], r=3.0, metric=2, sub_k=2)
+    hash_codes = pstable_lsh._map(x)
+
+
+def test_jaccard_dist():
+    input_array = np.random.randint(1, 10000, (2, 100))
+    jaccard_lsh = JaccardLSHTransformer(sub_k=3, null_value=0, seed=2345)
+    i: int = 1
+    while i <= 10:
+        input_transf = jaccard_lsh.transform(input_array)
+        assert set(input_transf.flatten()).issubset(set(input_array.flatten()))
+        i += 1
+
+def test_w_jaccard_lsh():
+    # each entity is the corresponding occurrence of words in vocabulary
+    input_array = np.random.uniform(0, 1, (1, 6))
+    input_array[0, 0] = 0.
+    input_array[0, 3] = 0.
+    input_array = np.tile(input_array, (5, 1))
+    w_jaccard_lsh = WeightedJaccardLSHTransformer(number_of_words=6,
+                                                  sub_k=3,
+                                                  null_value=0,
+                                                  seed=2345)
+
+    i = 1
+    while i <= 10:
+        input_transf = w_jaccard_lsh.transform(input_array)
+        assert (np.all(input_transf <= input_array))
+        assert (np.all(input_transf >= 0))
+        i += 1
+
+
+if __name__ == "__main__":
+    # test_pstable_dist()
+    for _ in range(3):
+        test_jaccard_dist()
+    # test_w_jaccard_lsh()
+    
