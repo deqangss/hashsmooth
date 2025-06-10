@@ -47,6 +47,7 @@ sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
 from python_parser.parser_folder import remove_comments_and_docstrings
 
+print(os.getcwd())
 # try:
 #     from torch.utils.tensorboard import SummaryWriter
 # except:
