@@ -316,7 +316,6 @@ class HashSmooth(HashSmoothBase):
         self.transform_method = transform_method
 
     def transform(self, x, tokenizer):
-        # todo:
         dim_of_a_sample = x.shape[1] // 2
         x_transform = self.transform_method.transform(x[:, :dim_of_a_sample], self.k_hashcode)  # the first example
         x_transform_ = torch.hstack([x_transform, x[:, dim_of_a_sample:]])
