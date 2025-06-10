@@ -27,6 +27,7 @@ import logging
 import os
 import pickle
 import random
+import sys
 import re
 import shutil
 import json
@@ -36,6 +37,15 @@ from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampl
 from torch.utils.data.distributed import DistributedSampler
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
+from python_parser.parser_folder import remove_comments_and_docstrings
 
 # try:
 #     from torch.utils.tensorboard import SummaryWriter
