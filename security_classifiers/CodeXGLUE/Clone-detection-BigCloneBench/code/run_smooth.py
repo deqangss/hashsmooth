@@ -863,12 +863,12 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=pool)
+        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=None)
 
         if args.local_rank == 0:
             torch.distributed.barrier()
 
-        global_step, tr_loss = train(args, train_dataset, model, tokenizer,pool)
+        global_step, tr_loss = train(args, train_dataset, model, tokenizer,None)
 
 
     # Evaluation

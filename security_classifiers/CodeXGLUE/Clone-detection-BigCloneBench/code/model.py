@@ -18,6 +18,7 @@ from hashsmooth.core import HashSmoothBase
 from torchmalware.certification.perturbation import RandomPerturbation as TorchMalwareRandomPerturb
 from torchmalware.certification import deletion_mech
 import torchmalware
+binom_test = np.vectorize(binom_test)
 ABSTAIN = -1
 
 class RobertaClassificationHead(nn.Module):
