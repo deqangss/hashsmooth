@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from hashsmooth import LSHTransformer
+from hashsmooth.lsh_torch import LSHTransformerTorch
 from hashsmooth.utils_hash import get_position, lower_confidence_interval, upper_confidence_interval, binom_test
 
 EPS = 1e-6

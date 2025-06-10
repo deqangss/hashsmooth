@@ -35,6 +35,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 # try:
 #     from torch.utils.tensorboard import SummaryWriter
 # except:
@@ -828,7 +830,7 @@ def main():
                                           seed=args.seed)
         model = RandomDelSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
     elif args.smooth == 'hash':
-        input_transformer = EditLSHTransformerTorch(tokenizer.model_max_length,
+        input_transformer = EditLSHTransformerTorch(tokenizer.max_len_single_sentence,  # where are 2 tokens?
                                                     args.k_random,
                                                     args.kmer,
                                                     l_chucksize=1,
