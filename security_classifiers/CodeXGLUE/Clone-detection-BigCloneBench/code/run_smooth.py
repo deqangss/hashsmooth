@@ -577,7 +577,7 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
         with torch.no_grad():
             logits = []
             for sample_idx in range(args.n_sampling):
-                inputs_tran = model.transform(inputs)
+                inputs_tran = model.transform(inputs, tokenizer)
                 logit = model(inputs_tran)
                 logits.append(logit.cpu().numpy())
             logits = np.concatenate(logits)
@@ -588,7 +588,7 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
 
             logits = []
             for sample_idx in range(args.n_estimation):
-                inputs_tran = model.transform(inputs)
+                inputs_tran = model.transform(inputs, tokenizer)
                 logit = model(inputs_tran)
                 logits.append(logit.cpu().numpy())
             logits = np.concatenate(logits)
@@ -756,7 +756,8 @@ def main():
                         help="confidence interval.")
 
     
-    pool = multiprocessing.Pool(cpu_cont)
+    # pool = multiprocessing.Pool(cpu_cont)
+    pool = None
     args = parser.parse_args()
 
     # Setup distant debugging if needed
