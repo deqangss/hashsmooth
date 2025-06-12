@@ -27,7 +27,6 @@ import logging
 import os
 import pickle
 import random
-import sys
 import re
 import shutil
 import json
@@ -36,31 +35,14 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-
-sys.path.append('../../')
-sys.path.append('../../../')
-sys.path.append('../../../../')
-sys.path.append('../../../python_parser')
-sys.path.append('../../../../hashsmooth')
-sys.path.append('../../../../randomsmooth')
-sys.path.append('../../../../torchware')
-from python_parser.parser_folder import remove_comments_and_docstrings
-
-# try:
-#     from torch.utils.tensorboard import SummaryWriter
-# except:
-#     from tensorboardX import SummaryWriter
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except:
+    from tensorboardX import SummaryWriter
 
 from tqdm import tqdm, trange
 import multiprocessing
 from model import Model
-from model import RandomSmooth4LLM, RandomDelSmooth4LLM, HashSmooth4LLM, binom_test
-
-from randomsmooth.random_tran import RandomTransformer
-from torchmalware.random_del_wrapper import RandomDeleter
-from hashsmooth import EditLSHTransformerTorch
-from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_interval
 
 cpu_cont = 16
 from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
@@ -80,26 +62,6 @@ MODEL_CLASSES = {
     'distilbert': (DistilBertConfig, DistilBertForMaskedLM, DistilBertTokenizer)
 }
 
-def get_example(item):
-    url1,url2,label,tokenizer,args,cache,url_to_code=item
-    if url1 in cache:
-        code1=cache[url1].copy()
-    else:
-        try:
-            code=' '.join(url_to_code[url1].split())
-        except:
-            code=""
-        code1=tokenizer.tokenize(code)
-    if url2 in cache:
-        code2=cache[url2].copy()
-    else:
-        try:
-            code=' '.join(url_to_code[url2].split())
-        except:
-            code=""
-        code2=tokenizer.tokenize(code)
-        
-    return convert_examples_to_features(code1,code2,label,url1,url2,tokenizer,args,cache)
 
 
 class InputFeatures(object):
@@ -107,96 +69,63 @@ class InputFeatures(object):
     def __init__(self,
                  input_tokens,
                  input_ids,
+                 idx,
                  label,
-                 url1,
-                 url2
 
     ):
         self.input_tokens = input_tokens
         self.input_ids = input_ids
+        self.idx=str(idx)
         self.label=label
-        self.url1=url1
-        self.url2=url2
         
-def convert_examples_to_features(code1_tokens,code2_tokens,label,url1,url2,tokenizer,args,cache):
+def convert_examples_to_features(code, label, tokenizer,args):
     #source
-    code1_tokens=code1_tokens[:args.block_size-2]
-    code1_tokens =[tokenizer.cls_token]+code1_tokens+[tokenizer.sep_token]
-    code2_tokens=code2_tokens[:args.block_size-2]
-    code2_tokens =[tokenizer.cls_token]+code2_tokens+[tokenizer.sep_token]  
-    
-    code1_ids=tokenizer.convert_tokens_to_ids(code1_tokens)
-    padding_length = args.block_size - len(code1_ids)
-    code1_ids+=[tokenizer.pad_token_id]*padding_length
-    
-    code2_ids=tokenizer.convert_tokens_to_ids(code2_tokens)
-    padding_length = args.block_size - len(code2_ids)
-    code2_ids+=[tokenizer.pad_token_id]*padding_length
-    
-    source_tokens=code1_tokens+code2_tokens
-    source_ids=code1_ids+code2_ids
-    return InputFeatures(source_tokens,source_ids,label,url1,url2)
+    code_tokens=tokenizer.tokenize(code)[:args.block_size-2]
+    source_tokens =[tokenizer.cls_token]+code_tokens+[tokenizer.sep_token]
+    source_ids =  tokenizer.convert_tokens_to_ids(source_tokens)
+    padding_length = args.block_size - len(source_ids)
+    source_ids+=[tokenizer.pad_token_id]*padding_length
+    return InputFeatures(source_tokens,source_ids,0,label)
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, args, file_path='train', block_size=512,pool=None):
-        postfix=file_path.split('/')[-1].split('.txt')[0]
+    def __init__(self, tokenizer, args, file_path=None):
         self.examples = []
-        index_filename=file_path
-        logger.info("Creating features from index file at %s ", index_filename)
-        url_to_code={}
+        # To-Do: 这里需要根据code authorship的数据集重新做.
+        file_type = file_path.split('/')[-1].split('.')[0]
         folder = '/'.join(file_path.split('/')[:-1]) # 得到文件目录
 
         cache_file_path = os.path.join(folder, 'cached_{}'.format(
-                                    postfix))
-        # 保存下对应的code1和code2
+                                    file_type))
         code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
-                                    postfix))
-        code_pairs = []
+                                    file_type))
+
+        print('\n cached_features_file: ',cache_file_path)
         try:
             self.examples = torch.load(cache_file_path)
             with open(code_pairs_file_path, 'rb') as f:
-                code_pairs = pickle.load(f)
+                code_files = pickle.load(f)
+            
             logger.info("Loading features from cached file %s", cache_file_path)
+        
         except:
-
-            # 读取了所有的数据集文件.
-            with open('/'.join(index_filename.split('/')[:-1])+'/data.jsonl') as f:
+            logger.info("Creating features from dataset file at %s", file_path)
+            code_files = []
+            with open(file_path) as f:
                 for line in f:
-                    line=line.strip()
-                    js=json.loads(line)
-                    url_to_code[js['idx']]=js['func']
-                    # idx 表示每段代码的id
-
-            data=[]
-            cache={} # 这个cache的意义何在？
-            f=open(index_filename)
-            with open(index_filename) as f:
-                for line in f:
-                    line=line.strip()
-                    url1,url2,label=line.split('\t')
-                    if url1 not in url_to_code or url2 not in url_to_code:
-                        # 在data.jsonl中不存在，直接跳过
-                        continue
-                    if label=='0':
-                        label=0
-                    else:
-                        label=1
-                    data.append((url1,url2,label,tokenizer, args,cache,url_to_code))
-                    # 所有东西都存进来内存不爆炸么....
-            # if 'train' not in postfix:
-            #     data=random.sample(data,int(len(data)*0.01))
-            for sing_example in data:
-                code_pairs.append([sing_example[0], 
-                                    sing_example[1], 
-                                    url_to_code[sing_example[0]], 
-                                    url_to_code[sing_example[1]]])
+                    code = line.split(" <CODESPLIT> ")[0]
+                    code = code.replace("\\n", "\n").replace('\"','"')
+                    label = line.split(" <CODESPLIT> ")[1]
+                    # 将这俩内容转化成input.
+                    self.examples.append(convert_examples_to_features(code, int(label), tokenizer,args))
+                    code_files.append(code)
+                    # 这里每次都是重新读取并处理数据集，能否cache然后load
+            assert(len(self.examples) == len(code_files))
             with open(code_pairs_file_path, 'wb') as f:
-                pickle.dump(code_pairs, f)
-            pool = multiprocessing.Pool(7)
-            self.examples=pool.map(get_example,tqdm(data,total=len(data)))
+                pickle.dump(code_files, f)
+            logger.info("Saving features into cached file %s", cache_file_path)
             torch.save(self.examples, cache_file_path)
-        # 这应该就是处理数据的地方了.
-        if 'train' in postfix:
+
+        if 'train' in file_path:
             for idx, example in enumerate(self.examples[:3]):
                     logger.info("*** Example ***")
                     logger.info("idx: {}".format(idx))
@@ -301,8 +230,8 @@ def train(args, train_dataset, model, tokenizer,pool):
             inputs = batch[0].to(args.device)        
             labels=batch[1].to(args.device) 
             model.train()
-            inputs_tran = model.transform(inputs, tokenizer)
-            loss,logits = model(inputs_tran,labels)
+            loss,logits = model(inputs,labels)
+
 
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
@@ -354,7 +283,7 @@ def train(args, train_dataset, model, tokenizer,pool):
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)                        
                         model_to_save = model.module if hasattr(model,'module') else model
-                        output_dir = os.path.join(output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+                        output_dir = os.path.join(output_dir, '{}'.format('model.bin')) 
                         torch.save(model_to_save.state_dict(), output_dir)
                         logger.info("Saving model checkpoint to %s", output_dir)
                         
@@ -367,7 +296,7 @@ def train(args, train_dataset, model, tokenizer,pool):
 def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=False):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = args.output_dir
-    eval_dataset = load_and_cache_examples(args, tokenizer, evaluate=True,pool=pool)
+    eval_dataset = TextDataset(tokenizer, args,args.eval_data_file)
     # 得到数据集.
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
@@ -390,49 +319,34 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
     model.eval()
     logits=[]  
     y_trues=[]
-    for sample_idx in range(args.n_sampling):
-        for batch in tqdm(eval_dataloader):
-            inputs = batch[0].to(args.device)
-            labels = batch[1].to(args.device)
-            with torch.no_grad():
-                inputs_tran = model.transform(inputs, tokenizer)
-                lm_loss,logit = model(inputs_tran,labels)
-                eval_loss += lm_loss.mean().item()
-                logits.append(logit.cpu().numpy())
-                # ground truth
-            if sample_idx == 0:
-                y_trues.append(labels.cpu().numpy())
-                nb_eval_steps += 1
+    for batch in tqdm(eval_dataloader):
+        inputs = batch[0].to(args.device)        
+        labels = batch[1].to(args.device) 
+        with torch.no_grad():
+            lm_loss,logit = model(inputs,labels)
+            eval_loss += lm_loss.mean().item()
+            logits.append(logit.cpu().numpy())
+            y_trues.append(labels.cpu().numpy())
+            # ground truth
+        
+        nb_eval_steps += 1
     logits=np.concatenate(logits,0)
     y_trues=np.concatenate(y_trues,0)
-    best_threshold=0.5
-    # best_f1=0
-    # # 在validation集上确定best_threshold的.
-    # for i in range(1,100):
-    #     threshold=i/100
-    #     y_preds=logits[:,1]>threshold
-    #     from sklearn.metrics import recall_score
-    #     recall=recall_score(y_trues, y_preds, average='macro')
-    #     from sklearn.metrics import precision_score
-    #     precision=precision_score(y_trues, y_preds, average='macro')
-    #     from sklearn.metrics import f1_score
-    #     f1=f1_score(y_trues, y_preds, average='macro')
-    #     if f1>best_f1:
-    #         best_f1=f1
-    #         best_threshold=threshold
-
-    # 使用best_threshold来计算指标.
-    preds=logits[:,1]>best_threshold
-    preds = np.array(preds).reshape([args.n_sampling, len(eval_dataset.examples)]).transpose([1, 0])
-    preds_onehot = np.eye(2)[preds.astype(int)].sum(axis=-2)
-    y_preds = np.argmax(preds_onehot, axis=-1)
-
+    best_threshold=0
+    best_f1=0
+    
+    y_preds = []
+    for logit in logits:
+        y_preds.append(np.argmax(logit))
+    print(y_trues)
+    print(y_preds)
     from sklearn.metrics import recall_score
     recall=recall_score(y_trues, y_preds, average='macro')
     from sklearn.metrics import precision_score
     precision=precision_score(y_trues, y_preds, average='macro')   
     from sklearn.metrics import f1_score
-    f1=f1_score(y_trues, y_preds, average='macro')             
+    f1=f1_score(y_trues, y_preds, average='macro') 
+
     result = {
         "eval_recall": float(recall),
         "eval_precision": float(precision),
@@ -447,18 +361,7 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
 
     return result
 
-def measurement(_y_true, _y_pred):
-    from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, balanced_accuracy_score
-    accuracy = accuracy_score(_y_true, _y_pred)
-    b_accuracy = balanced_accuracy_score(_y_true, _y_pred)
-    tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
-    fpr = fp / float(tn + fp)
-    fnr = fn / float(tp + fn)
-    f1 = f1_score(_y_true, _y_pred, average='binary')
-
-    return accuracy, b_accuracy, fnr, fpr, f1
-
-def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0.5, alpha=0.05):
+def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_dataset = load_and_cache_examples(args, tokenizer, test=True,pool=pool)
 
@@ -480,173 +383,39 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0.5, alpha=0
     model.eval()
     logits=[]  
     y_trues=[]
-    for sample_idx in range(args.n_sampling):
-        for batch in tqdm(eval_dataloader):
-            inputs = batch[0].to(args.device)
-            labels=batch[1].to(args.device)
-            with torch.no_grad():
-                inputs_tran = model.transform(inputs, tokenizer)
-                lm_loss,logit = model(inputs_tran,labels)
-                eval_loss += lm_loss.mean().item()
-                logits.append(logit.cpu().numpy())
-            if sample_idx == 0:
-                y_trues.append(labels.cpu().numpy())
-                nb_eval_steps += 1
+    for batch in tqdm(eval_dataloader):
+        inputs = batch[0].to(args.device)        
+        labels=batch[1].to(args.device) 
+        with torch.no_grad():
+            lm_loss,logit = model(inputs,labels)
+            eval_loss += lm_loss.mean().item()
+            logits.append(logit.cpu().numpy())
+            y_trues.append(labels.cpu().numpy())
+        nb_eval_steps += 1
     logits=np.concatenate(logits,0)
-    y_trues=np.concatenate(y_trues,0)
+    y_trues = np.concatenate(y_trues, 0)
 
-    preds = logits[:, 1] > best_threshold
-    preds = np.array(preds).reshape([args.n_sampling, len(eval_dataset.examples)]).transpose([1, 0])
-    preds_onehot = np.eye(2)[preds.astype(int)].sum(axis=-2)
-    y_preds = np.argmax(preds_onehot, axis=-1)
+    y_preds = []
+    for logit in logits:
+        y_preds.append(np.argmax(logit))
 
-    top2 = preds_onehot.argsort(axis=-1)[:, ::-1][:, :2]
-    count1 = preds_onehot[range(y_preds.shape[0]), top2[:, 0]]
-    count2 = preds_onehot[range(y_preds.shape[0]), top2[:, 1]]
-    abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
-
-    from sklearn.metrics import recall_score
-    recall=recall_score(y_trues, y_preds, average='macro')
+    from sklearn.metrics import recall_score, accuracy_score
+    acc = accuracy_score(y_trues, y_preds)
+    recall = recall_score(y_trues, y_preds, average='macro')
     from sklearn.metrics import precision_score
-    precision=precision_score(y_trues, y_preds, average='macro')   
+    precision = precision_score(y_trues, y_preds, average='macro')
     from sklearn.metrics import f1_score
-    f1=f1_score(y_trues, y_preds, average='macro')             
+    f1 = f1_score(y_trues, y_preds, average='macro')
     result = {
+        "test_acc": float(acc),
         "test_recall": float(recall),
         "test_precision": float(precision),
         "test_f1": float(f1)
     }
 
-    accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_trues, y_preds)
-    logger.info(
-        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.smooth, accuracy * 100,
-                                                                                        b_accuracy * 100))
-    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
-    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
-
-    y_trues = y_trues[~abstain_flag]
-    y_preds = y_preds[~abstain_flag]
-    logger.info('Filter out outlier: {}.'.format(np.sum(abstain_flag)))
-    recall2 = recall_score(y_trues, y_preds, average='macro')
-    precision2 = precision_score(y_trues, y_preds, average='macro')
-    f12 = f1_score(y_trues, y_preds, average='macro')
-    result.update({
-        "test_recall_filter": float(recall2),
-        "test_precision_filter": float(precision2),
-        "test_f1_filter": float(f12)
-    })
-
-    accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_trues, y_preds)
-    logger.info("After filter outliers\n")
-    logger.info(
-        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.smooth, accuracy * 100,
-                                                                                        b_accuracy * 100))
-    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
-    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
-
-    logger.info("***** Test results {} *****".format(prefix))
+    logger.info("***** Test results *****")
     for key in sorted(result.keys()):
         logger.info("  %s = %s", key, str(round(result[key], 5)))
-
-    return result
-
-
-def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
-    # Loop to handle MNLI double evaluation (matched, mis-matched)
-    eval_dataset = load_and_cache_examples(args, tokenizer, test=True, pool=pool)
-
-    args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
-    # Note that DistributedSampler samples randomly
-    eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size,num_workers=4,pin_memory=True)
-
-    # multi-gpu evaluate
-    if args.n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-
-    # Eval!
-    logger.info("***** Running Certification on Test Dataset *****")
-    logger.info("  Num examples = %d", len(eval_dataset))
-    logger.info("  Batch size = %d", args.eval_batch_size)
-    eval_loss = 0.0
-    nb_eval_steps = 0
-    model.eval()
-    radius_all = []
-    for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
-        inputs = batch[0].to(args.device)
-        label = batch[1].to(args.device)
-        bs, dim = inputs.shape
-        with torch.no_grad():
-            logits = []
-            for sample_idx in range(args.n_sampling):
-                inputs_tran = model.transform(inputs, tokenizer)
-                logit = model(inputs_tran)
-                logits.append(logit.cpu().numpy())
-            logits = np.concatenate(logits)
-            preds = [0 if first_softmax > threshold else 1 for first_softmax in logits[:, 0]]
-            preds = np.array(preds).reshape([args.n_sampling, bs]).transpose([1, 0])
-            preds_selection = np.eye(2)[preds.astype(int)].sum(axis=-2)
-            c_pred = preds_selection.argmax(axis=-1)
-
-            logits = []
-            for sample_idx in range(args.n_estimation):
-                inputs_tran = model.transform(inputs, tokenizer)
-                logit = model(inputs_tran)
-                logits.append(logit.cpu().numpy())
-            logits = np.concatenate(logits)
-            preds = [0 if first_softmax > threshold else 1 for first_softmax in logits[:, 0]]
-            preds = np.array(preds).reshape([args.n_estimation, bs]).transpose([1, 0])
-            preds_estimation = np.eye(2)[preds.astype(int)].sum(axis=-2)
-
-            n_targeted = preds_estimation[range(len(c_pred)), c_pred]
-            prob_underlined = lower_confidence_interval(n_targeted, args.n_estimation, args.alpha)
-            n_runnerup = preds_estimation[range(len(c_pred)), 1 - c_pred]
-            prob_overlined = upper_confidence_interval(n_runnerup, args.n_estimation, args.alpha)
-
-            radius = np.zeros_like(c_pred, dtype=object)
-            abstain_indicator = prob_underlined <= prob_overlined
-            radius[abstain_indicator] = model.ABSTAIN
-            incorrect_indicator = (c_pred != label.cpu().numpy())
-            incorrect_indicator_true = incorrect_indicator == True
-            if np.any(incorrect_indicator_true):
-                incorrect_indicator[incorrect_indicator_true] = incorrect_indicator[incorrect_indicator_true] ^ \
-                                                                abstain_indicator[incorrect_indicator_true]
-                radius[incorrect_indicator] = model.ABSTAIN - 1
-            total_abstain_indicator = abstain_indicator | incorrect_indicator
-            if not all(total_abstain_indicator):
-                if args.smooth == 'random':
-                    radius[~total_abstain_indicator] = model.calc_radius(
-                        np.array(prob_underlined[~total_abstain_indicator])[..., None],
-                        dim,
-                        args.k_random)
-                elif args.smooth == 'randdel':
-                    radius[~total_abstain_indicator] = model.calc_radius(
-                        np.array(prob_underlined[~total_abstain_indicator])[..., None],
-                        dim,
-                        args.k_random)
-                elif args.smooth == 'hash':
-                    radius[~total_abstain_indicator] = model.calc_radius(prob_underlined[~total_abstain_indicator],
-                                                                         prob_overlined[~total_abstain_indicator],
-                                                                         k_hashcode=args.k_random, max_radius=0.1,
-                                                                         n_grid=100
-                                                                         )
-                else:
-                    raise ValueError
-            radius_all.append(radius)
-
-            nb_eval_steps += 1
-
-    radius_all = np.concatenate(radius_all)
-    checkpoint_prefix = 'checkpoint-best-f1'
-    output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    output_dir = os.path.join(output_dir, '{}-{}-cert.npy'.format(args.smooth, int(args.k_random)))
-    np.save(output_dir, radius_all)
-    logger.info("Saving certification to %s", output_dir)
-
-    return radius_all
-
                                                 
 def main():
     parser = argparse.ArgumentParser()
@@ -666,6 +435,8 @@ def main():
     parser.add_argument("--model_type", default="bert", type=str,
                         help="The model architecture to be fine-tuned.")
     parser.add_argument("--model_name_or_path", default=None, type=str,
+                        help="The model checkpoint for weights initialization.")
+    parser.add_argument("--number_labels", type=int,
                         help="The model checkpoint for weights initialization.")
 
     parser.add_argument("--mlm", action='store_true',
@@ -688,15 +459,13 @@ def main():
     parser.add_argument("--do_eval", action='store_true',
                         help="Whether to run eval on the dev set.")
     parser.add_argument("--do_test", action='store_true',
-                        help="Whether to run eval on the dev set.")
-    parser.add_argument("--do_certify", action='store_true',
-                        help="Whether to run certification on the dev set.")
+                        help="Whether to run eval on the dev set.")    
     parser.add_argument("--evaluate_during_training", action='store_true',
                         help="Run evaluation during training at each logging step.")
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
 
-    parser.add_argument("--train_batch_size", default=4, type=int,
+    parser.add_argument("--train_batch_size", default=1, type=int,
                         help="Batch size per GPU/CPU for training.")
     parser.add_argument("--eval_batch_size", default=4, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
@@ -745,20 +514,6 @@ def main():
     parser.add_argument('--server_ip', type=str, default='', help="For distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
 
-    parser.add_argument('--smooth', type=str, default='random', choices=['random', 'randdel', 'hash'],
-                        help="random smoothing method.")
-    parser.add_argument('--k_random', type=int, default=128, help="number of random codes.")
-    parser.add_argument('--n_sampling', type=int, default=100, help="number of sampling.")
-    parser.add_argument('--n_estimation', type=int, default=10000,
-                        help="number of sampling for certification estimation.")
-    parser.add_argument('--n_examples', type=int, default=200,
-                        help="number of examples for certification or attacking.")
-    parser.add_argument('--kmer', type=int, default=2, help="number of adjacent tokens.")
-    parser.add_argument('--default_mode', action='store_true', default=True,
-                        help="Whether to run training.")
-    parser.add_argument("--alpha", default=0.05, type=float,
-                        help="confidence interval.")
-
     
     pool = multiprocessing.Pool(cpu_cont)
     args = parser.parse_args()
@@ -801,7 +556,7 @@ def main():
     args.start_step = 0
     checkpoint_last = os.path.join(args.output_dir, 'checkpoint-last')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
@@ -817,7 +572,7 @@ def main():
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           cache_dir=args.cache_dir if args.cache_dir else None)
-    config.num_labels=2
+    config.num_labels=args.number_labels
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name,
                                                 do_lower_case=args.do_lower_case,
                                                 cache_dir=args.cache_dir if args.cache_dir else None)
@@ -832,32 +587,7 @@ def main():
     else:
         model = model_class(config)
 
-    # model=Model(model,config,tokenizer,args)
-    if args.smooth == "random":
-        input_transformer = RandomTransformer(args.k_random,
-                                              mask_id=tokenizer.pad_token_id,
-                                              reuse_noise=True,
-                                              seed=args.seed)
-        model = RandomSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
-    elif args.smooth == 'randdel':
-        input_transformer = RandomDeleter(p_del=1. - (float(args.k_random) / tokenizer.model_max_length),
-                                          mask_id=tokenizer.pad_token_id,
-                                          reuse_noise=True,
-                                          seed=args.seed)
-        model = RandomDelSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
-    elif args.smooth == 'hash':
-        input_transformer = EditLSHTransformerTorch(tokenizer.max_len_single_sentence,  # where are 2 tokens?
-                                                    args.k_random,
-                                                    args.kmer,
-                                                    l_chucksize=1,
-                                                    null_value=tokenizer.pad_token_id,
-                                                    pad_value=tokenizer.pad_token_id,
-                                                    position_fixed=False,
-                                                    seed=args.seed
-                                                    )
-        model = HashSmooth4LLM(model, config, tokenizer, input_transformer,
-                               args=args)
-
+    model=Model(model,config,tokenizer,args)
     # load 模型.
     if args.local_rank == 0:
         torch.distributed.barrier()  # End of barrier to make sure only the first process in distributed training download model & vocab
@@ -869,7 +599,7 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=pool)
+        train_dataset = TextDataset(tokenizer, args,args.train_data_file)
 
         if args.local_rank == 0:
             torch.distributed.barrier()
@@ -880,27 +610,18 @@ def main():
     # Evaluation
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
-        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
         output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
         result=evaluate(args, model, tokenizer,pool=pool)
         
     if args.do_test and args.local_rank in [-1, 0]:
-        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
         output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
-        result = test(args, model, tokenizer, pool=pool, best_threshold=0.5, alpha=args.alpha)
-
-    if args.do_certify:
-        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
-        output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
-        model.load_state_dict(torch.load(output_dir))
-        model.to(args.device)
-        result = certify(args, model, tokenizer)
-        logger.info("***** Certify results *****")
-        print('the mean:', np.mean(result))
+        test(args, model, tokenizer,pool=pool,best_threshold=0.5)
 
     return results
 

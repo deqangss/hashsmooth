@@ -1,36 +1,37 @@
-from pickle import NONE
 import torch
 import sys
 import os
 
-sys.path.append('../../')
 sys.path.append('../../../')
 sys.path.append('../../../python_parser')
 
+import csv
+import json
 import argparse
 import warnings
 import torch
+import numpy as np
 from model import Model
 from utils import set_seed
 from utils import Recorder
-from run import TextDataset ,convert_examples_to_features
+from run import TextDataset
 from utils import CodeDataset
-from attacker import MHM_Attacker
-from attack import get_code_pairs
-from run_parser import get_identifiers, get_example
+from run_parser import get_identifiers
 from transformers import RobertaForMaskedLM
-from transformers import (RobertaConfig, RobertaModel, RobertaTokenizer)
+from transformers import (RobertaConfig, RobertaTokenizer, RobertaModel)
+from attacker import MHM_Attacker
+from attacker import convert_code_to_features
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-warnings.simplefilter(action='ignore', category=FutureWarning) # Only report warning
+warnings.simplefilter(action='ignore', category=FutureWarning) # Only report warning\
 
 MODEL_CLASSES = {
-    'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer)
+    'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer),
 }
 
 from utils import build_vocab
             
-if __name__ == "__main__":
+def main():
     
     import json
     import pickle
@@ -63,13 +64,16 @@ if __name__ == "__main__":
     parser.add_argument("--base_model", default=None, type=str,
                         help="Base Model")
     parser.add_argument("--csv_store_path", default=None, type=str,
-                        help="Base Model")
+                        help="results")
 
     parser.add_argument("--mlm", action='store_true',
                         help="Train with masked-language modeling loss instead of language modeling.")
+    parser.add_argument("--is_original_mhm", action='store_true',
+                        help="whether to use the original mhm")
     parser.add_argument("--mlm_probability", type=float, default=0.15,
                         help="Ratio of tokens to mask for masked language modeling loss")
-
+    parser.add_argument("--number_labels", type=int,
+                        help="The model checkpoint for weights initialization.")
     parser.add_argument("--config_name", default="", type=str,
                         help="Optional pretrained config name or path if not the same as model_name_or_path")
     parser.add_argument("--tokenizer_name", default="", type=str,
@@ -81,9 +85,7 @@ if __name__ == "__main__":
     parser.add_argument("--do_eval", action='store_true',
                         help="Whether to run eval on the dev set.")
     parser.add_argument("--do_test", action='store_true',
-                        help="Whether to run eval on the dev set.")
-    parser.add_argument("--original", action='store_true',
-                        help="Whether to MHM original.")   
+                        help="Whether to run eval on the dev set.")    
     parser.add_argument("--eval_batch_size", default=4, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
     parser.add_argument('--seed', type=int, default=42,
@@ -101,6 +103,7 @@ if __name__ == "__main__":
 
     codebert_mlm = RobertaForMaskedLM.from_pretrained(args.base_model)
     tokenizer_mlm = RobertaTokenizer.from_pretrained(args.base_model)
+    codebert_mlm.to('cuda') 
 
     args.start_epoch = 0
     args.start_step = 0
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           cache_dir=args.cache_dir if args.cache_dir else None)
-    config.num_labels=1 # 只有一个label?
+    config.num_labels= args.number_labels 
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name,
                                                 do_lower_case=False,
                                                 cache_dir=args.cache_dir if args.cache_dir else None)
@@ -144,32 +147,31 @@ if __name__ == "__main__":
 
     checkpoint_prefix = 'checkpoint-best-f1/model.bin'
     output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
-    model.load_state_dict(torch.load(output_dir))
+    model.load_state_dict(torch.load(output_dir))      
     model.to(args.device)
     print ("MODEL LOADED!")
-    codebert_mlm.to('cuda')
 
-    # Load Dataset
+
     ## Load Dataset
-    eval_dataset = TextDataset(tokenizer, args,args.eval_data_file)
+    eval_dataset = TextDataset(tokenizer, args, args.eval_data_file)
 
-    ## Load code pairs
-    source_codes = get_code_pairs(args.eval_data_file)
-    
-    postfix = args.eval_data_file.split('/')[-1].split('.txt')[0].split("_")
+    file_type = args.eval_data_file.split('/')[-1].split('.')[0] # valid
     folder = '/'.join(args.eval_data_file.split('/')[:-1]) # 得到文件目录
-    subs_path = os.path.join(folder, 'test_subs_{}_{}.jsonl'.format(
-                                    postfix[-2], postfix[-1]))
-    substitutes = []
-    with open(subs_path) as f:
-        for line in f:
-            js = json.loads(line.strip())
-            substitutes.append(js["substitutes"])
-    assert len(source_codes) == len(eval_dataset) == len(substitutes)
+    codes_file_path = os.path.join(folder, '{}_subs.jsonl'.format(
+                                file_type))
+    print(codes_file_path)
+    source_codes = []
+    substs = []
+    with open(codes_file_path) as rf:
+        for line in rf:
+            item = json.loads(line.strip())
+            source_codes.append(item["code"].replace("\\n", "\n").replace('\"','"'))
+            substs.append(item["substitutes"])
+    assert(len(source_codes) == len(eval_dataset) == len(substs))
 
     code_tokens = []
     for index, code in enumerate(source_codes):
-        code_tokens.append(get_identifiers(code[2], "java")[1])
+        code_tokens.append(get_identifiers(code, "python")[1])
 
     id2token, token2id = build_vocab(code_tokens, 5000)
 
@@ -188,29 +190,28 @@ if __name__ == "__main__":
     query_times = 0
     all_start_time = time.time()
     for index, example in enumerate(eval_dataset):
-        code_pair = source_codes[index]
-        substitute = substitutes[index]
-        ground_truth = example[1].item()
+        code = source_codes[index]
+        subs = substs[index]
+
         orig_prob, orig_label = model.get_results([example], args.eval_batch_size)
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
-        
+        ground_truth = example[1].item()
         if orig_label != ground_truth:
             continue
+        
         start_time = time.time()
         
         # 这里需要进行修改.
-
-        if args.original:
-            _res = attacker.mcmc_random(example, substitute, tokenizer, code_pair,
-                             _label=ground_truth, _n_candi=30,
-                             _max_iter=10, _prob_threshold=1)
-        
+        if args.is_original_mhm:
+            _res = attacker.mcmc_random(tokenizer, code,
+                                _label=ground_truth, _n_candi=30,
+                                _max_iter=100, _prob_threshold=1, subs = subs)
         else:
-            _res = attacker.mcmc(example, substitute, tokenizer, code_pair,
-                             _label=ground_truth, _n_candi=30,
-                             _max_iter=10, _prob_threshold=1)
-    
+            _res = attacker.mcmc(tokenizer, code,
+                                _label=ground_truth, _n_candi=30,
+                                _max_iter=100, _prob_threshold=1, subs = subs)
+        
         if _res['succ'] is None:
             continue
         if _res['succ'] == True:
@@ -225,10 +226,10 @@ if __name__ == "__main__":
         time_cost = (time.time()-start_time)/60
         print ("  ALL EXAMPLE time cost = %.2f min" % ((time.time()-all_start_time)/60))
         print ("  curr succ rate = "+str(n_succ/total_cnt))
-
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
-
-        recoder.writemhm(index, "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), _res["prog_length"], " ".join(_res['tokens']), ground_truth, _res["orig_label"], _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, time_cost)
+        recoder.writemhm(index, code, _res["prog_length"], _res['tokens'], ground_truth, orig_label, _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, time_cost)
         query_times = model.query
 
+if __name__ == "__main__":
+    main()
