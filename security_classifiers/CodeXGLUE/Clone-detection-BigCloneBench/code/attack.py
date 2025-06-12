@@ -20,7 +20,17 @@ import pickle
 import copy
 import torch
 import time
+from functools import partial
 import numpy as np
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
 
 from model import Model
 from utils import set_seed
@@ -29,6 +39,13 @@ from run import TextDataset
 from attacker import Attacker
 from transformers import RobertaForMaskedLM
 from transformers import (RobertaConfig, RobertaModel, RobertaTokenizer)
+
+from model import RandomSmooth4LLM, RandomDelSmooth4LLM, HashSmooth4LLM, binom_test
+
+from randomsmooth.random_tran import RandomTransformer
+from torchmalware.random_del_wrapper import RandomDeleter
+from hashsmooth import EditLSHTransformerTorch
+from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_interval
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 warnings.simplefilter(action='ignore', category=FutureWarning) # Only report warning
@@ -92,13 +109,29 @@ def main():
     parser.add_argument("--do_eval", action='store_true',
                         help="Whether to run eval on the dev set.")
     parser.add_argument("--do_test", action='store_true',
-                        help="Whether to run eval on the dev set.")    
+                        help="Whether to run eval on the dev set.")
+    parser.add_argument("--do_certify", action='store_true',
+                        help="Whether to run certification on the dev set.")
     parser.add_argument("--evaluate_during_training", action='store_true',
                         help="Run evaluation during training at each logging step.")
     parser.add_argument("--eval_batch_size", default=4, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
     parser.add_argument('--seed', type=int, default=42,
                         help="random seed for initialization")
+
+    parser.add_argument('--smooth', type=str, default='random', choices=['random', 'hash', 'randdel', 'none'],
+                        help="random smoothing method.")
+    parser.add_argument('--k_random', type=int, default=64, help="number of random codes.")
+    parser.add_argument('--n_sampling', type=int, default=100, help="number of sampling.")
+    parser.add_argument('--n_estimation', type=int, default=10000,
+                        help="number of sampling for certification estimation.")
+    parser.add_argument('--kmer', type=int, default=2, help="number of adjacent tokens.")
+    parser.add_argument('--n_examples', type=int, default=200,
+                        help="number of examples for certification or attacking.")
+    parser.add_argument('--default_mode', action='store_true', default=True,
+                        help="Whether to run training.")
+    parser.add_argument("--alpha", default=0.05, type=float,
+                        help="confidence interval.")
 
     
 
@@ -112,9 +145,9 @@ def main():
 
     args.start_epoch = 0
     args.start_step = 0
-    checkpoint_last = os.path.join(args.output_dir, 'checkpoint-last')
+    checkpoint_last = os.path.join(args.output_dir, 'checkpoint-best-f1')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
+        args.model_name_or_path = os.path.join(checkpoint_last, 'model.bin')
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
@@ -145,10 +178,42 @@ def main():
     else:
         model = model_class(config)
 
-    model=Model(model,config,tokenizer,args)
+    if args.smooth == 'none':
+        model = Model(model, config, tokenizer, args)
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
+    elif args.smooth == "random":
+        input_transformer = RandomTransformer(args.k_random,
+                                              mask_id=tokenizer.pad_token_id,
+                                              reuse_noise=True,
+                                              seed=args.seed)
+        model = RandomSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
+        checkpoint_prefix = 'checkpoint-f1-acc/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    elif args.smooth == 'randdel':
+        input_transformer = RandomDeleter(p_del=1. - (float(args.k_random) / tokenizer.model_max_length),
+                                          mask_id=tokenizer.pad_token_id,
+                                          reuse_noise=True,
+                                          seed=args.seed)
+        model = RandomDelSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
+        checkpoint_prefix = 'checkpoint-f1-acc/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    elif args.smooth == 'hash':
+        input_transformer = EditLSHTransformerTorch(tokenizer.max_len_single_sentence,  # where are 2 tokens?
+                                                    args.k_random,
+                                                    args.kmer,
+                                                    l_chucksize=1,
+                                                    null_value=tokenizer.pad_token_id,
+                                                    pad_value=tokenizer.pad_token_id,
+                                                    position_fixed=False,
+                                                    seed=args.seed
+                                                    )
+        model = HashSmooth4LLM(model, config, tokenizer, input_transformer,
+                               args=args)
+        checkpoint_prefix = 'checkpoint-f1-acc/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    else:
+        raise NotImplementedError
 
-
-    checkpoint_prefix = 'checkpoint-best-f1/model.bin'
     output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
     model.load_state_dict(torch.load(output_dir))
     model.to(args.device)
@@ -163,6 +228,8 @@ def main():
     eval_dataset = TextDataset(tokenizer, args, args.eval_data_file)
     ## Load code pairs
     source_codes = get_code_pairs(args.eval_data_file)
+    if args.do_certify:
+        source_codes = source_codes[:args.n_examples]
 
     postfix = args.eval_data_file.split('/')[-1].split('.txt')[0].split("_")
     folder = '/'.join(args.eval_data_file.split('/')[:-1]) # 得到文件目录
@@ -173,7 +240,11 @@ def main():
         for line in f:
             js = json.loads(line.strip())
             substitutes.append(js["substitutes"])
-    assert len(source_codes) == len(eval_dataset) == len(substitutes)
+    if args.do_certify:
+        substitutes = substitutes[:args.n_examples]
+    assert len(source_codes) == len(eval_dataset) == len(substitutes), "{}-{}-{}".format(len(source_codes),
+                                                                                         len(eval_dataset),
+                                                                                         len(substitutes))
 
 
     # 现在要尝试计算importance_score了.
@@ -184,15 +255,20 @@ def main():
     attacker = Attacker(args, model, tokenizer, codebert_mlm, tokenizer_mlm, use_bpe=1, threshold_pred_score=0)
     start_time = time.time()
     query_times = 0
+    features = []
+    new_features = []
+    status = []
     for index, example in enumerate(eval_dataset):
         example_start_time = time.time()
         code_pair = source_codes[index]
         substitute = substitutes[index]
-        code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.greedy_attack(example,  substitute, code_pair)
+        code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words =\
+            attacker.greedy_attack(example,  substitute, code_pair)
         attack_type = "Greedy"
         if is_success == -1 and args.use_ga:
             # 如果不成功，则使用gi_attack
-            code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.ga_attack(example, substitute, code, initial_replace=replaced_words)
+            code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words =\
+                attacker.ga_attack(example, substitute, code, initial_replace=replaced_words)
             attack_type = "GA"
 
         example_end_time = (time.time()-example_start_time)/60
@@ -212,7 +288,11 @@ def main():
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
 
-        recoder.write(index, code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, model.query - query_times, example_end_time)
+        features.append(feature)
+        new_features.append(new_feature)
+        status.append(is_success)
+
+        recoder.write(index, code, feature, new_feature, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, model.query - query_times, example_end_time)
         
         query_times = model.query
 
@@ -229,6 +309,8 @@ def main():
         print("Total count: ", total_cnt)
         print("Index: ", index)
         print()
+        with open(args.output_dir + '/adv-ga.pickle', 'wb') as fw:
+            pickle.dump((features, new_features, status), fw)
 
 
 if __name__ == '__main__':

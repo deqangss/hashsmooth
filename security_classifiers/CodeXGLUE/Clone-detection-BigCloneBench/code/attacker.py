@@ -5,6 +5,7 @@ sys.path.append('../../../python_parser')
 
 import copy
 import torch
+import numpy as np
 import random
 from run import InputFeatures, convert_examples_to_features
 from utils import select_parents, crossover, map_chromesome, mutate, is_valid_variable_name, _tokenize, get_identifier_posistions_from_code, get_masked_code_by_position, get_substitues, is_valid_substitue, set_seed
@@ -13,6 +14,8 @@ from utils import CodeDataset
 from utils import getUID, isUID, getTensor, build_vocab
 from run_parser import get_identifiers, get_example
 from transformers import (RobertaForMaskedLM, RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer)
+
+from model import HashSmooth
 
 def compute_fitness(chromesome, words_2, codebert_tgt, tokenizer_tgt, orig_prob, orig_label, true_label ,code, names_positions_dict, args):
     # 计算fitness function.
@@ -136,12 +139,12 @@ class Attacker():
         if not orig_label == true_label:
             # 说明原来就是错的
             is_success = -4
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, example[0].cpu().numpy().reshape(-1), example[0].cpu().numpy().reshape(-1), adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
             
         if len(variable_names) == 0:
             # 没有提取到identifier，直接退出
             is_success = -3
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, example[0].cpu().numpy().reshape(-1), example[0].cpu().numpy().reshape(-1), adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
 
         names_positions_dict = get_identifier_posistions_from_code(words, variable_names)
 
@@ -257,14 +260,22 @@ class Attacker():
             mutate_logits, mutate_preds = self.model_tgt.get_results(new_dataset, self.args.eval_batch_size)
             mutate_fitness_values = []
             for index, logits in enumerate(mutate_logits):
-                if mutate_preds[index] != orig_label:
+                if mutate_preds[index] != orig_label and mutate_preds[index] != HashSmooth.ABSTAIN:
                     adv_code = map_chromesome(_temp_mutants[index], code_1, "java")
                     for old_word in _temp_mutants[index].keys():
                         if old_word == _temp_mutants[index][old_word]:
                             nb_changed_var += 1
                             nb_changed_pos += len(names_positions_dict[old_word])
 
-                    return code, prog_length, adv_code, true_label, orig_label, mutate_preds[index], 1, variable_names, None, nb_changed_var, nb_changed_pos, _temp_mutants[index]
+                    temp_replace = ' '.join(adv_code.split())
+                    temp_replace = self.tokenizer_tgt.tokenize(temp_replace)
+                    new_feature = convert_examples_to_features(temp_replace,
+                                                               words_2,
+                                                               example[1].item(),
+                                                               None, None,
+                                                               self.tokenizer_tgt,
+                                                               self.args, None)
+                    return code, prog_length, example[0].cpu().numpy().reshape(-1), np.array(new_feature.input_ids), adv_code, true_label, orig_label, mutate_preds[index], 1, variable_names, None, nb_changed_var, nb_changed_pos, _temp_mutants[index]
                 _tmp_fitness = max(orig_prob) - logits[orig_label]
                 mutate_fitness_values.append(_tmp_fitness)
             
@@ -276,8 +287,16 @@ class Attacker():
                     min_index = fitness_values.index(min_value)
                     population[min_index] = _temp_mutants[index]
                     fitness_values[min_index] = fitness_value
+        temp_replace = ' '.join(adv_code.split())
+        temp_replace = self.tokenizer_tgt.tokenize(temp_replace)
+        new_feature = convert_examples_to_features(temp_replace,
+                                                   words_2,
+                                                   example[1].item(),
+                                                   None, None,
+                                                   self.tokenizer_tgt,
+                                                   self.args, None)
 
-        return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, nb_changed_var, nb_changed_pos, None
+        return code, prog_length, example[0].cpu().numpy().reshape(-1), np.array(new_feature.input_ids), adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, nb_changed_var, nb_changed_pos, None
         
 
 
@@ -330,15 +349,15 @@ class Attacker():
 
         variable_names = list(substitutes.keys())
 
-        if not orig_label == true_label:
+        if (orig_label != true_label) and (orig_label != HashSmooth.ABSTAIN):
             # 说明原来就是错的
             is_success = -4
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, example[0].cpu().numpy().reshape(-1), example[0].cpu().numpy().reshape(-1), adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
             
         if len(variable_names) == 0:
             # 没有提取到identifier，直接退出
             is_success = -3
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, example[0].cpu().numpy().reshape(-1), example[0].cpu().numpy().reshape(-1), adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
 
         sub_words = [self.tokenizer_tgt.cls_token] + sub_words[:self.args.block_size - 2] + [self.tokenizer_tgt.sep_token]
 
@@ -355,7 +374,7 @@ class Attacker():
                                                 model_type='classification')
 
         if importance_score is None:
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, -3, variable_names, None, None, None, None
+            return code, prog_length, example[0].cpu().numpy().reshape(-1), example[0].cpu().numpy().reshape(-1), adv_code, true_label, orig_label, temp_label, -3, variable_names, None, None, None, None
 
 
         token_pos_to_score_pos = {}
@@ -424,7 +443,7 @@ class Attacker():
 
             for index, temp_prob in enumerate(logits):
                 temp_label = preds[index]
-                if temp_label != orig_label:
+                if temp_label != true_label and temp_label != HashSmooth.ABSTAIN:
                     # 如果label改变了，说明这个mutant攻击成功
                     is_success = 1
                     nb_changed_var += 1
@@ -433,11 +452,28 @@ class Attacker():
                     replaced_words[tgt_word] = candidate
                     
                     adv_code = get_example(final_code, tgt_word, candidate, "java")
+
+                    temp_replace = " ".join(adv_code.split())
+                    temp_replace = self.tokenizer_tgt.tokenize(temp_replace)
+                    # 需要将几个位置都替换成sustitue_
+                    new_feature = convert_examples_to_features(temp_replace,
+                                                               words_2,
+                                                               example[1].item(),
+                                                               None, None,
+                                                               self.tokenizer_tgt,
+                                                               self.args, None)
+
                     print("%s SUC! %s => %s (%.5f => %.5f)" % \
                         ('>>', tgt_word, candidate,
                         current_prob,
                         temp_prob[orig_label]), flush=True)
-                    return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+                    return code, prog_length, example[0].cpu().numpy().reshape(-1), np.array(new_feature.input_ids), adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+                elif temp_label == HashSmooth.ABSTAIN:
+                    gap = current_prob - temp_prob[true_label]
+                    # 并选择那个最大的gap.
+                    if gap > most_gap:
+                        most_gap = gap
+                        candidate = substitute_list[index]
                 else:
                     # 如果没有攻击成功，我们看probability的修改
                     gap = current_prob - temp_prob[temp_label]
@@ -447,7 +483,6 @@ class Attacker():
                         candidate = substitute_list[index]
         
             if most_gap > 0:
-
                 nb_changed_var += 1
                 nb_changed_pos += len(names_positions_dict[tgt_word])
                 current_prob = current_prob - most_gap
@@ -461,8 +496,17 @@ class Attacker():
                 replaced_words[tgt_word] = tgt_word
             
             adv_code = final_code
+            temp_replace = " ".join(adv_code.split())
+            temp_replace = self.tokenizer_tgt.tokenize(temp_replace)
+            # 需要将几个位置都替换成sustitue_
+            new_feature = convert_examples_to_features(temp_replace,
+                                                       words_2,
+                                                       example[1].item(),
+                                                       None, None,
+                                                       self.tokenizer_tgt,
+                                                       self.args, None)
 
-        return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+        return code, prog_length, example[0].cpu().numpy().reshape(-1), np.array(new_feature.input_ids), adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
 
 
 
