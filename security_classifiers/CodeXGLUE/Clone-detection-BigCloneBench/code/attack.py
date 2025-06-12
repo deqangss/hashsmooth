@@ -145,9 +145,9 @@ def main():
 
     args.start_epoch = 0
     args.start_step = 0
-    checkpoint_last = os.path.join(args.output_dir, 'checkpoint-best-f1')
+    checkpoint_last = os.path.join(args.output_dir, 'checkpoint-latest')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'model.bin')
+        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
