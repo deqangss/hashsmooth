@@ -22,7 +22,7 @@ import torch
 import time
 from functools import partial
 import numpy as np
-# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 sys.path.append('../../')
 sys.path.append('../../../')
