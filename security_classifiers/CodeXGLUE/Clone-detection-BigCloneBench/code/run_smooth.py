@@ -756,8 +756,7 @@ def main():
                         help="confidence interval.")
 
     
-    # pool = multiprocessing.Pool(cpu_cont)
-    pool = None
+    pool = multiprocessing.Pool(cpu_cont)
     args = parser.parse_args()
 
     # Setup distant debugging if needed
@@ -798,7 +797,7 @@ def main():
     args.start_step = 0
     checkpoint_last = os.path.join(args.output_dir, 'checkpoint-last')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
+        args.model_name_or_path = os.path.join(checkpoint_last, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
@@ -866,12 +865,12 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=None)
+        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=pool)
 
         if args.local_rank == 0:
             torch.distributed.barrier()
 
-        global_step, tr_loss = train(args, train_dataset, model, tokenizer,None)
+        global_step, tr_loss = train(args, train_dataset, model, tokenizer,pool)
 
 
     # Evaluation
