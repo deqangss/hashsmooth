@@ -139,6 +139,12 @@ class TextDataset(Dataset):
             with open(code_pairs_file_path, 'rb') as f:
                 code_pairs = pickle.load(f)
             logger.info("Loading features from cached file %s", cache_file_path)
+            if args.do_certify:
+                logger.info(
+                    "=======*Using {} features from cached file {} for certification=======*".format(args.n_examples,
+                                                                                                     cache_file_path))
+                self.examples = self.examples[:args.n_examples]
+                code_pairs = code_pairs[:args.n_examples]
         except:
 
             # 读取了所有的数据集文件.
