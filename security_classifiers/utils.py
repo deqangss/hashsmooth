@@ -718,11 +718,9 @@ class Recorder():
                               query_times,
                               time_cost])
 
-    def writemhm(self, index, code, example, new_example, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, query_times, time_cost):
+    def writemhm(self, index, code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, query_times, time_cost):
         self.writer.writerow([index,
                               code,
-                              example,
-                              new_example,
                               prog_length,
                               adv_code,
                               true_label,
