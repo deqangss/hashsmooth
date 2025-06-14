@@ -745,7 +745,7 @@ class MHM_Attacker():
             prob, pred = self.classifier.get_results(new_dataset, self.args.eval_batch_size)
 
             for i in range(len(candi_token)):   # Find a valid example
-                if pred[i] != _label: # 如果有样本攻击成功
+                if pred[i] != _label and pred[i] != HashSmooth.ABSTAIN: # 如果有样本攻击成功
                     return {"status": "s", "alpha": 1, "tokens": candi_tokens[i],
                             "old_uid": selected_uid, "new_uid": candi_token[i],
                             "old_prob": prob[0], "new_prob": prob[i],
