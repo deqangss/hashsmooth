@@ -201,8 +201,8 @@ class RandomSmooth4LLM(nn.Module, RandomSmooth):
 
         # abstain
         top2 = pred_labels_onehot.argsort(axis=-1)[:, ::-1][:, :2]
-        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]]
-        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]]
+        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]].astype(int)
+        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]].astype(int)
         abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
         pred_labels[abstain_flag] = self.ABSTAIN
 
@@ -298,8 +298,8 @@ class RandomDelSmooth4LLM(nn.Module, RandomDelSmooth):
 
         # abstain
         top2 = pred_labels_onehot.argsort(axis=-1)[:, ::-1][:, :2]
-        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]]
-        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]]
+        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]].astype(int)
+        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]].astype(int)
         abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
         pred_labels[abstain_flag] = self.ABSTAIN
 
@@ -387,8 +387,8 @@ class HashSmooth4LLM(nn.Module, HashSmooth):
 
         # abstain
         top2 = pred_labels_onehot.argsort(axis=-1)[:, ::-1][:, :2]
-        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]]
-        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]]
+        count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]].astype(int)
+        count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]].astype(int)
         abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
         pred_labels[abstain_flag] = self.ABSTAIN
 
