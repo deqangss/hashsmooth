@@ -79,7 +79,8 @@ def main():
                         help="An optional input evaluation data file to evaluate the perplexity on (a text file).")
     parser.add_argument("--test_data_file", default=None, type=str,
                         help="An optional input evaluation data file to evaluate the perplexity on (a text file).")
-                    
+    parser.add_argument("--base_model", default=None, type=str,
+                        help="Base Model")
     parser.add_argument("--model_type", default="bert", type=str,
                         help="The model architecture to be fine-tuned.")
     parser.add_argument("--model_name_or_path", default=None, type=str,
@@ -295,14 +296,12 @@ def main():
         example_start_time = time.time()
         code = source_codes[index]
         subs = substs[index]
-        # todo: adaption
         code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.greedy_attack(
             example, code, subs)
         
         attack_type = "Greedy"
         if is_success == -1 and args.use_ga:
             # 如果不成功，则使用gi_attack
-            # todo: adaption
             code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.ga_attack(
                 example, code, subs, initial_replace=replaced_words)
             attack_type = "GA"

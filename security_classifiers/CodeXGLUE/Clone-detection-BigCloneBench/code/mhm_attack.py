@@ -145,7 +145,7 @@ if __name__ == "__main__":
     checkpoint_last = os.path.join(args.output_dir, 'checkpoint-latest') # 读取model的路径
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
         # 如果路径存在且有内容，则从checkpoint load模型
-        args.model_name_or_path = os.path.join(checkpoint_last, 'model.bin')
+        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
@@ -275,12 +275,12 @@ if __name__ == "__main__":
         if args.original:
             _res = attacker.mcmc_random(example, substitute, tokenizer, code_pair,
                              _label=ground_truth, _n_candi=30,
-                             _max_iter=10, _prob_threshold=1)
+                             _max_iter=30, _prob_threshold=1)
         
         else:
             _res = attacker.mcmc(example, substitute, tokenizer, code_pair,
                              _label=ground_truth, _n_candi=30,
-                             _max_iter=10, _prob_threshold=1)
+                             _max_iter=30, _prob_threshold=1)
     
         if _res['succ'] is None:
             continue

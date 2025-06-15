@@ -472,7 +472,7 @@ class MHM_Attacker():
         uid = get_identifier_posistions_from_code(words, variable_names)
 
         if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code, 'raw_tokens': code}
 
         # 还需要得到substitues
 
@@ -541,8 +541,8 @@ class MHM_Attacker():
         
         uid = get_identifier_posistions_from_code(words, variable_names)
 
-        if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+        if len(uid) <= 0: # 是有可能存在找不到变量名的情况的. todo: check return
+            return {'succ': None, 'tokens': code, 'raw_tokens': code}
 
 
         variable_substitue_dict = {}
@@ -628,7 +628,7 @@ class MHM_Attacker():
             prob, pred = self.classifier.get_results(new_dataset, self.args.eval_batch_size)
 
             for i in range(len(candi_token)):   # Find a valid example
-                if pred[i] != _label: # 如果有样本攻击成功
+                if pred[i] != _label and pred[i] != HashSmooth.ABSTAIN: # 如果有样本攻击成功
                     return {"status": "s", "alpha": 1, "tokens": candi_tokens[i],
                             "old_uid": selected_uid, "new_uid": candi_token[i],
                             "old_prob": prob[0], "new_prob": prob[i],
@@ -689,7 +689,7 @@ class MHM_Attacker():
             prob, pred = self.classifier.get_results(new_dataset, self.args.eval_batch_size)
 
             for i in range(len(candi_token)):   # Find a valid example
-                if pred[i] != _label: # 如果有样本攻击成功
+                if pred[i] != _label and pred[i] != HashSmooth.ABSTAIN: # 如果有样本攻击成功
                     return {"status": "s", "alpha": 1, "tokens": candi_tokens[i],
                             "old_uid": selected_uid, "new_uid": candi_token[i],
                             "old_prob": prob[0], "new_prob": prob[i],
