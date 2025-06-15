@@ -35,7 +35,7 @@ sys.path.append('../../../../torchware')
 from model import Model
 from utils import set_seed
 from utils import Recorder
-from run import TextDataset
+from run_smooth import TextDataset
 from attacker import Attacker
 from transformers import RobertaForMaskedLM
 from transformers import (RobertaConfig, RobertaModel, RobertaTokenizer)

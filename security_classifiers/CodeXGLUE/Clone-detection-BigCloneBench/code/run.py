@@ -146,19 +146,12 @@ class TextDataset(Dataset):
         # 保存下对应的code1和code2
         code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
                                     postfix))
-        print(code_pairs_file_path)
         code_pairs = []
         try:
             self.examples = torch.load(cache_file_path)
             with open(code_pairs_file_path, 'rb') as f:
                 code_pairs = pickle.load(f)
             logger.info("Loading features from cached file %s", cache_file_path)
-            if args.do_certify:
-                logger.info(
-                    "=======*Using {} features from cached file {} for certification=======*".format(args.n_examples,
-                                                                                                     cache_file_path))
-                self.examples = self.examples[:args.n_examples]
-                code_pairs = code_pairs[:args.n_examples]
         except Exception as e:
             warnings.warn(str(e))
 

@@ -26,7 +26,7 @@ import torch
 from model import Model
 from utils import set_seed
 from utils import Recorder
-from run import TextDataset ,convert_examples_to_features
+from run_smooth import TextDataset,convert_examples_to_features
 from utils import CodeDataset
 from attacker import MHM_Attacker
 from attack import get_code_pairs
