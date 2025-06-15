@@ -21,6 +21,7 @@ import torch
 import numpy as np
 import pickle
 import time
+from functools import partial
 from run import set_seed
 from run import TextDataset
 from run import InputFeatures
@@ -28,6 +29,18 @@ from utils import Recorder
 from utils import python_keywords, is_valid_substitue, _tokenize
 from utils import get_identifier_posistions_from_code
 from utils import get_masked_code_by_position, get_substitues, is_valid_variable_name
+
+import numpy as np
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
+
 from model import Model
 from run_parser import get_identifiers
 from attacker import Attacker
@@ -36,6 +49,12 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.data import SequentialSampler, DataLoader
 from transformers import RobertaForMaskedLM
 from transformers import (RobertaConfig, RobertaModel, RobertaTokenizer)
+from model import RandomSmooth4LLM, RandomDelSmooth4LLM, HashSmooth4LLM, binom_test
+
+from randomsmooth.random_tran import RandomTransformer
+from torchmalware.random_del_wrapper import RandomDeleter
+from hashsmooth import EditLSHTransformerTorch
+from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_interval
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 warnings.simplefilter(action='ignore', category=FutureWarning) # Only report warning\
@@ -88,6 +107,8 @@ def main():
                         help="Whether to run eval on the dev set.")
     parser.add_argument("--do_test", action='store_true',
                         help="Whether to run eval on the dev set.")
+    parser.add_argument("--do_certify", action='store_true',
+                        help="Whether to run certification on the dev set.")
     parser.add_argument("--language_type", type=str,
                         help="The programming language type of dataset")     
     parser.add_argument("--evaluate_during_training", action='store_true',
@@ -133,6 +154,20 @@ def main():
                         help="Overwrite the cached training and evaluation sets")
     parser.add_argument('--seed', type=int, default=42,
                         help="random seed for initialization")
+
+    parser.add_argument('--smooth', type=str, default='random', choices=['random', 'hash', 'randdel', 'none'],
+                        help="random smoothing method.")
+    parser.add_argument('--k_random', type=int, default=64, help="number of random codes.")
+    parser.add_argument('--n_sampling', type=int, default=100, help="number of sampling.")
+    parser.add_argument('--n_estimation', type=int, default=10000,
+                        help="number of sampling for certification estimation.")
+    parser.add_argument('--kmer', type=int, default=2, help="number of adjacent tokens.")
+    parser.add_argument('--n_examples', type=int, default=200,
+                        help="number of examples for certification or attacking.")
+    parser.add_argument('--default_mode', action='store_true', default=True,
+                        help="Whether to run training.")
+    parser.add_argument("--alpha", default=0.05, type=float,
+                        help="confidence interval.")
 
 
     args = parser.parse_args()
@@ -182,18 +217,50 @@ def main():
     else:
         model = model_class(config)
 
-    model = Model(model,config,tokenizer,args)
+    if args.smooth == 'none':
+        model = Model(model, config, tokenizer, args)
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
+    elif args.smooth == "random":
+        input_transformer = RandomTransformer(args.k_random,
+                                              mask_id=tokenizer.pad_token_id,
+                                              reuse_noise=True,
+                                              seed=args.seed)
+        model = RandomSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
+        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    elif args.smooth == 'randdel':
+        input_transformer = RandomDeleter(p_del=1. - (float(args.k_random) / tokenizer.model_max_length),
+                                          mask_id=tokenizer.pad_token_id,
+                                          reuse_noise=True,
+                                          seed=args.seed)
+        model = RandomDelSmooth4LLM(model, config, tokenizer, input_transformer, args=args)
+        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    elif args.smooth == 'hash':
+        input_transformer = EditLSHTransformerTorch(tokenizer.max_len_single_sentence,  # where are 2 tokens?
+                                                    args.k_random,
+                                                    args.kmer,
+                                                    l_chucksize=1,
+                                                    null_value=tokenizer.pad_token_id,
+                                                    pad_value=tokenizer.pad_token_id,
+                                                    position_fixed=False,
+                                                    seed=args.seed
+                                                    )
+        model = HashSmooth4LLM(model, config, tokenizer, input_transformer,
+                               args=args)
+        checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
+        model.get_results = partial(model.get_results, alpha=args.alpha)
+    else:
+        raise NotImplementedError
 
-
-    checkpoint_prefix = 'checkpoint-best-f1/model.bin'
     output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
     model.load_state_dict(torch.load(output_dir))      
     model.to(args.device)
 
 
     ## Load CodeBERT (MLM) model
-    codebert_mlm = RobertaForMaskedLM.from_pretrained("microsoft/codebert-base-mlm")
-    tokenizer_mlm = RobertaTokenizer.from_pretrained("microsoft/codebert-base-mlm")
+    codebert_mlm = RobertaForMaskedLM.from_pretrained(args.base_model)
+    tokenizer_mlm = RobertaTokenizer.from_pretrained(args.base_model)
     codebert_mlm.to('cuda') 
 
     ## Load Dataset
@@ -221,16 +288,23 @@ def main():
     attacker = Attacker(args, model, tokenizer, codebert_mlm, tokenizer_mlm, use_bpe=1, threshold_pred_score=0)
     start_time = time.time()
     query_times = 0
+    features = []
+    new_features = []
+    status = []
     for index, example in enumerate(eval_dataset):
         example_start_time = time.time()
         code = source_codes[index]
         subs = substs[index]
-        code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.greedy_attack(example, code, subs)
+        # todo: adaption
+        code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.greedy_attack(
+            example, code, subs)
         
         attack_type = "Greedy"
         if is_success == -1 and args.use_ga:
             # 如果不成功，则使用gi_attack
-            code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.ga_attack(example, code, subs, initial_replace=replaced_words)
+            # todo: adaption
+            code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.ga_attack(
+                example, code, subs, initial_replace=replaced_words)
             attack_type = "GA"
 
         example_end_time = (time.time()-example_start_time)/60
@@ -248,7 +322,12 @@ def main():
                 replace_info += key + ':' + replaced_words[key] + ','
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
-        recoder.write(index, code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, model.query - query_times, example_end_time)
+
+        features.append(feature)
+        new_features.append(new_feature)
+        status.append(is_success)
+
+        recoder.write(index, code, feature, new_feature, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, model.query - query_times, example_end_time)
         query_times = model.query
         
         if is_success >= -1 :
