@@ -36,6 +36,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
 from torch.utils.data.distributed import DistributedSampler
 
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 sys.path.append('../../')
 sys.path.append('../../../')
 sys.path.append('../../../../')
