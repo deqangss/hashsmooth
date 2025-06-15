@@ -147,6 +147,7 @@ class TextDataset(Dataset):
         code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
                                     postfix))
         code_pairs = []
+        print(cache_file_path, code_pairs_file_path)
         try:
             self.examples = torch.load(cache_file_path)
             with open(code_pairs_file_path, 'rb') as f:
