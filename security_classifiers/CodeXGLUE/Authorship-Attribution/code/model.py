@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. 
 # Licensed under the MIT license.
 import torch
-import sys
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
@@ -11,11 +10,6 @@ from torch.nn import CrossEntropyLoss, MSELoss
 from torch.utils.data import SequentialSampler, DataLoader
 import numpy as np
 import math
-
-sys.path.append('../../../python_parser')
-sys.path.append('../../../../hashsmooth')
-sys.path.append('../../../../randomsmooth')
-sys.path.append('../../../../torchware')
 
 from statsmodels.stats.proportion import proportion_confint, binom_test
 from randomsmooth.random_tran import RandomTransformer

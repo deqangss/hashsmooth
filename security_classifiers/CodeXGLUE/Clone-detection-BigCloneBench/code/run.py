@@ -25,6 +25,7 @@ import argparse
 import glob
 import logging
 import os
+import sys
 import pickle
 import random
 import re
@@ -34,6 +35,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
 from torch.utils.data.distributed import DistributedSampler
+
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
 
 # try:
 #     from torch.utils.tensorboard import SummaryWriter
