@@ -6,11 +6,17 @@ import torch
 from tinycss2 import tokenizer
 from torch.autograd import Variable
 import copy
+import sys
 import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss, MSELoss
 from torch.utils.data import SequentialSampler, DataLoader
 import numpy as np
 import math
+
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
 
 from statsmodels.stats.proportion import proportion_confint, binom_test
 from randomsmooth.random_tran import RandomTransformer
@@ -20,6 +26,8 @@ from torchmalware.certification import deletion_mech
 import torchmalware
 binom_test = np.vectorize(binom_test)
 ABSTAIN = -1
+
+
 
 class RobertaClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""
