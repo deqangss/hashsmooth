@@ -28,6 +28,7 @@ import os
 import pickle
 import random
 import re
+import sys
 import shutil
 import json
 import numpy as np
@@ -39,6 +40,14 @@ from torch.utils.data.distributed import DistributedSampler
 #     from torch.utils.tensorboard import SummaryWriter
 # except:
 #     from tensorboardX import SummaryWriter
+
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
 
 from tqdm import tqdm, trange
 import multiprocessing
