@@ -31,6 +31,7 @@ import random
 import re
 import shutil
 import json
+import warnings
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
@@ -160,7 +161,8 @@ class TextDataset(Dataset):
                                                                                                      cache_file_path))
                 self.examples = self.examples[:args.n_examples]
                 code_pairs = code_pairs[:args.n_examples]
-        except:
+        except Exception as e:
+            warnings.warn("Data load warning" + str(e))
             with open('/'.join(index_filename.split('/')[:-1]) + '/data.jsonl') as f:
                 for line in f:
                     line = line.strip()
