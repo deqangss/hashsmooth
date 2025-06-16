@@ -306,12 +306,12 @@ if __name__ == "__main__":
 
         if _res['succ'] == True:
             success_attack += 1
-            recoder.write(index, first_code, _res['tokens'], _res["prog_length"], len(identifiers),
-                          replace_info, model.query - query_times, example_end_time, "MHM")
+            recoder.writemhm(index, "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), code_pair[2], _res['tokens'],
+                         _res["prog_length"], " ".join(_res['tokens']), ground_truth, _res["orig_label"], _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, "0")
 
         else:
-            recoder.write(index, None, None, _res["prog_length"], len(identifiers),
-                          None, model.query - query_times, example_end_time, "0")
+            recoder.writemhm(index,  "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), code_pair[2], _res['tokens'],
+                          None, " ".join(_res['tokens']), ground_truth, None, None, 0, None, None, None, None, None, None, model.query - query_times, None)
         query_times = model.query
         print("Success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
     print("Final success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
