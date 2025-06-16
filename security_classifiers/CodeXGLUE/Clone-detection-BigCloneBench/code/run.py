@@ -502,7 +502,7 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
 
     accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_trues, y_preds)
     logger.info(
-        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.smooth, accuracy * 100,
+        "Model of achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(accuracy * 100,
                                                                                         b_accuracy * 100))
     MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
     logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
