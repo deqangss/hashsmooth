@@ -156,7 +156,10 @@ class RandomSmooth4LLM(nn.Module, RandomSmooth):
 
     def forward(self, input_ids=None, labels=None):
         input_ids = input_ids.view(-1, self.args.block_size)
-        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1))[0]
+        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(self.tokenizer.pad_token_id))[
+            0]  # 2B * L * D
+        sequence_lengths = torch.ne(input_ids, self.tokenizer.pad_token_id).sum(-1) - 1
+        outputs = outputs[range(input_ids.size(0)), sequence_lengths, :]  # 2B * D
         logits = self.classifier(outputs)
         prob = F.softmax(logits)
         if labels is not None:
@@ -253,7 +256,10 @@ class RandomDelSmooth4LLM(nn.Module, RandomDelSmooth):
 
     def forward(self, input_ids=None, labels=None):
         input_ids = input_ids.view(-1, self.args.block_size)
-        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1))[0]
+        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(self.tokenizer.pad_token_id))[
+            0]  # 2B * L * D
+        sequence_lengths = torch.ne(input_ids, self.tokenizer.pad_token_id).sum(-1) - 1
+        outputs = outputs[range(input_ids.size(0)), sequence_lengths, :]  # 2B * D
         logits = self.classifier(outputs)
         prob = F.softmax(logits)
         if labels is not None:
@@ -342,7 +348,10 @@ class HashSmooth4LLM(nn.Module, HashSmooth):
 
     def forward(self, input_ids=None, labels=None):
         input_ids = input_ids.view(-1, self.args.block_size)
-        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1))[0]
+        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(self.tokenizer.pad_token_id))[
+            0]  # 2B * L * D
+        sequence_lengths = torch.ne(input_ids, self.tokenizer.pad_token_id).sum(-1) - 1
+        outputs = outputs[range(input_ids.size(0)), sequence_lengths, :]  # 2B * D
         logits = self.classifier(outputs)
         prob = F.softmax(logits)
         if labels is not None:
