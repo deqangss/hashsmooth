@@ -155,12 +155,6 @@ class TextDataset(Dataset):
             with open(code_pairs_file_path, 'rb') as f:
                 code_pairs = pickle.load(f)
             logger.info("Loading features from cached file %s", cache_file_path)
-            if args.do_certify:
-                logger.info(
-                    "=======*Using {} features from cached file {} for certification=======*".format(args.n_examples,
-                                                                                                     cache_file_path))
-                self.examples = self.examples[:args.n_examples]
-                code_pairs = code_pairs[:args.n_examples]
         except Exception as e:
             warnings.warn("Data load warning" + str(e))
             with open('/'.join(index_filename.split('/')[:-1]) + '/data.jsonl') as f:
