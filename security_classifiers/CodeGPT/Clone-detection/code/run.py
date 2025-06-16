@@ -605,7 +605,8 @@ def main():
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
 
     
-    pool = multiprocessing.Pool(cpu_cont)
+    # pool = multiprocessing.Pool(cpu_cont)
+    pool = None
     args = parser.parse_args()
 
     # Setup distant debugging if needed
