@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 import copy
 import random
+import re
 import sys
 from tqdm import tqdm
 from torch.utils.data.dataset import Dataset
 import os
 import numpy as np
 import csv
+import javalang
 from python_parser.run_parser import get_example, get_example_batch
 
 python_keywords = ['import', '', '[', ']', ':', ',', '.', '(', ')', '{', '}', 'not', 'is', '=', "+=", '-=', "<", ">",
@@ -80,6 +82,22 @@ c_special_ids = ["main",  # main function
 special_char = ['[', ']', ':', ',', '.', '(', ')', '{', '}', 'not', 'is', '=', "+=", '-=', "<", ">", '+', '-', '*', '/',
                 '|']
 
+def remove_comments_and_docstrings(source):
+    def replacer(match):
+        s = match.group(0)
+        if s.startswith('/'):
+            return " " # note: a space and not an empty string
+        else:
+            return s
+    pattern = re.compile(
+        r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
+        re.DOTALL | re.MULTILINE
+    )
+    temp=[]
+    for x in re.sub(pattern, replacer, source).split('\n'):
+        if x.strip()!="":
+            temp.append(x)
+    return '\n'.join(temp)
 
 def select_parents(population):
     length = range(len(population))
@@ -169,6 +187,29 @@ def is_valid_substitue(substitute: str, tgt_word: str, lang: str) -> bool:
         is_valid = False
 
     return is_valid
+
+
+def is_valid_identifier(name: str) -> bool:
+    name = name.strip()
+    if name == '':
+        return False
+    if name in java_keywords:
+        return False
+    elif name in java_special_ids:
+        return False
+    elif name[0].lower() in "abcdefghijklmnopqrstuvwxyz_$":
+        for _c in name[1:-1]:
+            if _c.lower() not in "0123456789abcdefghijklmnopqrstuvwxyz_$":
+                return False
+    else:
+        return False
+    return True
+
+def get_code_tokens(code):
+    code = remove_comments_and_docstrings(code)
+    tokens = javalang.tokenizer.tokenize(code)
+    code_tokens = [token.value for token in tokens]
+    return code_tokens
 
 
 def _tokenize(seq, tokenizer):

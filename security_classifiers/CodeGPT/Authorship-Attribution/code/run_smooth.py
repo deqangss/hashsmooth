@@ -25,9 +25,9 @@ import argparse
 import glob
 import logging
 import os
+import sys
 import pickle
 import random
-import sys
 import re
 import shutil
 import json
@@ -35,6 +35,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset, SequentialSampler, RandomSampler,TensorDataset
 from torch.utils.data.distributed import DistributedSampler
+
+# try:
+#     from torch.utils.tensorboard import SummaryWriter
+# except:
+#     from tensorboardX import SummaryWriter
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -45,12 +50,6 @@ sys.path.append('../../../python_parser')
 sys.path.append('../../../../hashsmooth')
 sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
-from python_parser.parser_folder import remove_comments_and_docstrings
-
-# try:
-#     from torch.utils.tensorboard import SummaryWriter
-# except:
-#     from tensorboardX import SummaryWriter
 
 from tqdm import tqdm, trange
 import multiprocessing
@@ -65,7 +64,7 @@ from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_in
 cpu_cont = 16
 from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
                           BertConfig, BertForMaskedLM, BertTokenizer,
-                          GPT2Config, GPT2LMHeadModel, GPT2Tokenizer,
+                          GPT2Config, GPT2Model, GPT2Tokenizer,
                           OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer,
                           RobertaConfig, RobertaModel, RobertaTokenizer,
                           DistilBertConfig, DistilBertForMaskedLM, DistilBertTokenizer)
@@ -73,13 +72,33 @@ from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
 logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
-    'gpt2': (GPT2Config, GPT2LMHeadModel, GPT2Tokenizer),
+    'gpt2': (GPT2Config, GPT2Model, GPT2Tokenizer),
     'openai-gpt': (OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer),
     'bert': (BertConfig, BertForMaskedLM, BertTokenizer),
     'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer),
     'distilbert': (DistilBertConfig, DistilBertForMaskedLM, DistilBertTokenizer)
 }
 
+def get_example(item):
+    url1,url2,label,tokenizer,args,cache,url_to_code=item
+    if url1 in cache:
+        code1=cache[url1].copy()
+    else:
+        try:
+            code=' '.join(url_to_code[url1].split())
+        except:
+            code=""
+        code1=tokenizer.tokenize(code)
+    if url2 in cache:
+        code2=cache[url2].copy()
+    else:
+        try:
+            code=' '.join(url_to_code[url2].split())
+        except:
+            code=""
+        code2=tokenizer.tokenize(code)
+        
+    return convert_examples_to_features(code1,code2,label,url1,url2,tokenizer,args,cache)
 
 
 class InputFeatures(object):
@@ -88,56 +107,58 @@ class InputFeatures(object):
                  input_tokens,
                  input_ids,
                  idx,
-                 label,
+                 label
 
     ):
         self.input_tokens = input_tokens
         self.input_ids = input_ids
-        self.idx=str(idx)
-        self.label=label
+        self.idx = str(idx)
+        self.label = label
+
         
 def convert_examples_to_features(code, label, tokenizer,args):
     #source
-    code_tokens=tokenizer.tokenize(code)[:args.block_size-2]
-    source_tokens =[tokenizer.cls_token]+code_tokens+[tokenizer.sep_token]
-    source_ids =  tokenizer.convert_tokens_to_ids(source_tokens)
+    code_tokens = tokenizer.tokenize(code)[:args.block_size - 2]
+    source_tokens = [tokenizer.bos_token] + code_tokens + [tokenizer.eos_token]
+    source_ids = tokenizer.convert_tokens_to_ids(source_tokens)
     padding_length = args.block_size - len(source_ids)
-    source_ids+=[tokenizer.pad_token_id]*padding_length
-    return InputFeatures(source_tokens,source_ids,0,label)
+    source_ids += [tokenizer.pad_token_id] * padding_length
+    return InputFeatures(source_tokens, source_ids, 0, label)
+
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, args, file_path=None):
+    def __init__(self, tokenizer, args, file_path='train', block_size=512, pool=None):
         self.examples = []
-        # To-Do: 这里需要根据code authorship的数据集重新做.
+
         file_type = file_path.split('/')[-1].split('.')[0]
-        folder = '/'.join(file_path.split('/')[:-1]) # 得到文件目录
+        folder = '/'.join(file_path.split('/')[:-1])  # 得到文件目录
 
         cache_file_path = os.path.join(folder, 'cached_{}'.format(
-                                    file_type))
+            file_type))
         code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
-                                    file_type))
+            file_type))
 
-        print('\n cached_features_file: ',cache_file_path)
+        print('\n cached_features_file: ', cache_file_path)
         try:
             self.examples = torch.load(cache_file_path)
             with open(code_pairs_file_path, 'rb') as f:
                 code_files = pickle.load(f)
-            
+
             logger.info("Loading features from cached file %s", cache_file_path)
-        
+
         except:
             logger.info("Creating features from dataset file at %s", file_path)
             code_files = []
             with open(file_path) as f:
                 for line in f:
                     code = line.split(" <CODESPLIT> ")[0]
-                    code = code.replace("\\n", "\n").replace('\"','"')
+                    code = code.replace("\\n", "\n").replace('\"', '"')
                     label = line.split(" <CODESPLIT> ")[1]
                     # 将这俩内容转化成input.
-                    self.examples.append(convert_examples_to_features(code, int(label), tokenizer,args))
+                    self.examples.append(convert_examples_to_features(code, int(label), tokenizer, args))
                     code_files.append(code)
                     # 这里每次都是重新读取并处理数据集，能否cache然后load
-            assert(len(self.examples) == len(code_files))
+            assert (len(self.examples) == len(code_files))
             with open(code_pairs_file_path, 'wb') as f:
                 pickle.dump(code_files, f)
             logger.info("Saving features into cached file %s", cache_file_path)
@@ -145,13 +166,11 @@ class TextDataset(Dataset):
 
         if 'train' in file_path:
             for idx, example in enumerate(self.examples[:3]):
-                    logger.info("*** Example ***")
-                    logger.info("idx: {}".format(idx))
-                    logger.info("label: {}".format(example.label))
-                    logger.info("input_tokens: {}".format([x.replace('\u0120','_') for x in example.input_tokens]))
-                    logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
-
-
+                logger.info("*** Example ***")
+                logger.info("idx: {}".format(idx))
+                logger.info("label: {}".format(example.label))
+                logger.info("input_tokens: {}".format([x.replace('\u0120', '_') for x in example.input_tokens]))
+                logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
 
     def __len__(self):
         return len(self.examples)
@@ -162,7 +181,6 @@ class TextDataset(Dataset):
 
 
 def load_and_cache_examples(args, tokenizer, evaluate=False,test=False,pool=None):
-    # 问题是，我寻思你们也没cache啊....
     dataset = TextDataset(tokenizer, args, file_path=args.test_data_file if test else (args.eval_data_file if evaluate else args.train_data_file),block_size=args.block_size,pool=pool)
     return dataset
 
@@ -249,7 +267,7 @@ def train(args, train_dataset, model, tokenizer,pool):
             labels=batch[1].to(args.device) 
             model.train()
             inputs_tran = model.transform(inputs, tokenizer)
-            loss,logits = model(inputs_tran,labels)
+            loss, logits = model(inputs_tran, labels)
 
 
             if args.n_gpu > 1:
@@ -302,7 +320,7 @@ def train(args, train_dataset, model, tokenizer,pool):
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)                        
                         model_to_save = model.module if hasattr(model,'module') else model
-                        output_dir = os.path.join(output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+                        output_dir = os.path.join(output_dir, '{}'.format('model.bin')) 
                         torch.save(model_to_save.state_dict(), output_dir)
                         logger.info("Saving model checkpoint to %s", output_dir)
                         
@@ -312,11 +330,10 @@ def train(args, train_dataset, model, tokenizer,pool):
     return global_step, tr_loss / global_step
 
 
-def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=False):
+def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=False,test=False):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_output_dir = args.output_dir
-    eval_dataset = TextDataset(tokenizer, args,args.eval_data_file)
-    # 得到数据集.
+    eval_dataset = load_and_cache_examples(args, tokenizer, test=test,evaluate=True,pool=pool)
     if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(eval_output_dir)
 
@@ -344,23 +361,38 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
             labels = batch[1].to(args.device)
             with torch.no_grad():
                 inputs_tran = model.transform(inputs, tokenizer)
-                lm_loss,logit = model(inputs_tran,labels)
+                lm_loss, logit = model(inputs_tran, labels)
                 eval_loss += lm_loss.mean().item()
                 logits.append(logit.cpu().numpy())
                 # ground truth
             if sample_idx == 0:
                 y_trues.append(labels.cpu().numpy())
                 nb_eval_steps += 1
-    logits=np.concatenate(logits,0)
-    y_trues=np.concatenate(y_trues,0)
-    
+    logits = np.concatenate(logits, 0)
+    y_trues = np.concatenate(y_trues, 0)
+
     y_preds = []
     for logit in logits:
         y_preds.append(np.argmax(logit))
     preds = np.array(y_preds).reshape([args.n_sampling, len(eval_dataset.examples)]).transpose([1, 0])
     preds_onehot = np.eye(args.number_labels)[preds.astype(int)].sum(axis=-2)
     y_preds = np.argmax(preds_onehot, axis=-1)
-
+    # best_threshold=0
+    # best_f1=0
+    # for i in range(1,100):
+    #     threshold=i/100
+    #     y_preds=logits[:,1]>threshold
+    #     from sklearn.metrics import recall_score
+    #     recall=recall_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import precision_score
+    #     precision=precision_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import f1_score
+    #     f1=f1_score(y_trues, y_preds, average='macro')
+    #     if f1>best_f1:
+    #         best_f1=f1
+    #         best_threshold=threshold
+    #
+    # y_preds=logits[:,1]>best_threshold
     eval_acc = np.mean(y_trues == y_preds)
     eval_loss = eval_loss / (nb_eval_steps * args.n_sampling)
     perplexity = torch.tensor(eval_loss)
@@ -370,22 +402,22 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
     from sklearn.metrics import precision_score
     precision=precision_score(y_trues, y_preds, average='macro')   
     from sklearn.metrics import f1_score
-    f1=f1_score(y_trues, y_preds, average='macro') 
-
+    f1=f1_score(y_trues, y_preds, average='macro')             
     result = {
         "eval_recall": float(recall),
         "eval_precision": float(precision),
         "eval_f1": float(f1),
         "eval_loss": float(perplexity),
         "eval_acc": round(eval_acc, 6)
+        
     }
 
     logger.info("***** Eval results {} *****".format(prefix))
+    logger.info("Test: %s".format(test))
     for key in sorted(result.keys()):
         logger.info("  %s = %s", key, str(round(result[key],4)))
 
     return result
-
 
 def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
@@ -412,7 +444,7 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     for sample_idx in range(args.n_sampling):
         for batch in tqdm(eval_dataloader):
             inputs = batch[0].to(args.device)
-            labels=batch[1].to(args.device)
+            labels = batch[1].to(args.device)
             with torch.no_grad():
                 inputs_tran = model.transform(inputs, tokenizer)
                 lm_loss, logit = model(inputs_tran, labels)
@@ -422,7 +454,7 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
                 y_trues.append(labels.cpu().numpy())
                 nb_eval_steps += 1
 
-    logits=np.concatenate(logits,0)
+    logits = np.concatenate(logits, 0)
     y_trues = np.concatenate(y_trues, 0)
 
     y_preds = []
@@ -431,6 +463,13 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     preds = np.array(y_preds).reshape([args.n_sampling, len(eval_dataset.examples)]).transpose([1, 0])
     preds_onehot = np.eye(args.number_labels)[preds.astype(int)].sum(axis=-2)
     y_preds = np.argmax(preds_onehot, axis=-1)
+    # y_preds=logits[:,1]>best_threshold
+    # with open(os.path.join(args.output_dir,"predictions.txt"),'w') as f:
+    #     for example,pred in zip(eval_dataset.examples,y_preds):
+    #         if pred:
+    #             f.write(example.url1+'\t'+example.url2+'\t'+'1'+'\n')
+    #         else:
+    #             f.write(example.url1+'\t'+example.url2+'\t'+'0'+'\n')
 
     top2 = preds_onehot.argsort(axis=-1)[:, ::-1][:, :2]
     count1 = preds_onehot[range(y_preds.shape[0]), top2[:, 0]].astype(int)
@@ -439,19 +478,24 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
 
     from sklearn.metrics import recall_score, accuracy_score
     acc = accuracy_score(y_trues, y_preds)
-    recall = recall_score(y_trues, y_preds, average='macro')
+    recall=recall_score(y_trues, y_preds, average='macro')
     from sklearn.metrics import precision_score
-    precision = precision_score(y_trues, y_preds, average='macro')
+    precision=precision_score(y_trues, y_preds, average='macro')   
     from sklearn.metrics import f1_score
-    f1 = f1_score(y_trues, y_preds, average='macro')
+    f1=f1_score(y_trues, y_preds, average='macro')             
     result = {
         "test_acc": float(acc),
-        "test_recall": float(recall),
-        "test_precision": float(precision),
-        "test_f1": float(f1)
+        "eval_recall": float(recall),
+        "eval_precision": float(precision),
+        "eval_f1": float(f1),
+        # "eval_threshold":best_threshold,
+        
     }
+
+    logger.info("***** Eval results {} *****".format(prefix))
+    logger.info("Test: True")
     for key in sorted(result.keys()):
-        logger.info("  %s = %s", key, str(round(result[key], 5)))
+        logger.info("  %s = %s", key, str(round(result[key],4)))
 
     y_trues = y_trues[~abstain_flag]
     y_preds = y_preds[~abstain_flag]
@@ -569,7 +613,7 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
 
     return radius_all
 
-                                                
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -584,7 +628,7 @@ def main():
                         help="An optional input evaluation data file to evaluate the perplexity on (a text file).")
     parser.add_argument("--test_data_file", default=None, type=str,
                         help="An optional input evaluation data file to evaluate the perplexity on (a text file).")
-                    
+
     parser.add_argument("--model_type", default="bert", type=str,
                         help="The model architecture to be fine-tuned.")
     parser.add_argument("--model_name_or_path", default=None, type=str,
@@ -620,7 +664,7 @@ def main():
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
 
-    parser.add_argument("--train_batch_size", default=1, type=int,
+    parser.add_argument("--train_batch_size", default=4, type=int,
                         help="Batch size per GPU/CPU for training.")
     parser.add_argument("--eval_batch_size", default=4, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
@@ -725,7 +769,7 @@ def main():
     args.start_step = 0
     checkpoint_last = os.path.join(args.output_dir, 'checkpoint-last')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin')
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
@@ -741,7 +785,7 @@ def main():
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           cache_dir=args.cache_dir if args.cache_dir else None)
-    config.num_labels=args.number_labels
+    config.num_labels = args.number_labels
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name,
                                                 do_lower_case=args.do_lower_case,
                                                 cache_dir=args.cache_dir if args.cache_dir else None)
@@ -756,7 +800,7 @@ def main():
     else:
         model = model_class(config)
 
-    # model=Model(model,config,tokenizer,args)
+    #model=Model(model,config,tokenizer,args)
     if args.smooth == "random":
         input_transformer = RandomTransformer(args.k_random,
                                               mask_id=tokenizer.pad_token_id,
@@ -781,7 +825,6 @@ def main():
                                                     )
         model = HashSmooth4LLM(model, config, tokenizer, input_transformer,
                                args=args)
-    # load 模型.
     if args.local_rank == 0:
         torch.distributed.barrier()  # End of barrier to make sure only the first process in distributed training download model & vocab
 
@@ -792,7 +835,7 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        train_dataset = TextDataset(tokenizer, args,args.train_data_file)
+        train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=pool)
 
         if args.local_rank == 0:
             torch.distributed.barrier()
@@ -803,16 +846,18 @@ def main():
     # Evaluation
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
-        output_dir = os.path.join(args.output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
+        output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
         result=evaluate(args, model, tokenizer,pool=pool)
         
     if args.do_test and args.local_rank in [-1, 0]:
-        output_dir = os.path.join(args.output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
+        output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
-        test(args, model, tokenizer,pool=pool,best_threshold=0.5)
+        test(args, model, tokenizer,pool=pool)
 
     if args.do_certify:
         checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
