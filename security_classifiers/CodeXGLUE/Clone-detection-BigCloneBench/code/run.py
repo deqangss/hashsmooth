@@ -399,21 +399,21 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
         nb_eval_steps += 1
     logits=np.concatenate(logits,0)
     y_trues=np.concatenate(y_trues,0)
-    best_threshold=0
+    best_threshold=0.5
     best_f1=0
     # 在validation集上确定best_threshold的.
-    for i in range(1,100):
-        threshold=i/100
-        y_preds=logits[:,1]>threshold
-        from sklearn.metrics import recall_score
-        recall=recall_score(y_trues, y_preds, average='macro')
-        from sklearn.metrics import precision_score
-        precision=precision_score(y_trues, y_preds, average='macro')   
-        from sklearn.metrics import f1_score
-        f1=f1_score(y_trues, y_preds, average='macro') 
-        if f1>best_f1:
-            best_f1=f1
-            best_threshold=threshold
+    # for i in range(1,100):
+    #     threshold=i/100
+    #     y_preds=logits[:,1]>threshold
+    #     from sklearn.metrics import recall_score
+    #     recall=recall_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import precision_score
+    #     precision=precision_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import f1_score
+    #     f1=f1_score(y_trues, y_preds, average='macro')
+    #     if f1>best_f1:
+    #         best_f1=f1
+    #         best_threshold=threshold
 
     # 使用best_threshold来计算指标.
     y_preds=logits[:,1]>best_threshold
@@ -436,6 +436,17 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
         logger.info("  %s = %s", key, str(round(result[key],4)))
 
     return result
+
+def measurement(_y_true, _y_pred):
+    from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, balanced_accuracy_score
+    accuracy = accuracy_score(_y_true, _y_pred)
+    b_accuracy = balanced_accuracy_score(_y_true, _y_pred)
+    tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
+    fpr = fp / float(tn + fp)
+    fnr = fn / float(tp + fn)
+    f1 = f1_score(_y_true, _y_pred, average='binary')
+
+    return accuracy, b_accuracy, fnr, fpr, f1
 
 def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
@@ -488,6 +499,13 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     logger.info("***** Test results {} *****".format(prefix))
     for key in sorted(result.keys()):
         logger.info("  %s = %s", key, str(round(result[key],4)))
+
+    accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_trues, y_preds)
+    logger.info(
+        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.smooth, accuracy * 100,
+                                                                                        b_accuracy * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
 
     return result
                                                 

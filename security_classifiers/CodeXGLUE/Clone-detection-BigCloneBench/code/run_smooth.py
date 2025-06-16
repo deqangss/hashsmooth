@@ -365,7 +365,7 @@ def train(args, train_dataset, model, tokenizer,pool):
                         logger.info("Saving model checkpoint to %s", output_dir)
                         
         if args.max_steps > 0 and global_step > args.max_steps:
-            train_iterator.close()
+            # train_iterator.close()
             break
     return global_step, tr_loss / global_step
 

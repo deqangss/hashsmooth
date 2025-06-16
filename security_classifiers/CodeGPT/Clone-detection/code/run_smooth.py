@@ -25,6 +25,7 @@ import argparse
 import glob
 import logging
 import os
+import sys
 import pickle
 import random
 import re
@@ -54,6 +55,11 @@ from tqdm import tqdm, trange
 import multiprocessing
 from model import Model
 from model import RandomSmooth4LLM, RandomDelSmooth4LLM, HashSmooth4LLM, binom_test
+
+from randomsmooth.random_tran import RandomTransformer
+from torchmalware.random_del_wrapper import RandomDeleter
+from hashsmooth import EditLSHTransformerTorch
+from hashsmooth.utils_hash import lower_confidence_interval, upper_confidence_interval
 
 cpu_cont = 16
 from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
@@ -137,32 +143,65 @@ class TextDataset(Dataset):
         postfix=file_path.split('/')[-1].split('.txt')[0]
         self.examples = []
         index_filename=file_path
+
         logger.info("Creating features from index file at %s ", index_filename)
         url_to_code={}
-        with open('/'.join(index_filename.split('/')[:-1])+'/data.jsonl') as f:
-            for line in f:
-                line=line.strip()
-                js=json.loads(line)
-                url_to_code[js['idx']]=js['func']
 
-        data=[]
-        cache={}
-        f=open(index_filename)
-        with open(index_filename) as f:
-            for line in f:
-                line=line.strip()
-                url1,url2,label=line.split('\t')
-                if url1 not in url_to_code or url2 not in url_to_code:
-                    continue
-                if label=='0':
-                    label=0
-                else:
-                    label=1
-                data.append((url1,url2,label,tokenizer, args,cache,url_to_code))
-        # if 'test' not in postfix:
-        #     data=random.sample(data,int(len(data)*0.1))
+        folder = '/'.join(file_path.split('/')[:-1])  # 得到文件目录
 
-        self.examples=pool.map(get_example, data)
+        cache_file_path = os.path.join(folder, 'cached_{}'.format(
+            postfix))
+        # 保存下对应的code1和code2
+        code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
+            postfix))
+        code_pairs = []
+        try:
+            self.examples = torch.load(cache_file_path)
+            with open(code_pairs_file_path, 'rb') as f:
+                code_pairs = pickle.load(f)
+            logger.info("Loading features from cached file %s", cache_file_path)
+            if args.do_certify:
+                logger.info(
+                    "=======*Using {} features from cached file {} for certification=======*".format(args.n_examples,
+                                                                                                     cache_file_path))
+                self.examples = self.examples[:args.n_examples]
+                code_pairs = code_pairs[:args.n_examples]
+        except:
+            with open('/'.join(index_filename.split('/')[:-1])+'/data.jsonl') as f:
+                for line in f:
+                    line=line.strip()
+                    js=json.loads(line)
+                    url_to_code[js['idx']]=js['func']
+
+            data=[]
+            cache={}
+            f=open(index_filename)
+            with open(index_filename) as f:
+                for line in f:
+                    line=line.strip()
+                    url1,url2,label=line.split('\t')
+                    if url1 not in url_to_code or url2 not in url_to_code:
+                        continue
+                    if label=='0':
+                        label=0
+                    else:
+                        label=1
+                    data.append((url1,url2,label,tokenizer, args,cache,url_to_code))
+            # if 'test' not in postfix:
+            #     data=random.sample(data,int(len(data)*0.1))
+            for sing_example in data:
+                code_pairs.append([sing_example[0],
+                                    sing_example[1],
+                                    url_to_code[sing_example[0]],
+                                    url_to_code[sing_example[1]]])
+            with open(code_pairs_file_path, 'wb') as f:
+                pickle.dump(code_pairs, f)
+
+            if pool is None:
+                pool = multiprocessing.Pool(7)
+            self.examples=pool.map(get_example, data)
+            torch.save(self.examples, cache_file_path)
+
         if 'train' in postfix:
             for idx, example in enumerate(self.examples[:3]):
                     logger.info("*** Example ***")
@@ -170,7 +209,6 @@ class TextDataset(Dataset):
                     logger.info("label: {}".format(example.label))
                     logger.info("input_tokens: {}".format([x.replace('\u0120','_') for x in example.input_tokens]))
                     logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
-
 
 
     def __len__(self):
@@ -326,7 +364,6 @@ def train(args, train_dataset, model, tokenizer,pool):
                         logger.info("Saving model checkpoint to %s", output_dir)
                         
         if args.max_steps > 0 and global_step > args.max_steps:
-            train_iterator.close()
             break
     return global_step, tr_loss / global_step
 

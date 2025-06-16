@@ -42,6 +42,14 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 # except:
 #     from tensorboardX import SummaryWriter
 
+sys.path.append('../../')
+sys.path.append('../../../')
+sys.path.append('../../../../')
+sys.path.append('../../../python_parser')
+sys.path.append('../../../../hashsmooth')
+sys.path.append('../../../../randomsmooth')
+sys.path.append('../../../../torchware')
+
 from tqdm import tqdm, trange
 import multiprocessing
 from model import Model
@@ -125,42 +133,75 @@ def convert_examples_to_features(code1_tokens,code2_tokens,label,url1,url2,token
 
 class TextDataset(Dataset):
     def __init__(self, tokenizer, args, file_path='train', block_size=512,pool=None):
-        postfix=file_path.split('/')[-1].split('.txt')[0]
+        postfix = file_path.split('/')[-1].split('.txt')[0]
         self.examples = []
-        index_filename=file_path
+        index_filename = file_path
+
         logger.info("Creating features from index file at %s ", index_filename)
-        url_to_code={}
-        with open('/'.join(index_filename.split('/')[:-1])+'/data.jsonl') as f:
-            for line in f:
-                line=line.strip()
-                js=json.loads(line)
-                url_to_code[js['idx']]=js['func']
+        url_to_code = {}
 
-        data=[]
-        cache={}
-        f=open(index_filename)
-        with open(index_filename) as f:
-            for line in f:
-                line=line.strip()
-                url1,url2,label=line.split('\t')
-                if url1 not in url_to_code or url2 not in url_to_code:
-                    continue
-                if label=='0':
-                    label=0
-                else:
-                    label=1
-                data.append((url1,url2,label,tokenizer, args,cache,url_to_code))
-        # if 'test' not in postfix:
-        #     data=random.sample(data,int(len(data)*0.1))
+        folder = '/'.join(file_path.split('/')[:-1])  # 得到文件目录
 
-        self.examples=pool.map(get_example, data)
+        cache_file_path = os.path.join(folder, 'cached_{}'.format(
+            postfix))
+        # 保存下对应的code1和code2
+        code_pairs_file_path = os.path.join(folder, 'cached_{}.pkl'.format(
+            postfix))
+        code_pairs = []
+        try:
+            self.examples = torch.load(cache_file_path)
+            with open(code_pairs_file_path, 'rb') as f:
+                code_pairs = pickle.load(f)
+            logger.info("Loading features from cached file %s", cache_file_path)
+            if args.do_certify:
+                logger.info(
+                    "=======*Using {} features from cached file {} for certification=======*".format(args.n_examples,
+                                                                                                     cache_file_path))
+                self.examples = self.examples[:args.n_examples]
+                code_pairs = code_pairs[:args.n_examples]
+        except:
+            with open('/'.join(index_filename.split('/')[:-1]) + '/data.jsonl') as f:
+                for line in f:
+                    line = line.strip()
+                    js = json.loads(line)
+                    url_to_code[js['idx']] = js['func']
+
+            data = []
+            cache = {}
+            f = open(index_filename)
+            with open(index_filename) as f:
+                for line in f:
+                    line = line.strip()
+                    url1, url2, label = line.split('\t')
+                    if url1 not in url_to_code or url2 not in url_to_code:
+                        continue
+                    if label == '0':
+                        label = 0
+                    else:
+                        label = 1
+                    data.append((url1, url2, label, tokenizer, args, cache, url_to_code))
+            # if 'test' not in postfix:
+            #     data=random.sample(data,int(len(data)*0.1))
+            for sing_example in data:
+                code_pairs.append([sing_example[0],
+                                   sing_example[1],
+                                   url_to_code[sing_example[0]],
+                                   url_to_code[sing_example[1]]])
+            with open(code_pairs_file_path, 'wb') as f:
+                pickle.dump(code_pairs, f)
+
+            if pool is None:
+                pool = multiprocessing.Pool(7)
+            self.examples = pool.map(get_example, data)
+            torch.save(self.examples, cache_file_path)
+
         if 'train' in postfix:
             for idx, example in enumerate(self.examples[:3]):
-                    logger.info("*** Example ***")
-                    logger.info("idx: {}".format(idx))
-                    logger.info("label: {}".format(example.label))
-                    logger.info("input_tokens: {}".format([x.replace('\u0120','_') for x in example.input_tokens]))
-                    logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
+                logger.info("*** Example ***")
+                logger.info("idx: {}".format(idx))
+                logger.info("label: {}".format(example.label))
+                logger.info("input_tokens: {}".format([x.replace('\u0120', '_') for x in example.input_tokens]))
+                logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
 
 
 
@@ -357,20 +398,20 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
         nb_eval_steps += 1
     logits=np.concatenate(logits,0)
     y_trues=np.concatenate(y_trues,0)
-    best_threshold=0
-    best_f1=0
-    for i in range(1,100):
-        threshold=i/100
-        y_preds=logits[:,1]>threshold
-        from sklearn.metrics import recall_score
-        recall=recall_score(y_trues, y_preds, average='macro')
-        from sklearn.metrics import precision_score
-        precision=precision_score(y_trues, y_preds, average='macro')   
-        from sklearn.metrics import f1_score
-        f1=f1_score(y_trues, y_preds, average='macro') 
-        if f1>best_f1:
-            best_f1=f1
-            best_threshold=threshold
+    best_threshold=0.5
+    # best_f1=0
+    # for i in range(1,100):
+    #     threshold=i/100
+    #     y_preds=logits[:,1]>threshold
+    #     from sklearn.metrics import recall_score
+    #     recall=recall_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import precision_score
+    #     precision=precision_score(y_trues, y_preds, average='macro')
+    #     from sklearn.metrics import f1_score
+    #     f1=f1_score(y_trues, y_preds, average='macro')
+    #     if f1>best_f1:
+    #         best_f1=f1
+    #         best_threshold=threshold
 
     y_preds=logits[:,1]>best_threshold
     from sklearn.metrics import recall_score
@@ -393,6 +434,17 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
         logger.info("  %s = %s", key, str(round(result[key],4)))
 
     return result
+
+def measurement(_y_true, _y_pred):
+    from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, balanced_accuracy_score
+    accuracy = accuracy_score(_y_true, _y_pred)
+    b_accuracy = balanced_accuracy_score(_y_true, _y_pred)
+    tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
+    fpr = fp / float(tn + fp)
+    fnr = fn / float(tp + fn)
+    f1 = f1_score(_y_true, _y_pred, average='binary')
+
+    return accuracy, b_accuracy, fnr, fpr, f1
 
 def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
@@ -428,12 +480,12 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     logits=np.concatenate(logits,0)
     y_trues=np.concatenate(y_trues,0)
     y_preds=logits[:,1]>best_threshold
-    with open(os.path.join(args.output_dir,"predictions.txt"),'w') as f:
-        for example,pred in zip(eval_dataset.examples,y_preds):
-            if pred:
-                f.write(example.url1+'\t'+example.url2+'\t'+'1'+'\n')
-            else:
-                f.write(example.url1+'\t'+example.url2+'\t'+'0'+'\n')
+    # with open(os.path.join(args.output_dir,"predictions.txt"),'w') as f:
+    #     for example,pred in zip(eval_dataset.examples,y_preds):
+    #         if pred:
+    #             f.write(example.url1+'\t'+example.url2+'\t'+'1'+'\n')
+    #         else:
+    #             f.write(example.url1+'\t'+example.url2+'\t'+'0'+'\n')
     
     from sklearn.metrics import recall_score
     recall=recall_score(y_trues, y_preds, average='macro')
@@ -453,6 +505,13 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     logger.info("Test: True")
     for key in sorted(result.keys()):
         logger.info("  %s = %s", key, str(round(result[key],4)))
+
+    accuracy, b_accuracy, fnr, fpr, f1 = measurement(y_trues, y_preds)
+    logger.info(
+        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.smooth, accuracy * 100,
+                                                                                        b_accuracy * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100))
                                                 
 def main():
     parser = argparse.ArgumentParser()
