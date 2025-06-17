@@ -284,16 +284,18 @@ if __name__ == "__main__":
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
 
-        if orig_label != ground_truth:
-            continue
         identifiers = list(substitutes.keys())
         if len(identifiers) == 0:
-            continue
-        total_cnt += 1
-        example_start_time = time.time()
-        _res = attacker.mcmc_random(example, substitutes, tokenizer, code_pair,
-                                    _label=ground_truth, _n_candi=30,
-                                    _max_iter=100, _prob_threshold=1)
+            total_cnt += 1
+            _res = {'succ': None, 'tokens': first_code, 'raw_tokens': first_code}
+        elif orig_label != ground_truth:
+            _res = {'succ': None, 'tokens': first_code, 'raw_tokens': first_code}
+        else:
+            total_cnt += 1
+            example_start_time = time.time()
+            _res = attacker.mcmc_random(example, substitutes, tokenizer, code_pair,
+                                        _label=ground_truth, _n_candi=30,
+                                        _max_iter=100, _prob_threshold=1)
 
         example_end_time = (time.time() - example_start_time) / 60
         print("Example time cost: ", round(example_end_time, 2), "min")
@@ -311,7 +313,7 @@ if __name__ == "__main__":
 
         else:
             recoder.writemhm(index,  "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), code_pair[2], _res['tokens'],
-                          None, " ".join(_res['tokens']), ground_truth, None, None, 0, None, None, None, None, None, None, model.query - query_times, None)
+                          None, " ".join(_res['tokens']), ground_truth, orig_label, None, 0, None, None, None, None, None, None, model.query - query_times, None)
         query_times = model.query
         print("Success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
     print("Final success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))

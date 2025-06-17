@@ -269,18 +269,17 @@ if __name__ == "__main__":
         orig_label = orig_label[0]
         
         if orig_label != ground_truth:
-            continue
-        start_time = time.time()
-
-        if args.original:
-            _res = attacker.mcmc_random(example, substitute, tokenizer, code_pair,
-                             _label=ground_truth, _n_candi=30,
-                             _max_iter=30, _prob_threshold=1)
-        
+            _res = {'succ': None, 'tokens': code_pair[2], 'raw_tokens': code_pair[2]}
         else:
-            _res = attacker.mcmc(example, substitute, tokenizer, code_pair,
-                             _label=ground_truth, _n_candi=30,
-                             _max_iter=30, _prob_threshold=1)
+            if args.original:
+                _res = attacker.mcmc_random(example, substitute, tokenizer, code_pair,
+                                 _label=ground_truth, _n_candi=30,
+                                 _max_iter=30, _prob_threshold=1)
+
+            else:
+                _res = attacker.mcmc(example, substitute, tokenizer, code_pair,
+                                 _label=ground_truth, _n_candi=30,
+                                 _max_iter=30, _prob_threshold=1)
     
         if _res['succ'] is None:
             continue

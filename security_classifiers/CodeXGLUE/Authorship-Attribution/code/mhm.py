@@ -264,20 +264,19 @@ def main():
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
         ground_truth = example[1].item()
-        if orig_label != ground_truth:
-            continue
-        
         start_time = time.time()
-        
-        # 这里需要进行修改.
-        if args.is_original_mhm:
-            _res = attacker.mcmc_random(tokenizer, code,
-                                _label=ground_truth, _n_candi=30,
-                                _max_iter=30, _prob_threshold=1, subs = subs)
+        if orig_label != ground_truth:
+            _res = {'succ': None, 'tokens': code, 'raw_tokens': code}
         else:
-            _res = attacker.mcmc(tokenizer, code,
-                                _label=ground_truth, _n_candi=30,
-                                _max_iter=30, _prob_threshold=1, subs = subs)
+            # 这里需要进行修改.
+            if args.is_original_mhm:
+                _res = attacker.mcmc_random(tokenizer, code,
+                                    _label=ground_truth, _n_candi=30,
+                                    _max_iter=30, _prob_threshold=1, subs = subs)
+            else:
+                _res = attacker.mcmc(tokenizer, code,
+                                    _label=ground_truth, _n_candi=30,
+                                    _max_iter=30, _prob_threshold=1, subs = subs)
         
         if _res['succ'] is None:
             continue
@@ -302,7 +301,7 @@ def main():
 
         else:
             recoder.writemhm(index, code, code, _res['tokens'],
-                          None, " ".join(_res['tokens']), ground_truth, None, None, 0, None, None, None, None, None, None, model.query - query_times, None)
+                          None, " ".join(_res['tokens']), ground_truth, orig_label, None, 0, None, None, None, None, None, None, model.query - query_times, None)
         query_times = model.query
 
 if __name__ == "__main__":

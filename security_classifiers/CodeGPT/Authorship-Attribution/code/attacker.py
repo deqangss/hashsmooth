@@ -533,6 +533,7 @@ class MHM_Attacker():
 
     def mcmc_random(self, tokenizer, code=None, _label=None, _n_candi=30,
              _max_iter=100, _prob_threshold=0.95, subs = {}):
+
         identifiers, code_tokens = get_identifiers(code, 'python')
         processed_code = " ".join(code_tokens)
         prog_length = len(code_tokens)
