@@ -282,7 +282,7 @@ if __name__ == "__main__":
                                  _max_iter=30, _prob_threshold=1)
     
         if _res['succ'] is None:
-            continue
+            pass
         if _res['succ'] == True:
             print ("EXAMPLE "+str(index)+" SUCCEEDED!")
             n_succ += 1
