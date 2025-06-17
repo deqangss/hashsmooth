@@ -275,8 +275,6 @@ def main():
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
         ground_truth = example[1].item()
-        if orig_label != ground_truth:
-            continue
         
         start_time = time.time()
         
@@ -309,7 +307,10 @@ def main():
         # recoder.writemhm(index, code, code, _res['tokens'], _res["prog_length"], _res['tokens'], ground_truth, orig_label, _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, time_cost)
         if _res['succ'] == True:
             recoder.writemhm(index, code, code, _res['tokens'],
-                         _res["prog_length"], " ".join(_res['tokens']), ground_truth, _res["orig_label"], _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, "0")
+                         _res["prog_length"], " ".join(_res['tokens']), ground_truth,
+                             orig_label, _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"],
+                             _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"],
+                             model.query - query_times, "0")
 
         else:
             recoder.writemhm(index, code, code, _res['tokens'],

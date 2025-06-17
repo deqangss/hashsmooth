@@ -303,7 +303,7 @@ if __name__ == "__main__":
                              "CODE1: " + code_pair[2].replace("\n", " ") + " ||CODE2: " + code_pair[3].replace("\n",
                                                                                                                " "),
                              code_pair[2], _res['tokens'],
-                             _res["prog_length"], " ".join(_res['tokens']), ground_truth, _res["orig_label"],
+                             _res["prog_length"], " ".join(_res['tokens']), ground_truth, orig_label,
                              _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"],
                              _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"],
                              model.query - query_times, time_cost)
