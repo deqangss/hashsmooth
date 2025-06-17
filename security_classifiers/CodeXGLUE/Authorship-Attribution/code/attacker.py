@@ -589,7 +589,7 @@ class MHM_Attacker():
                     for uid_ in old_uids.keys():
                         replace_info[uid_] = old_uids[uid_][-1]
                         if old_uids[uid_][-1] not in uid.keys():
-                            warnings.warn("Cannot find the key: ", old_uids[uid_][-1])
+                            warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
                             pass
                         else:
                             nb_changed_pos += len(uid[old_uids[uid_][-1]])
