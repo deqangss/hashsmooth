@@ -322,7 +322,8 @@ class EditLSHTransformer(LSHTransformer):
         if self.number_of_words >= (1 << 16) - 1:
             warnings.warn("Too much words triggers the collision.\n")
         self.kmer_size = kmer_size
-        assert self.kmer_size <= self.number_of_words
+        if self.kmer_size <= self.number_of_words:
+            warnings.warn("Renew the feature dimension.")
         self.l_chucksize = l_chucksize
         self.hashcode2input_dict = collections.defaultdict(str)
         self.dict_saving_path = os.path.join(_current_file_path, "res/hashcodes2input_{}.dict".format(self.kmer_size))
