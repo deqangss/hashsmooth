@@ -285,7 +285,6 @@ def main():
         #     continue
         total_cnt += 1
 
-        print(identifiers)
         code, prog_length, feature, new_feature, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words = attacker.greedy_attack(
             example, substitutes, code_pair)
         attack_type = "Greedy"

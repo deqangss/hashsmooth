@@ -541,7 +541,7 @@ class MHM_Attacker():
         
         uid = get_identifier_posistions_from_code(words, variable_names)
 
-        if len(uid) <= 0: # 是有可能存在找不到变量名的情况的. todo: check return
+        if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
             return {'succ': None, 'tokens': code, 'raw_tokens': code}
 
 
