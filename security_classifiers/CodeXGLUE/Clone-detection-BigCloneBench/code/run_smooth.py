@@ -763,7 +763,7 @@ def main():
     parser.add_argument("--alpha", default=0.05, type=float,
                         help="confidence interval.")
 
-    
+
     pool = multiprocessing.Pool(cpu_cont)
     args = parser.parse_args()
 
@@ -805,7 +805,7 @@ def main():
     args.start_step = 0
     checkpoint_last = os.path.join(args.output_dir, 'checkpoint-last')
     if os.path.exists(checkpoint_last) and os.listdir(checkpoint_last):
-        args.model_name_or_path = os.path.join(checkpoint_last, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        args.model_name_or_path = os.path.join(checkpoint_last, 'pytorch_model.bin'.format(args.smooth, int(args.k_random)))
         args.config_name = os.path.join(checkpoint_last, 'config.json')
         idx_file = os.path.join(checkpoint_last, 'idx_file.txt')
         with open(idx_file, encoding='utf-8') as idxf:
