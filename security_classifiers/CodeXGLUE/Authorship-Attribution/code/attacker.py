@@ -8,7 +8,7 @@ import copy
 import torch
 import random
 from model import Model, HashSmooth
-from run import TextDataset, InputFeatures, convert_examples_to_features
+from run_smooth import TextDataset, InputFeatures, convert_examples_to_features
 from utils import select_parents, crossover, map_chromesome, mutate, is_valid_variable_name, _tokenize, get_identifier_posistions_from_code, get_masked_code_by_position, get_substitues, is_valid_substitue, set_seed
 
 from utils import CodeDataset
@@ -391,7 +391,6 @@ class Attacker():
                 # 3. 将他们转化成features
             logits, preds = self.model_tgt.get_results(new_dataset, self.args.eval_batch_size)
             assert(len(logits) == len(substitute_list))
-
 
             for index, temp_prob in enumerate(logits):
                 temp_label = preds[index]
