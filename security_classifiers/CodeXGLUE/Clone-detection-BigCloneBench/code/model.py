@@ -324,7 +324,7 @@ class HashSmooth(HashSmoothBase):
         x_transform_ = torch.hstack([x_transform, x[:, dim_of_a_sample:]])
         return retain_specific_tokens(x_transform_, x, tokenizer)
 
-    def cal_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
+    def calc_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
         return self._calc_radius(probas, second_probas, k_hashcode, max_radius, n_grid)
 
 

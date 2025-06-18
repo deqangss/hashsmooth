@@ -322,7 +322,7 @@ class HashSmooth(HashSmoothBase):
         x_transform = self.transform_method.transform(x, self.k_hashcode)
         return retain_specific_tokens(x_transform, x, tokenizer)
 
-    def cal_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
+    def calc_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
         return self._calc_radius(probas, second_probas, k_hashcode, max_radius, n_grid)
 
 
