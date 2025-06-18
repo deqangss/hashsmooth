@@ -1,10 +1,12 @@
 import sys
+import warnings
 
 sys.path.append('../../../')
 sys.path.append('../../../python_parser')
 
 import copy
 import torch
+import numpy as np
 import random
 from run import InputFeatures
 from utils import select_parents, crossover, map_chromesome, mutate, is_valid_variable_name, _tokenize, get_identifier_posistions_from_code, get_masked_code_by_position, get_substitues, is_valid_substitue, set_seed
@@ -12,6 +14,7 @@ from utils import select_parents, crossover, map_chromesome, mutate, is_valid_va
 from utils import CodePairDataset
 from utils import isUID
 from run_parser import get_identifiers, extract_dataflow, get_example
+from model import HashSmooth
 
 def compute_fitness(chromesome, code_2, codebert_tgt, tokenizer_tgt, orig_prob, orig_label, true_label , code_1, names_positions_dict, args):
     # 计算fitness function.
@@ -43,17 +46,24 @@ def convert_code_to_features(code1, code2, tokenizer, label, args):
             ori2cur_pos[i]=(ori2cur_pos[i-1][1],ori2cur_pos[i-1][1]+len(code_tokens[i]))    
         code_tokens=[y for x in code_tokens for y in x]
 
-        code_tokens=code_tokens[:args.code_length+args.data_flow_length-2-min(len(dfg),args.data_flow_length)]
-        source_tokens =[tokenizer.cls_token]+code_tokens+[tokenizer.sep_token]
-        source_ids =  tokenizer.convert_tokens_to_ids(source_tokens)
-        position_idx = [i+tokenizer.pad_token_id + 1 for i in range(len(source_tokens))]
-        dfg = dfg[:args.code_length+args.data_flow_length-len(source_tokens)]
+        code_tokens = code_tokens[:args.code_length - 2]
+        source_tokens = [tokenizer.cls_token] + code_tokens
+        source_ids = tokenizer.convert_tokens_to_ids(source_tokens)
+        position_idx = [i + tokenizer.pad_token_id + 1 for i in range(len(source_tokens))]
+        if len(source_tokens) < args.code_length - 1:
+            padding_length = args.code_length - len(source_tokens) - 1
+            position_idx += [tokenizer.pad_token_id] * padding_length
+            source_ids += [tokenizer.pad_token_id] * padding_length
+        source_tokens += [tokenizer.sep_token]
+        source_ids += [tokenizer.sep_token_id]
+        position_idx += [tokenizer.pad_token_id]
+        dfg = dfg[:args.code_length + args.data_flow_length - len(source_ids)]
         source_tokens += [x[0] for x in dfg]
-        position_idx+=[0 for x in dfg]
-        source_ids+=[tokenizer.unk_token_id for x in dfg]
-        padding_length=args.code_length+args.data_flow_length-len(source_ids)
-        position_idx+=[tokenizer.pad_token_id]*padding_length
-        source_ids+=[tokenizer.pad_token_id]*padding_length
+        position_idx += [0 for x in dfg]
+        source_ids += [tokenizer.unk_token_id for x in dfg]
+        padding_length = args.code_length + args.data_flow_length - len(source_ids)
+        position_idx += [tokenizer.pad_token_id] * padding_length
+        source_ids += [tokenizer.pad_token_id] * padding_length
 
         reverse_index={}
         for idx,x in enumerate(dfg):
@@ -100,8 +110,9 @@ def get_importance_score(args, example, code, code_2, words_list: list, sub_word
     # 3. 将他们转化成features
     logits, preds = tgt_model.get_results(new_dataset, args.eval_batch_size)
     orig_probs = logits[0]
-    orig_label = preds[0]
+    # orig_label = preds[0]
     # 第一个是original code的数据.
+    orig_label = example[6].item()
     
     orig_prob = max(orig_probs)
     # predicted label对应的probability
@@ -152,6 +163,7 @@ class Attacker():
         true_label = example[6].item()
         adv_code = ''
         temp_label = None
+        feature_ids = np.concatenate([example[0].cpu().numpy().reshape(-1), example[3].cpu().numpy().reshape(-1)])
 
 
 
@@ -169,15 +181,15 @@ class Attacker():
 
         variable_names = list(substitutes.keys())
 
-        if not orig_label == true_label:
+        if (orig_label != true_label) and (orig_label != HashSmooth.ABSTAIN):
             # 说明原来就是错的
             is_success = -4
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, feature_ids, feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
             
         if len(variable_names) == 0:
             # 没有提取到identifier，直接退出
             is_success = -3
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, feature_ids, feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
 
         names_positions_dict = get_identifier_posistions_from_code(words, variable_names)
 
@@ -232,8 +244,10 @@ class Attacker():
 
                 _the_best_candidate = -1
                 for index, temp_prob in enumerate(logits):
-                    temp_label = preds[index]
-                    gap = current_prob - temp_prob[temp_label]
+                    # temp_label = preds[index]
+                    # gap = current_prob - temp_prob[temp_label]
+                    pred_prob = temp_prob[orig_label] if orig_label != HashSmooth.ABSTAIN else max(temp_prob)
+                    gap = current_prob - pred_prob
                     # 并选择那个最大的gap.
                     if gap > most_gap:
                         most_gap = gap
@@ -289,14 +303,20 @@ class Attacker():
             mutate_logits, mutate_preds = self.model_tgt.get_results(new_dataset, self.args.eval_batch_size)
             mutate_fitness_values = []
             for index, logits in enumerate(mutate_logits):
-                if mutate_preds[index] != orig_label:
+                if mutate_preds[index] != orig_label and mutate_preds[index] != HashSmooth.ABSTAIN:
                     adv_code = map_chromesome(_temp_mutants[index], code_1, "java")
                     for old_word in _temp_mutants[index].keys():
                         if old_word == _temp_mutants[index][old_word]:
                             nb_changed_var += 1
                             nb_changed_pos += len(names_positions_dict[old_word])
+                    new_feature = convert_code_to_features(adv_code,
+                                                          code_2,
+                                                          self.tokenizer_tgt,
+                                                          example[6].item(),
+                                                          self.args)
+                    new_feature_ids = np.array(new_feature.input_ids_1 + new_feature.input_ids_2)
 
-                    return code, prog_length, adv_code, true_label, orig_label, mutate_preds[index], 1, variable_names, None, nb_changed_var, nb_changed_pos, _temp_mutants[index]
+                    return code, prog_length, feature_ids, new_feature_ids, adv_code, true_label, orig_label, mutate_preds[index], 1, variable_names, None, nb_changed_var, nb_changed_pos, _temp_mutants[index]
                 _tmp_fitness = max(orig_prob) - logits[orig_label]
                 mutate_fitness_values.append(_tmp_fitness)
             
@@ -309,7 +329,13 @@ class Attacker():
                     population[min_index] = _temp_mutants[index]
                     fitness_values[min_index] = fitness_value
 
-        return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, nb_changed_var, nb_changed_pos, None
+        new_feature = convert_code_to_features(adv_code,
+                                               code_2,
+                                               self.tokenizer_tgt,
+                                               example[6].item(),
+                                               self.args)
+        new_feature_ids = np.array(new_feature.input_ids_1 + new_feature.input_ids_2)
+        return code, prog_length, feature_ids, new_feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, nb_changed_var, nb_changed_pos, None
         
 
 
@@ -344,6 +370,7 @@ class Attacker():
         true_label = example[6].item()
         adv_code = ''
         temp_label = None
+        feature_ids = np.concatenate([example[0].cpu().numpy().reshape(-1), example[3].cpu().numpy().reshape(-1)])
 
 
         # When do attack, we only attack the first code snippet
@@ -360,19 +387,19 @@ class Attacker():
 
         variable_names = list(substitutes.keys())
 
-        if not orig_label == true_label:
+        if (orig_label != true_label) and (orig_label != HashSmooth.ABSTAIN):
             # 说明原来就是错的
             is_success = -4
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, feature_ids, feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
             
         if len(variable_names) == 0:
             # 没有提取到identifier，直接退出
             is_success = -3
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
+            return code, prog_length, feature_ids, feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, None, None, None, None
 
         sub_words = [self.tokenizer_tgt.cls_token] + sub_words[:self.args.code_length - 2] + [self.tokenizer_tgt.sep_token]
 
-        importance_score, replace_token_positions, names_positions_dict = get_importance_score(self.args, example, 
+        importance_score, replace_token_positions, names_positions_dict = get_importance_score(self.args, example,
                                                 processed_code, processed_code_2,
                                                 words,
                                                 sub_words,
@@ -385,7 +412,7 @@ class Attacker():
                                                 model_type='classification')
 
         if importance_score is None:
-            return code, prog_length, adv_code, true_label, orig_label, temp_label, -3, variable_names, None, None, None, None
+            return code, prog_length, feature_ids, feature_ids, adv_code, true_label, orig_label, temp_label, -3, variable_names, None, None, None, None
 
 
         token_pos_to_score_pos = {}
@@ -451,7 +478,7 @@ class Attacker():
 
             for index, temp_prob in enumerate(logits):
                 temp_label = preds[index]
-                if temp_label != orig_label:
+                if temp_label != orig_label and temp_label != HashSmooth.ABSTAIN:
                     # 如果label改变了，说明这个mutant攻击成功
                     is_success = 1
                     nb_changed_var += 1
@@ -460,11 +487,24 @@ class Attacker():
                     replaced_words[tgt_word] = candidate
 
                     adv_code = get_example(final_code, tgt_word, candidate, "java")
+                    new_feature = convert_code_to_features(adv_code,
+                                                           code_2,
+                                                           self.tokenizer_tgt,
+                                                           example[6].item(),
+                                                           self.args)
+                    new_feature_ids = np.array(new_feature.input_ids_1 + new_feature.input_ids_2)
                     print("%s SUC! %s => %s (%.5f => %.5f)" % \
                         ('>>', tgt_word, candidate,
                         current_prob,
                         temp_prob[orig_label]), flush=True)
-                    return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+                    return code, prog_length, feature_ids, new_feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+                elif temp_label == HashSmooth.ABSTAIN:
+                    # gap = current_prob - max(temp_prob)
+                    gap = current_prob - temp_prob[true_label]
+                    # 并选择那个最大的gap.
+                    if gap > most_gap:
+                        most_gap = gap
+                        candidate = substitute_list[index]
                 else:
                     # 如果没有攻击成功，我们看probability的修改
                     gap = current_prob - temp_prob[temp_label]
@@ -488,8 +528,14 @@ class Attacker():
                 replaced_words[tgt_word] = tgt_word
             
             adv_code = final_code
+            new_feature = convert_code_to_features(adv_code,
+                                                   code_2,
+                                                   self.tokenizer_tgt,
+                                                   example[6].item(),
+                                                   self.args)
+            new_feature_ids = np.array(new_feature.input_ids_1 + new_feature.input_ids_2)
 
-        return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
+        return code, prog_length, feature_ids, new_feature_ids, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
 
 
 
@@ -534,14 +580,14 @@ class MHM_Attacker():
         if not orig_label == true_label:
             # 说明原来就是错的
             is_success = -4
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code_1, 'raw_tokens': code_1}
 
         raw_tokens = copy.deepcopy(words)
 
         uid = get_identifier_posistions_from_code(words, variable_names)
 
         if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code_1, 'raw_tokens': code_1}
 
         # 还需要得到substitues
 
@@ -593,7 +639,11 @@ class MHM_Attacker():
         nb_changed_pos = 0
         for uid_ in old_uids.keys():
             replace_info[uid_] = old_uids[uid_][-1]
-            nb_changed_pos += len(uid[old_uids[uid_][-1]])
+            if old_uids[uid_][-1] not in uid.keys():
+                warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
+                pass
+            else:
+                nb_changed_pos += len(uid[old_uids[uid_][-1]])
         return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos":nb_changed_pos, "replace_info": replace_info, "attack_type": "MHM", "orig_label": orig_label}
     
     def mcmc_random(self, example, substituions, tokenizer, code_pair, _label=None, _n_candi=30,
@@ -628,14 +678,14 @@ class MHM_Attacker():
         if not orig_label == true_label:
             # 说明原来就是错的
             is_success = -4
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code_1, 'raw_tokens': code_1}
 
         raw_tokens = copy.deepcopy(words)
 
         uid = get_identifier_posistions_from_code(words, variable_names)
 
         if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code_1, 'raw_tokens': code_1}
 
         variable_substitue_dict = {}
         for tgt_word in uid.keys():
@@ -686,7 +736,11 @@ class MHM_Attacker():
 
         for uid_ in old_uids.keys():
             replace_info[uid_] = old_uids[uid_][-1]
-            nb_changed_pos += len(uid[old_uids[uid_][-1]])
+            if old_uids[uid_][-1] not in uid.keys():
+                warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
+                pass
+            else:
+                nb_changed_pos += len(uid[old_uids[uid_][-1]])
         return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos":nb_changed_pos, "replace_info": replace_info, "attack_type": "Ori_MHM", "orig_label": orig_label}
 
     def __replaceUID(self, words_2, _tokens, _label=None, _uid={}, substitute_dict={},
@@ -720,7 +774,7 @@ class MHM_Attacker():
             prob, pred = self.classifier.get_results(new_dataset, self.args.eval_batch_size)
 
             for i in range(len(candi_token)):   # Find a valid example
-                if pred[i] != _label: # 如果有样本攻击成功
+                if pred[i] != _label and pred[i] != HashSmooth.ABSTAIN: # 如果有样本攻击成功
                     return {"status": "s", "alpha": 1, "tokens": candi_tokens[i],
                             "old_uid": selected_uid, "new_uid": candi_token[i],
                             "old_prob": prob[0], "new_prob": prob[i],
@@ -782,7 +836,7 @@ class MHM_Attacker():
             prob, pred = self.classifier.get_results(new_dataset, self.args.eval_batch_size)
 
             for i in range(len(candi_token)):   # Find a valid example
-                if pred[i] != _label: # 如果有样本攻击成功
+                if pred[i] != _label and pred[i] != HashSmooth.ABSTAIN: # 如果有样本攻击成功
                     return {"status": "s", "alpha": 1, "tokens": candi_tokens[i],
                             "old_uid": selected_uid, "new_uid": candi_token[i],
                             "old_prob": prob[0], "new_prob": prob[i],

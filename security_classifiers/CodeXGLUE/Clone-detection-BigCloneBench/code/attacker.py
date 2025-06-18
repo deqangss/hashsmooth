@@ -564,7 +564,7 @@ class MHM_Attacker():
         uid = get_identifier_posistions_from_code(words, variable_names)
 
         if len(uid) <= 0: # 是有可能存在找不到变量名的情况的.
-            return {'succ': None, 'tokens': None, 'raw_tokens': None}
+            return {'succ': None, 'tokens': code_1, 'raw_tokens': code_1}
 
         
         variable_substitue_dict = {}

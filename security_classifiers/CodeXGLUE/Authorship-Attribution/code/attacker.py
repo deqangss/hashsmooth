@@ -65,13 +65,15 @@ def get_importance_score(args, example, code, words_list: list, sub_words: list,
     orig_probs = logits[0]
     orig_label = preds[0]
     # 第一个是original code的数据.
+    true_label = example[1].item()
     
     orig_prob = max(orig_probs)
     # predicted label对应的probability
 
     importance_score = []
     for prob in logits[1:]:
-        importance_score.append(orig_prob - prob[orig_label])
+        prob_temp = prob[orig_label] if orig_label != HashSmooth.ABSTAIN else prob[true_label]
+        importance_score.append(orig_prob - prob_temp)
 
     return importance_score, replace_token_positions, positions
 
@@ -527,7 +529,11 @@ class MHM_Attacker():
         nb_changed_pos = 0
         for uid_ in old_uids.keys():
             replace_info[uid_] = old_uids[uid_][-1]
-            nb_changed_pos += len(uid[old_uids[uid_][-1]])
+            if old_uids[uid_][-1] not in uid.keys():
+                warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
+                pass
+            else:
+                nb_changed_pos += len(uid[old_uids[uid_][-1]])
         return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos": nb_changed_pos, "replace_info": replace_info, "attack_type": "MHM"}
 
     def mcmc_random(self, tokenizer, code=None, _label=None, _n_candi=30,
@@ -599,7 +605,11 @@ class MHM_Attacker():
         nb_changed_pos = 0
         for uid_ in old_uids.keys():
             replace_info[uid_] = old_uids[uid_][-1]
-            nb_changed_pos += len(uid[old_uids[uid_][-1]])
+            if old_uids[uid_][-1] not in uid.keys():
+                warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
+                pass
+            else:
+                nb_changed_pos += len(uid[old_uids[uid_][-1]])
         return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos": nb_changed_pos, "replace_info": replace_info, "attack_type": "MHM-Origin"}
     
     def __replaceUID(self, _tokens, _label=None, _uid={}, substitute_dict={},

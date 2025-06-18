@@ -22,16 +22,6 @@ import numpy as np
 import pickle
 import time
 from functools import partial
-from run import set_seed
-from run import TextDataset
-from run import InputFeatures
-from utils import Recorder
-from utils import python_keywords, is_valid_substitue, _tokenize
-from utils import get_identifier_posistions_from_code
-from utils import get_masked_code_by_position, get_substitues, is_valid_variable_name
-
-import numpy as np
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 sys.path.append('../../')
 sys.path.append('../../../')
@@ -40,6 +30,12 @@ sys.path.append('../../../python_parser')
 sys.path.append('../../../../hashsmooth')
 sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
+from run import set_seed
+from run import TextDataset
+from run import InputFeatures
+from utils import Recorder
+import numpy as np
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 from model import Model
 from run_parser import get_identifiers
@@ -342,6 +338,8 @@ def main():
         print("Total count: ", total_cnt)
         print("Index: ", index)
         print()
+        with open(args.output_dir + '/adv-ga.pickle', 'wb') as fw:
+            pickle.dump((features, new_features, status), fw)
     
         
 if __name__ == '__main__':

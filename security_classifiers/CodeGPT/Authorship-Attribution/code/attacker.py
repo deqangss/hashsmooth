@@ -64,6 +64,7 @@ def get_importance_score(args, example, code, words_list: list, sub_words: list,
     logits, preds = tgt_model.get_results(new_dataset, args.eval_batch_size)
     orig_probs = logits[0]
     orig_label = preds[0]
+    true_label = example[1].item()
     # 第一个是original code的数据.
     
     orig_prob = max(orig_probs)
@@ -71,7 +72,8 @@ def get_importance_score(args, example, code, words_list: list, sub_words: list,
 
     importance_score = []
     for prob in logits[1:]:
-        importance_score.append(orig_prob - prob[orig_label])
+        prob_temp = prob[orig_label] if orig_label != HashSmooth.ABSTAIN else prob[true_label]
+        importance_score.append(orig_prob - prob_temp)
 
     return importance_score, replace_token_positions, positions
 
