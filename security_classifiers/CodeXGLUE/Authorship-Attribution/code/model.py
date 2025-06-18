@@ -197,9 +197,9 @@ class RandomSmooth4LLM(nn.Module, RandomSmooth):
 
         logits = np.concatenate(logits, 0)
         probs = logits
-        pred_labels = [0 if first_softmax > threshold else 1 for first_softmax in logits[:, 0]]
+        pred_labels = np.argmax(logits, axis=1)
         pred_labels = np.array(pred_labels).reshape([self.args.n_sampling, len(dataset)]).transpose([1, 0])
-        pred_labels_onehot = np.eye(2)[pred_labels.astype(int)].sum(axis=-2)
+        pred_labels_onehot = np.eye(self.args.number_labels)[pred_labels.astype(int)].sum(axis=-2)
         pred_labels = np.argmax(pred_labels_onehot, axis=-1)
 
         # abstain
@@ -293,9 +293,9 @@ class RandomDelSmooth4LLM(nn.Module, RandomDelSmooth):
 
         logits = np.concatenate(logits, 0)
         probs = logits
-        pred_labels = [0 if first_softmax > threshold else 1 for first_softmax in logits[:, 0]]
+        pred_labels = np.argmax(logits, axis=1)
         pred_labels = np.array(pred_labels).reshape([self.args.n_sampling, len(dataset)]).transpose([1, 0])
-        pred_labels_onehot = np.eye(2)[pred_labels.astype(int)].sum(axis=-2)
+        pred_labels_onehot = np.eye(self.args.number_labels)[pred_labels.astype(int)].sum(axis=-2)
         pred_labels = np.argmax(pred_labels_onehot, axis=-1)
 
         # abstain
@@ -380,9 +380,9 @@ class HashSmooth4LLM(nn.Module, HashSmooth):
 
         logits = np.concatenate(logits, 0)
         probs = logits
-        pred_labels = [0 if first_softmax > threshold else 1 for first_softmax in logits[:, 0]]
+        pred_labels = np.argmax(logits, axis=1)
         pred_labels = np.array(pred_labels).reshape([self.args.n_sampling, len(dataset)]).transpose([1, 0])
-        pred_labels_onehot = np.eye(2)[pred_labels.astype(int)].sum(axis=-2)
+        pred_labels_onehot = np.eye(self.args.number_labels)[pred_labels.astype(int)].sum(axis=-2)
         pred_labels = np.argmax(pred_labels_onehot, axis=-1)
 
         # abstain
