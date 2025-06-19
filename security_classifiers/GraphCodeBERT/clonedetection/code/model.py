@@ -226,7 +226,7 @@ class RandomSmooth4LLM(nn.Module, RandomSmooth):
         top2 = pred_labels_onehot.argsort(axis=-1)[:, ::-1][:, :2]
         count1 = pred_labels_onehot[range(len(dataset)), top2[:, 0]].astype(int)
         count2 = pred_labels_onehot[range(len(dataset)), top2[:, 1]].astype(int)
-        abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
+        abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha # two classes
         pred_labels[abstain_flag] = self.ABSTAIN
 
         probs = np.array(probs).reshape([self.args.n_sampling, len(dataset), -1]).transpose([1, 0, 2]).mean(axis=-2)
