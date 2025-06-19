@@ -724,11 +724,11 @@ class MHM_Attacker():
         for uid_ in old_uids.keys():
             replace_info[uid_] = old_uids[uid_][-1]
             if old_uids[uid_][-1] not in uid.keys():
-                warnings.warn("Cannot find the key: ", old_uids[uid_][-1])
+                warnings.warn("Cannot find the key: " + old_uids[uid_][-1])
                 pass
             else:
                 nb_changed_pos += len(uid[old_uids[uid_][-1]])
-        return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length,
+        return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': raw_tokens, "prog_length": prog_length,
                 "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid,
                 "score_info": res["old_prob"][0] - res["new_prob"][0], "nb_changed_var": len(old_uids),
                 "nb_changed_pos": nb_changed_pos, "replace_info": replace_info, "attack_type": "Ori_MHM",
@@ -1000,4 +1000,3 @@ class WIR_Attacker():
             adv_code = final_code
 
         return code, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, names_to_importance_score, nb_changed_var, nb_changed_pos, replaced_words
- 

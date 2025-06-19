@@ -592,8 +592,8 @@ class GraphCodeDataset(Dataset):
                             self.args.code_length+self.args.data_flow_length),dtype=bool)
         #calculate begin index of node and max length of input
 
-        if self.args.smooth == 'randomdel' or self.args.smooth == 'hrs' or self.args.smooth=='random':
-            k_random = self.args.k_random if self.args.smooth != 'hrs' else self.args.kmer * self.args.k_random
+        if self.args.smooth == 'randdel' or self.args.smooth == 'hash' or self.args.smooth=='random':
+            k_random = self.args.k_random if self.args.smooth != 'hash' else self.args.kmer * self.args.k_random
             # node_index=sum([i>1 for i in self.examples[item].position_idx])
             # max_length=sum([i!=1 for i in self.examples[item].position_idx])
             node_index = sum([i > 1 for i in self.examples[item].position_idx if i <= k_random + 1])

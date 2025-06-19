@@ -591,7 +591,7 @@ class MHM_Attacker():
                 pass
             else:
                 nb_changed_pos += len(uid[old_uids[uid_][-1]])
-        return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos":nb_changed_pos, "replace_info": replace_info, "attack_type": "MHM"}
+        return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': raw_tokens, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos":nb_changed_pos, "replace_info": replace_info, "attack_type": "MHM"}
     
     
     def mcmc_random(self, tokenizer, code=None, _label=None, _n_candi=30,
@@ -617,7 +617,7 @@ class MHM_Attacker():
         old_uids = {}
         old_uid = ""
         for iteration in range(1, 1+_max_iter):
-            # 这个函数需要tokens todo: check
+            # 这个函数需要tokens
             res = self.__replaceUID_random(_tokens=code, _label=_label, _uid=uid,
                                     substitute_dict=variable_substitue_dict,
                                     _n_candi=_n_candi,
@@ -662,7 +662,7 @@ class MHM_Attacker():
                 pass
             else:
                 nb_changed_pos += len(uid[old_uids[uid_][-1]])
-        return {'succ': False, 'tokens': res['tokens'], 'raw_tokens': None, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos": nb_changed_pos, "replace_info": replace_info, "attack_type": "Ori_MHM"}
+        return {'succ': False, 'tokens': code, 'raw_tokens': raw_tokens, "prog_length": prog_length, "new_pred": res["new_pred"], "is_success": -1, "old_uid": old_uid, "score_info": res["old_prob"][0]-res["new_prob"][0], "nb_changed_var": len(old_uids), "nb_changed_pos": nb_changed_pos, "replace_info": replace_info, "attack_type": "Ori_MHM"}
     
     def __replaceUID(self, _tokens, _label=None, _uid={}, substitute_dict={},
                      _n_candi=30, _prob_threshold=0.95, _candi_mode="random"):

@@ -261,7 +261,7 @@ if __name__ == "__main__":
         start_time = time.time()
 
         if orig_label != ground_truth:
-            _res = {'succ': None, 'tokens': code_pair[2], 'raw_tokens': code_pair[2]}
+            _res = {'succ': None, 'tokens': code, 'raw_tokens': code}
         else:
             # 这里需要进行修改.
             if args.original:
@@ -290,15 +290,15 @@ if __name__ == "__main__":
         
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
-        if _res['succ'] == True:
+        example_ = convert_code_to_features(_res['raw_tokens'], tokenizer, ground_truth, args)
+        if _res['succ'] == True and _res['succ'] == False:
             recoder.writemhm(index, code, code, _res['tokens'],
-                             _res["prog_length"], " ".join(_res['tokens']), ground_truth, orig_label, _res["new_pred"],
+                             _res["prog_length"], _res['tokens'], ground_truth, orig_label, _res["new_pred"],
                              _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"],
                              _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"],
                              model.query - query_times, "0")
-
         else:
             recoder.writemhm(index, code, code, _res['tokens'],
-                             None, " ".join(_res['tokens']), ground_truth, orig_label, None, 0, None, None, None, None,
+                             None, _res['tokens'], ground_truth, orig_label, None, 0, None, None, None, None,
                              None, None, model.query - query_times, None)
         query_times = model.query
