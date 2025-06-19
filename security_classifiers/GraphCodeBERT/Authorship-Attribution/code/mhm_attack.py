@@ -250,7 +250,7 @@ if __name__ == "__main__":
     total_cnt = 0
     query_times = 0
     all_start_time = time.time()
-    for index, example in enumerate(eval_dataset):
+    for index, example in enumerate(eval_dataset[20:]):
         code = source_codes[index]
         subs = substs[index]
         
@@ -290,8 +290,7 @@ if __name__ == "__main__":
         
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
-        example_ = convert_code_to_features(_res['raw_tokens'], tokenizer, ground_truth, args)
-        if _res['succ'] == True and _res['succ'] == False:
+        if _res['succ'] == True or _res['succ'] == False:
             recoder.writemhm(index, code, code, _res['tokens'],
                              _res["prog_length"], _res['tokens'], ground_truth, orig_label, _res["new_pred"],
                              _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"],
@@ -299,6 +298,6 @@ if __name__ == "__main__":
                              model.query - query_times, "0")
         else:
             recoder.writemhm(index, code, code, _res['tokens'],
-                             None, _res['tokens'], ground_truth, orig_label, None, 0, None, None, None, None,
+                             None, _res['tokens'], ground_truth, orig_label, None, 0, None, None, None, 0,
                              None, None, model.query - query_times, None)
         query_times = model.query

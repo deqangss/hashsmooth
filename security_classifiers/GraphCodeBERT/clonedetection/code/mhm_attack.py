@@ -287,7 +287,7 @@ if __name__ == "__main__":
         print ("  curr succ rate = "+str(n_succ/total_cnt))
         print("Query times in this attack: ", model.query - query_times)
         print("All Query times: ", model.query)
-        if _res['succ'] == True and _res['succ'] == False:
+        if _res['succ'] == True or _res['succ'] == False:
             recoder.writemhm(index,
                              "CODE1: " + code_pair[2].replace("\n", " ") + " ||CODE2: " + code_pair[3].replace("\n",
                                                                                                                " "),
