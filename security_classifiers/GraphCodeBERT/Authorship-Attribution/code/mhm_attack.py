@@ -250,7 +250,7 @@ if __name__ == "__main__":
     total_cnt = 0
     query_times = 0
     all_start_time = time.time()
-    for index, example in enumerate(eval_dataset[20:]):
+    for index, example in enumerate(eval_dataset):
         code = source_codes[index]
         subs = substs[index]
         
