@@ -460,7 +460,7 @@ def measurement(_y_true, _y_pred):
     tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
     fpr = fp / float(tn + fp)
     fnr = fn / float(tp + fn)
-    f1 = f1_score(_y_true, _y_pred, average='binary')
+    f1 = f1_score(_y_true, _y_pred, average='macro')
 
     return accuracy, b_accuracy, fnr, fpr, f1
 
