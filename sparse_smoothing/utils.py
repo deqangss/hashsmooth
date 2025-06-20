@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from sparse_smoothing.sparsegraph import SparseGraph
 from torch_sparse import coalesce
-from torch_geometric.data import Data, Batch
+# from torch_geometric.data import Data, Batch
 from torchvision import datasets, transforms
 from torch.utils.data import TensorDataset
 
