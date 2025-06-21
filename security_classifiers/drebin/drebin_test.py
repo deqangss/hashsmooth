@@ -118,7 +118,7 @@ def _main():
                                          pf_plus=args.pf_plus,
                                          default_mode=True,
                                          model_save_dir=os.path.join(args.save_path,
-                                                                     'random_{}_model'.format(args.model)))
+                                                                     'sparsity_{}_model'.format(args.model)))
         train_model = functools.partial(classifier.fit, n_sampling=args.n_sampling)
         predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
     elif args.smooth == 'hash':

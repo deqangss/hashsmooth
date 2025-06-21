@@ -4,6 +4,7 @@
 # datetime: 2023/8/7 7:42 PM
 # software: PyCharm
 import os
+import sys
 import random
 import argparse
 import functools
@@ -23,7 +24,7 @@ from randomsmooth.random_tran import RandomTransformer
 from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch
 from model import DrebinNN, DrebinSVM, RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 from dataset import Dataset
-from .drebin_blackbox_attack import EABlackBoxEvasionProblem, EvolutionAA
+from drebin_blackbox_attack import EABlackBoxEvasionProblem, EvolutionAA
 
 torch.manual_seed(23456)
 torch.cuda.manual_seed(23456)
@@ -88,8 +89,6 @@ logger.addHandler(drebin_utils.ErrorHandler)
 
 def _main():
     args = atta_argparse.parse_args()
-    if not os.path.exists(args.save_path):
-        drebin_utils.mkdir(args.save_path)
 
     if args.cuda:
         assert torch.cuda.is_available(), "No GPU device."
@@ -111,8 +110,8 @@ def _main():
     test_indices = np.arange(len(mal_test_x))
     np.random.seed(args.seed)
     np.random.shuffle(test_indices)
-    mal_test_x_sel = mal_test_x[test_indices[:10]]
-    mal_test_y_sel = mal_test_y[test_indices[:10]]
+    mal_test_x_sel = mal_test_x[test_indices[:100]] # todo: check the number of examples
+    mal_test_y_sel = mal_test_y[test_indices[:100]]
 
     test_mal_producer = dataset.get_dataloader(*(mal_test_x_sel, mal_test_y_sel))
     input_dim = test_x.shape[1]
@@ -142,7 +141,7 @@ def _main():
                                            pf_plus=args.pf_plus,
                                            default_mode=True,
                                            model_save_dir=os.path.join(args.save_path,
-                                                                       'random_{}_model'.format(args.model)))
+                                                                       'sparsity_{}_model'.format(args.model)))
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
         classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling, batch_size=args.batch_size)
     elif args.smooth == 'hash':
@@ -234,9 +233,9 @@ def _main():
             ))
 
     # save
-    if not os.path.exists(os.path.join(classifier.model_save_path, 'adv-examples-ea')):
-        drebin_utils.mkdir(os.path.join(classifier.model_save_path, 'adv-examples-ea'))
-    np.savez(os.path.join(classifier.model_save_path, 'adv-examples-ea',
+    if not os.path.exists(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples-ea')):
+        drebin_utils.mkdir(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples-ea'))
+    np.savez(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples-ea',
                           '{}_{}_{}_adv.npz'.format(args.model, args.smooth, args.K)),
              adv=advs, mal_pred=adv_prediction, test_idx=test_indices[:200])
 

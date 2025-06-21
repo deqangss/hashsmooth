@@ -116,7 +116,7 @@ def _main():
                                          pf_plus=args.pf_plus,
                                          default_mode=True,
                                          model_save_dir=os.path.join(args.save_path,
-                                                                     'random_{}_model'.format(args.model)))
+                                                                     'sparsity_{}_model'.format(args.model)))
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
         classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling, batch_size=args.batch_size)
     elif args.smooth == 'hash':
@@ -192,9 +192,9 @@ def _main():
                 ))
 
     # save
-    if not os.path.exists(os.path.join(classifier.model_save_path, 'adv-examples')):
-        drebin_utils.mkdir(os.path.join(classifier.model_save_path, 'adv-examples'))
-    np.savez(os.path.join(classifier.model_save_path, 'adv-examples', '{}_{}_{}_adv.npz'.format(args.model, args.smooth + str(args.K), args.steps)),
+    if not os.path.exists(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples')):
+        drebin_utils.mkdir(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples'))
+    np.savez(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples', '{}_{}_{}_pgd_adv.npz'.format(args.model, args.smooth + str(args.K), args.steps)),
              adv=adv, mal_pred=adv_prediction)
 
 

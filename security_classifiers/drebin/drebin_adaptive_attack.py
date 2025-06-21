@@ -137,7 +137,7 @@ class PGDl1(object):
 
         # 5. tailor the interdependent apis
         if self.is_attacker and (self.omega_add is not None) and (self.omega_rmv is not None):
-            iterdep_add_flag = torch.sum(self.omega_add, dim=-1) > 0
+            iterdep_feat_flag = torch.sum(self.omega_add, dim=-1) > 0
             perturbations += (torch.any(directions[:, iterdep_feat_flag] > 0, dim=-1, keepdim=True)) * check_nonexist_insert
             directions += perturbations * self.omega_add
 

@@ -6,6 +6,7 @@
 import os
 import argparse
 import functools
+import pickle
 
 import numpy as np
 import torch
@@ -29,46 +30,43 @@ from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch
 from model import DrebinNN, DrebinSVM, RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 from dataset import Dataset
 
-cmd_md = argparse.ArgumentParser(description='arguments for drebin model test')
-cmd_md.add_argument('--lr', type=float, default=0.001,
-                    help='The learning rate of ML models.')
-cmd_md.add_argument('--seed', type=int, default=23456,
-                    help='Random seed for reproduction')
-cmd_md.add_argument('--cuda', action='store_true', default=False,
-                    help='whether use cuda enable gpu or not.')
-cmd_md.add_argument('--dataset_dir', type=str, default='',
-                    help='Folder path to dataset directory.')
-cmd_md.add_argument('--dataset_name', type=str, default='drebin',
-                    help='Dataset name.')
-cmd_md.add_argument('--batch_size', type=int, default=64,
-                    help='computation upon a batch of data instances for saving RAM')
-cmd_md.add_argument('--epochs', type=int, default=200,
-                    help='number of epochs to train a model')
-cmd_md.add_argument('--K', type=int, default=64,
-                    help='Number of selected entities or hash functions.')
-cmd_md.add_argument('--alpha', type=float, default=0.05,
-                    help='Significance level of hypotheses testing.')
-cmd_md.add_argument('--pf_minus', type=float, default=0.9,
-                    help='The probability to flip a one to a zero.')
-cmd_md.add_argument('--pf_plus', type=float, default=0.1,
-                    help='The probability to flip a zero to a one')
-cmd_md.add_argument('--n_sampling', type=int, default=100,
-                    help='Number of sampling times for estimating the predictive label.')
-cmd_md.add_argument('--save_path', type=str, default='',
-                    help='Folder path to save results.')
-cmd_md.add_argument('--model', type=str, default='drebin_svm',
-                    choices=['svm', 'dnn'],
-                    help="model type, choose from 'svm' and 'dnn'.\n")
-cmd_md.add_argument('--smooth', type=str, default='none',
-                    choices=['random', 'sparsity', 'hash'],
-                    help="smooth method, choose from 'random' or 'hash'.\n")
+cert_argparse = argparse.ArgumentParser(description='arguments for drebin certification')
+cert_argparse.add_argument('--seed', type=int, default=23456,
+                           help='Random seed for reproduction')
+cert_argparse.add_argument('--cuda', action='store_true', default=False,
+                           help='whether use cuda enable gpu or not.')
+cert_argparse.add_argument('--dataset_dir', type=str, default='',
+                           help='Folder path to dataset directory.')
+cert_argparse.add_argument('--dataset_name', type=str, default='drebin',
+                           help='Dataset name.')
+cert_argparse.add_argument('--batch_size', type=int, default=64,
+                           help='computation upon a batch of data instances for saving RAM')
+cert_argparse.add_argument('--K', type=int, default=64,
+                           help='Number of hash functions.')
+cert_argparse.add_argument('--pf_minus', type=float, default=0.9,
+                           help='The probability to flip a one to a zero.')
+cert_argparse.add_argument('--pf_plus', type=float, default=0.1,
+                           help='The probability to flip a zero to a one')
+cert_argparse.add_argument('--alpha', type=float, default=0.05,
+                           help='Significance level of hypotheses testing.')
+cert_argparse.add_argument('--n_sampling', type=int, default=100,
+                           help='Number of sampling times for estimating the predictive label.')
+cert_argparse.add_argument('--n_estimation', type=int, default=10000,
+                           help='Number of sampling times for estimating the confidence level.')
+cert_argparse.add_argument('--save_path', type=str, default='./results',
+                           help='Folder path to save results.')
+cert_argparse.add_argument('--model', type=str, default='drebin_svm',
+                           choices=['svm', 'dnn'],
+                           help="model type, choose from 'svm' and 'dnn'.\n")
+cert_argparse.add_argument('--smooth', type=str, default='none',
+                            choices=['random', 'sparsity', 'hash'],
+                            help="smooth method, choose from 'random' or 'hash'.\n")
 
 logger = drebin_utils.logging.getLogger("drebin")
 logger.addHandler(drebin_utils.ErrorHandler)
 
 def _main():
-    args = cmd_md.parse_args()
-    logger.info(vars(args))
+    args = cert_argparse.parse_args()
     if not os.path.exists(args.save_path):
         drebin_utils.mkdir(args.save_path)
     if args.cuda:
@@ -85,7 +83,7 @@ def _main():
     if args.smooth == 'hash':
         mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x)
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
-    input_dim = mal_test_x[0].shape[1]
+    input_dim = mal_test_x.shape[1]
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
         classifier.model.to(device)
@@ -111,7 +109,7 @@ def _main():
                                          pf_plus=args.pf_plus,
                                          default_mode=True,
                                          model_save_dir=os.path.join(args.save_path,
-                                                                     'random_{}_model'.format(args.model)))
+                                                                     'sparsity_{}_model'.format(args.model)))
         classifier.certify = functools.partial(classifier.certify, n_selection=args.n_sampling,
                                                n_estimation=args.n_estimation,
                                                alpha=args.alpha)
@@ -135,7 +133,7 @@ def _main():
 
     # certification
     logger.info("sub k {}, number of selection {}, number of estimation {}, confidence level {}.".format(
-        args.sub_k,
+        args.K,
         args.n_sampling,
         args.n_estimation,
         args.alpha
@@ -150,26 +148,28 @@ def _main():
     if args.smooth == 'random' or args.smooth == 'hash':
         radii_dis = np.concatenate([rad[0] for rad in radii])
     elif args.smooth == 'sparsity':
-        radii_dis = np.vstack([[rad[0], rad[1]] for rad in radii])
+        add_rad = []
+        rmv_rad = []
+        for rad in radii:
+            add_rad.append(rad[0])
+            rmv_rad.append(rad[1])
+        radii_dis = np.stack([np.concatenate(add_rad), np.concatenate(rmv_rad)])
     else:
         raise ValueError
-    assert len(radii_dis) == len(mal_test_y)
+    assert radii_dis.shape[-1] == len(mal_test_y)
     radius_mean = np.mean(radii_dis.clip(min=0.), axis=-1)
     radius_median = np.median(radii_dis, axis=-1)
     logger.info('\n' + '\n'.join(map(str, radii_dis.tolist())))
     logger.info("Model of {} achieves the certification mean {} and median {} with input dim {}.".format(
         args.model, radius_mean, radius_median, input_dim))
-    if not os.path.exists(os.path.join(classifier.model_save_path, 'cert')):
-        drebin_utils.mkdir(os.path.join(classifier.model_save_path, 'cert'))
+    if not os.path.exists(os.path.join(os.path.dirname(classifier.model_save_path), 'cert')):
+        drebin_utils.mkdir(os.path.join(os.path.dirname(classifier.model_save_path), 'cert'))
     if args.smooth == 'random' or args.smooth == 'hash':
-        np.savez(os.path.join(classifier.model_save_path, 'cert',
-                              '{}_{}_{}_radii.npz'.format(args.model, args.smooth, args.K)),
-                 radii=radii)
+        drebin_utils.dump_pickle(radii, os.path.join(os.path.dirname(classifier.model_save_path), 'cert',
+                              '{}_{}_{}_radii.npz'.format(args.model, args.smooth, args.K)))
     else:
-        np.savez(os.path.join(classifier.model_save_path, 'cert',
-                              '{}_{}_{}_{}_radii.npz'.format(args.model, args.smooth, args.pf_minus, args.pf_plus)),
-                 radii=radii)
-
+        drebin_utils.dump_pickle(radii, os.path.join(os.path.dirname(classifier.model_save_path), 'cert',
+                              '{}_{}_{}_{}_radii.npz'.format(args.model, args.smooth, args.pf_minus, args.pf_plus)))
 
 
 if __name__ == "__main__":

@@ -350,7 +350,7 @@ class RandomSmooth4Drebin(RandomSmooth):
             counts_selection = self.sample_funcs(x, n_selection)
             counts_estimation = self.sample_funcs(x, n_estimation)
 
-            c_pred = counts_selection.argmax(dim=-1)
+            c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
             n_targeted = counts_estimation[range(len(c_pred)), c_pred]
             prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
             n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
@@ -366,11 +366,11 @@ class RandomSmooth4Drebin(RandomSmooth):
                                                                 abstain_indicator[incorrect_indicator_true]
                 radius[incorrect_indicator] = self.ABSTAIN - 1
             total_abstain_indicator = abstain_indicator | incorrect_indicator
-
-            radius[~total_abstain_indicator] = self.calc_radius(
-                np.array(prob_underlined[~total_abstain_indicator])[..., None],
-                x[0].cpu().numpy().size,
-                self.max_k)
+            if np.any(~total_abstain_indicator):
+                radius[~total_abstain_indicator] = self.calc_radius(
+                    np.array(prob_underlined[~total_abstain_indicator])[..., None],
+                    x[0].cpu().numpy().size,
+                    self.max_k)
             return radius, total_abstain_indicator
 
     def sample_funcs(self, x: torch.Tensor, n: int):
@@ -548,22 +548,22 @@ class SparsitySmooth4Drebin(SparsitySmooth):
             radius_ad[incorrect_indicator] = self.ABSTAIN - 1
             radius_rd[incorrect_indicator] = self.ABSTAIN - 1
         total_abstain_indicator = abstain_indicator | incorrect_indicator
+        if np.any(~total_abstain_indicator):
+            grid_base, grid_lower, grid_upper = self.calc_radius(
+                counts_estimation[~total_abstain_indicator].cpu().numpy(),
+                counts_selection[~total_abstain_indicator].cpu().numpy(),
+                n_estimation,
+                alpha
+            )
+            max_ra_base = (grid_base > 0.5)[:, :, 0].argmin(1)
+            max_rd_base = (grid_base > 0.5)[:, 0, :].argmin(1)
+            max_ra_loup = (grid_lower >= grid_upper)[:, :, 0].argmin(1)
+            max_rd_loup = (grid_lower >= grid_upper)[:, 0, :].argmin(1)
 
-        grid_base, grid_lower, grid_upper = self.calc_radius(
-            n_targeted[~total_abstain_indicator],
-            n_runnerup[~total_abstain_indicator],
-            n_estimation,
-            alpha
-        )
-        max_ra_base = (grid_base > 0.5)[:, :, 0].argmin(1)
-        max_rd_base = (grid_base > 0.5)[:, 0, :].argmin(1)
-        max_ra_loup = (grid_lower >= grid_upper)[:, :, 0].argmin(1)
-        max_rd_loup = (grid_lower >= grid_upper)[:, 0, :].argmin(1)
+            radius_ad[~total_abstain_indicator] = max_ra_loup
+            radius_rd[~total_abstain_indicator] = max_rd_loup
 
-        radius_ad[~total_abstain_indicator] = max_ra_loup
-        radius_rd[~total_abstain_indicator] = max_rd_loup
-
-        return radius_ad, radius_rd, max_ra_base, max_rd_base, total_abstain_indicator
+        return radius_ad, radius_rd, total_abstain_indicator
 
     def sample_funcs(self, x: torch.Tensor, n):
         votes = torch.zeros((x.shape[0], self.num_of_classes), dtype=torch.long, device=x.device)
@@ -742,13 +742,13 @@ class HashSmooth4Drebin(HashSmooth):
                                                             abstain_indicator[incorrect_indicator_true]
             radii[incorrect_indicator] = self.ABSTAIN - 1
         total_abstain_indicator = abstain_indicator | incorrect_indicator
-
-        radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
-                                                          prob_overlined[~total_abstain_indicator],
-                                                           k_hashcode=self.k_hashcode,
-                                                           max_radius=0.1,
-                                                           n_grid=1000
-                                                          )
+        if np.any(~total_abstain_indicator):
+            radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
+                                                              prob_overlined[~total_abstain_indicator],
+                                                               k_hashcode=self.k_hashcode,
+                                                               max_radius=0.1,
+                                                               n_grid=1000
+                                                              )
         return radii, total_abstain_indicator
 
     def sample_funcs(self, x: torch.Tensor, n):
