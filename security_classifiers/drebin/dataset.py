@@ -78,7 +78,7 @@ class Dataset(torch.utils.data.Dataset):
         data_params = {
             'batch_size': self.batch_size,
             'shuffle': False,
-            'num_workers': 6
+            'num_workers': 0
         }
         assert isinstance(data, (np.ndarray, torch.Tensor))
         if label is None:

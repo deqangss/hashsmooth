@@ -1,14 +1,13 @@
-# -*- coding: UTF-8 -*-
-
-# author: Deqiang Li
-# datetime: 2023/8/7 7:42 PM
-# software: PyCharm
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import os
 import sys
 import argparse
-import functools
 
+import torch
 import numpy as np
+import functools
 import torch
 import drebin_utils
 sys.path.append('../../')
@@ -23,19 +22,14 @@ from randomsmooth.random_tran import RandomTransformer
 from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch
 from model import DrebinNN, DrebinSVM, RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 from dataset import Dataset
+from mimicry import Mimicry
 
-from drebin_adaptive_attack import PGDl1
+atta_argparse = argparse.ArgumentParser(description='arguments for mimicry attack')
+atta_argparse.add_argument('--trials', type=int, default=5,
+                           help='number of benign samples for perturbing one malicious file.')
+atta_argparse.add_argument('--n_ben', type=int, default=5000,
+                           help='number of benign samples.')
 
-torch.manual_seed(23456)
-torch.cuda.manual_seed(23456)
-np.random.seed(23456)
-
-atta_argparse = argparse.ArgumentParser(description='arguments for pgd-l1 attack')
-
-atta_argparse.add_argument('--steps', type=int, default=10,
-                           help='maximum number of perturbations.')
-# atta_argparse.add_argument('--real', action='store_true', default=False,
-#                            help='whether produce the perturbed apks.')
 atta_argparse.add_argument('--seed', type=int, default=23456,
                            help='Random seed for reproduction')
 atta_argparse.add_argument('--cuda', action='store_true', default=False,
@@ -64,10 +58,11 @@ atta_argparse.add_argument('--model', type=str, default='drebin_svm',
 atta_argparse.add_argument('--smooth', type=str, default='none',
                            choices=['none', 'random', 'sparsity', 'hash'],
                            help="smooth method, choose from 'random' or 'hash'.\n")
+atta_argparse.add_argument('--model_name', type=str, default='xxxxxxxx-xxxxxx', help='model timestamp.')
 
-logger = drebin_utils.logging.getLogger("pgdl1-attack")
+
+logger = drebin_utils.logging.getLogger("mimicry-attack")
 logger.addHandler(drebin_utils.ErrorHandler)
-
 
 def _main():
     args = atta_argparse.parse_args()
@@ -81,16 +76,25 @@ def _main():
     else:
         device = torch.device('cpu')
 
-    # obtain data
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     _1, _2, test_x_y = dataset.load()
     test_x, test_y = test_x_y
+    if args.smooth == 'hash':
+        test_x = dataset.preprocess_hash_dummy_feature(test_x)
+
     mal_test_y = test_y[test_y == 1]
     mal_test_x = test_x[test_y == 1]
-    if args.smooth == 'hash':
-        mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x)
-    test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
+    ben_test_y = test_y[test_y == 0]
+    ben_test_x = test_x[test_y == 0]
+
+    mal_count = len(mal_test_y)
+    ben_count = len(ben_test_x)
     input_dim = test_x.shape[1]
+    if mal_count <= 0 and ben_count <= 0:
+        return
+    test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
+    test_ben_producer = dataset.get_dataloader(*(ben_test_x, ben_test_y))
+    # test
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
         classifier.model.to(device)
@@ -113,11 +117,11 @@ def _main():
         classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling, batch_size=args.batch_size)
     elif args.smooth == 'sparsity':
         classifier = SparsitySmooth4Drebin(classifier, num_of_classes=2,
-                                         pf_minus=args.pf_minus,
-                                         pf_plus=args.pf_plus,
-                                         default_mode=True,
-                                         model_save_dir=os.path.join(args.save_path,
-                                                                     'sparsity_{}_model'.format(args.model)))
+                                           pf_minus=args.pf_minus,
+                                           pf_plus=args.pf_plus,
+                                           default_mode=True,
+                                           model_save_dir=os.path.join(args.save_path,
+                                                                       'sparsity_{}_model'.format(args.model)))
         classifier.predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
         classifier.get_loss = functools.partial(classifier.get_loss, n=args.n_sampling, batch_size=args.batch_size)
     elif args.smooth == 'hash':
@@ -137,37 +141,42 @@ def _main():
     else:
         raise ValueError
 
-    # test
-    y_prediction = []
-    classifier.load_model()
-    for idx, (test_x_batch, test_y_batch) in enumerate(test_mal_producer):
-        test_x_batch = test_x_batch.to(device)
-        y_pred = classifier.predict(test_x_batch).cpu().numpy()
-        y_prediction.append(y_pred)
-    y_prediction = np.concatenate(y_prediction)
-    assert len(y_prediction) == len(mal_test_y)
-    if hasattr(classifier, 'ABSTAIN'):
-        abstain_flag = y_prediction == classifier.ABSTAIN
-        abstain_ratio = np.sum(abstain_flag) / float(len(y_prediction))
-        logger.info('Abstain ratio: {}.'.format(abstain_ratio))
-        accuracy = (mal_test_y[~abstain_flag] == y_prediction[~abstain_flag]).sum() / float(len(y_prediction)) + abstain_ratio
-    else:
-        accuracy = (mal_test_y == y_prediction).sum() / float(len(y_prediction))
-    logger.info("Model of {}_{} achieves the accuracy on malware test dataset: {:.4f}%".format(args.model, args.smooth + str(args.K),
-                                                                                               accuracy * 100))
 
-    # attack
+
+    logger.info("Load model parameters from {}.".format(classifier.model_save_path))
+    classifier.eval()
+    ben_feature_vectors = []
+    with torch.no_grad():
+        c = args.n_ben if args.n_ben < ben_count else ben_count
+        for ben_x, ben_y in test_ben_producer:
+            ben_x = ben_x.to(device)
+            ben_feature_vectors.append(ben_x)
+            if len(ben_feature_vectors) * args.batch_size >= c:
+                break
+        ben_feature_vectors = torch.vstack(ben_feature_vectors)[:c]
+
     constraints = np.load(os.path.join(dataset.dataset_path, 'constraints.npz'))
-    pgdl1 = PGDl1(constraints['insertion'], constraints['removal'], None, None, is_attacker=True, device=device)
-    adv, adv_prediction = [], []
+    attack = Mimicry(ben_feature_vectors, constraints['insertion'], constraints['removal'], device=device)
+    success_flag_list = []
+    x_mod_list, adv_prediction = [], []
     for idx, (test_x_batch, test_y_batch) in enumerate(test_mal_producer):
         test_x_batch, test_y_batch = test_x_batch.to(device), test_y_batch.to(device)
-        adv_x = pgdl1.perturb(classifier, test_x_batch, test_y_batch, steps=args.steps, verbose=True)
-        # print(torch.sum(torch.abs(adv_x - test_x_batch), dim=-1))
-        adv_y_pred = classifier.predict(adv_x).cpu().numpy()
+        _flag, x_mod = attack.perturb(classifier,
+                                      test_x_batch,
+                                      test_y_batch,
+                                      trials=args.trials,
+                                      valid_dim=10000,
+                                      seed=args.seed)
+        success_flag_list.append(_flag)
+        logger.info(
+            f"The attack effectiveness under mimicry attack is {np.sum(_flag) / float(len(_flag)) * 100}%.")
+        x_mod_list.append(x_mod)
+        adv_y_pred = classifier.predict(x_mod).cpu().numpy()
         adv_prediction.append(adv_y_pred)
-        adv.append(adv_x.cpu().numpy())
-    adv = np.vstack(adv)
+    success_flag = np.concatenate(success_flag_list)
+    logger.info(f"The mean accuracy on perturbed malware is {(1. - np.sum(success_flag) / float(mal_count)) * 100}%.")
+
+    adv = torch.vstack(x_mod_list).cpu().numpy()
     adv_prediction = np.concatenate(adv_prediction)
 
     if hasattr(classifier, 'ABSTAIN'):
@@ -190,14 +199,17 @@ def _main():
                 args.smooth,
                 adv_accuracy * 100,
                 args.steps
-                ))
+            ))
 
     # save
     if not os.path.exists(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples')):
         drebin_utils.mkdir(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples'))
-    np.savez(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples', '{}_{}_{}_pgd_adv.npz'.format(args.model, args.smooth + str(args.K), args.steps)),
+    np.savez(os.path.join(os.path.dirname(classifier.model_save_path), 'adv-examples',
+                          '{}_{}_mimicry_adv.npz'.format(args.model, args.smooth + str(args.K))),
              adv=adv, mal_pred=adv_prediction)
 
 
-if __name__ == "__main__":
+
+
+if __name__ == '__main__':
     _main()
