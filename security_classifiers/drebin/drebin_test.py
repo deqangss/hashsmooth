@@ -79,6 +79,7 @@ def _main():
         # obtain data
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     train_x_y, val_x_y, test_x_y = dataset.load()
+    input_dim = train_x_y[0].shape[1]
     if args.smooth == 'hash':
         train_x= dataset.preprocess_hash_dummy_feature(train_x_y[0])
         val_x = dataset.preprocess_hash_dummy_feature(val_x_y[0])
@@ -87,7 +88,6 @@ def _main():
     train_x_y_producer = dataset.get_dataloader(*train_x_y)
     val_x_y_producer = dataset.get_dataloader(*val_x_y)
     test_x_y_producer = dataset.get_dataloader(*test_x_y)
-    input_dim = train_x_y[0].shape[1]
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
         classifier.model.to(device)
@@ -129,6 +129,7 @@ def _main():
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
                                        max_k=args.K,
+                                       input_dim=input_dim,
                                        default_mode=True,
                                        model_save_dir=os.path.join(args.save_path,
                                                                    'hash_{}_model'.format(args.model))

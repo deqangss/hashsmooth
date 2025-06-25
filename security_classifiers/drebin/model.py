@@ -600,12 +600,13 @@ class SparsitySmooth4Drebin(SparsitySmooth):
 class HashSmooth(HashSmoothBase):
     ABSTAIN = ABSTAIN
 
-    def __init__(self, num_of_classes, transform_method, max_k=1000, default_mode=True):
+    def __init__(self, num_of_classes, transform_method, max_k=1000, input_dim=1000, default_mode=True):
         super(HashSmooth, self).__init__(num_of_classes, transform_method, max_k, None, None, default_mode)
+        self.input_dim = input_dim
         self.transform_method = transform_method
 
     def transform(self, x):
-        return self.transform_method.transform(x)
+        return self.transform_method.transform(x)[:, :self.input_dim]
 
     def calc_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
         return self._calc_radius(probas, second_probas, k_hashcode, max_radius, n_grid)
@@ -617,6 +618,7 @@ class HashSmooth4Drebin(HashSmooth):
                  num_of_classes: int,
                  hash_method: LSHTransformer,
                  max_k,
+                 input_dim,
                  default_mode: bool,
                  model_save_dir=''
                  ):
@@ -627,6 +629,7 @@ class HashSmooth4Drebin(HashSmooth):
                             num_of_classes,
                             hash_method,
                             max_k=max_k,
+                            input_dim=input_dim,
                             default_mode=default_mode)
         self.clf_model = clf_model
         self.model_save_dir = model_save_dir
