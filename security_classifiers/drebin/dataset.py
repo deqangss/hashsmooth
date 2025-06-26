@@ -47,7 +47,7 @@ class Dataset(torch.utils.data.Dataset):
             raise FileExistsError("Only load 'train.pkl', and do you mean load {}.\n".format(','.join(g_file_names)))
 
         train_dataset = read_pickle(train_data_path)
-        # self.max_num_of_features = np.max(np.sum(train_dataset[0] == 1), axis=-1)
+        # self.max_num_of_features = np.mean(np.sum(train_dataset[0] == 1), axis=-1)
         val_data_path = os.path.join(self.dataset_path, 'validation.pkl')
         if not os.path.exists(val_data_path):
             # guess it
@@ -70,8 +70,8 @@ class Dataset(torch.utils.data.Dataset):
         x_numpy_pad = np.pad(x_numpy, ((0, 0), (0, self.max_num_of_features)), mode='constant', constant_values=0)
         nonzero_number = np.count_nonzero(x_numpy, axis=-1)
         for i in range(r):
-            _number = 0 if nonzero_number[i] > self.max_num_of_features else self.max_num_of_features - nonzero_number[i]
-            x_numpy_pad[i, -_number:] = 1.0
+            _number = c + self.max_num_of_features if nonzero_number[i] > self.max_num_of_features else c + nonzero_number[i]
+            x_numpy_pad[i, _number:] = 1.0
         return x_numpy_pad
 
     def get_dataloader(self, data, label=None):
