@@ -140,7 +140,7 @@ def _main():
         raise ValueError
 
     # train
-    # train_model(train_x_y_producer, val_x_y_producer, epochs=args.epochs, learning_rate=args.lr, device=device, verbose=True)
+    train_model(train_x_y_producer, val_x_y_producer, epochs=args.epochs, learning_rate=args.lr, device=device, verbose=True)
 
     # test
     y_prediction = []
