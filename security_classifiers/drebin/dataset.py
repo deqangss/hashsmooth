@@ -34,7 +34,7 @@ class Dataset(torch.utils.data.Dataset):
         self.dataset_path = os.path.join(self.dataset_dir, self.dataset_name)
         assert os.path.exists(self.dataset_path)
         self.batch_size = batch_size
-        self.max_num_of_features = 1
+        self.max_num_of_features = 0
 
     def load(self):
         # Here we just load the preprocessed data, while the data preprocessing shall be conducted by following the
