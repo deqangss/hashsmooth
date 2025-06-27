@@ -4,6 +4,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.metrics import f1_score
 from statsmodels.stats.proportion import proportion_confint, binom_test
 
 import drebin_utils
@@ -644,7 +645,7 @@ class HashSmooth4Drebin(HashSmooth):
             epochs=1000, learning_rate=0.001, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
         optimizer = torch.optim.Adam(self.clf_model.parameters(), lr=learning_rate)
-        best_avg_acc = 0.
+        best_f1_acc = 0.
         for i in range(epochs):
             self.clf_model.train()
             losses, accuracies = [], []
@@ -669,25 +670,26 @@ class HashSmooth4Drebin(HashSmooth):
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}%.')
 
             self.clf_model.eval()
-            avg_acc_val = []
+            avg_f1_val = []
             with torch.no_grad():
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
 
                     y_votes = self.sample_funcs(x_val, n_sampling)
                     y_pred = y_votes.argmax(dim=-1)
-                    acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
-                    avg_acc_val.append(acc_val)
-            avg_acc_val = np.mean(avg_acc_val)
+                    # acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
+                    f1_val = f1_score(y_val.cpu().numpy(), y_pred.cpu().numpy(), average='macro')
+                    avg_f1_val.append(f1_val)
+            avg_f1_val = np.mean(avg_f1_val)
 
-            if avg_acc_val >= best_avg_acc:
-                best_avg_acc = avg_acc_val
+            if avg_f1_val >= best_f1_acc:
+                best_f1_acc = avg_f1_val
                 best_epoch = i
                 torch.save(self.clf_model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
+                f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_f1_acc * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float):
         self.eval()
@@ -747,7 +749,7 @@ class HashSmooth4Drebin(HashSmooth):
         total_abstain_indicator = abstain_indicator | incorrect_indicator
         if np.any(~total_abstain_indicator):
             radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
-                                                              prob_overlined[~total_abstain_indicator],
+                                                               prob_overlined[~total_abstain_indicator],
                                                                k_hashcode=self.k_hashcode,
                                                                max_radius=0.1,
                                                                n_grid=1000
