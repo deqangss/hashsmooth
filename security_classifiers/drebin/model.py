@@ -48,7 +48,7 @@ class DrebinSVM(nn.Module):
         nbatches = len(train_x_y)
         # optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        best_avg_acc = 0.
+        best_avg_f1 = 0.
         for i in range(epochs):
             self.model.train()
             losses, accuraies = [], []
@@ -70,24 +70,25 @@ class DrebinSVM(nn.Module):
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}%.')
 
             self.model.eval()
-            avg_acc_val = []
+            avg_f1_val = []
             with torch.no_grad():
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
                     logits = self.model(x_val)
-                    acc_val = ((logits.data > 0.).view(-1) == y_val).sum().item()
-                    acc_val /= x_val.size()[0]
-                    avg_acc_val.append(acc_val)
-                avg_acc_val = np.mean(avg_acc_val)
+                    # acc_val = ((logits.data > 0.).view(-1) == y_val).sum().item()
+                    y_pred = (logits.data > 0.).view(-1)
+                    f1_val = f1_score(y_val.cpu().numpy(), y_pred.cpu().numpy(), average='macro')
+                    avg_f1_val.append(f1_val)
+                avg_f1_val = np.mean(avg_f1_val)
 
-                if avg_acc_val >= best_avg_acc:
-                    best_avg_acc = avg_acc_val
+                if avg_f1_val >= best_avg_f1:
+                    best_avg_f1 = avg_f1_val
                     best_epoch = i
                     torch.save(self.model.state_dict(), self.model_save_path)
                     logger.info(f'Model saved at path: {self.model_save_path}')
 
                 logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
+                    f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         self.eval()
@@ -143,7 +144,7 @@ class DrebinNN(nn.Module):
             epochs=1000, learning_rate=0.001, device='cpu', verbose=False):
         nbatches = len(train_x_y)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        best_avg_acc = 0.
+        best_avg_f1 = 0.
         for i in range(epochs):
             self.model.train()
             losses, accuracies = [], []
@@ -163,25 +164,26 @@ class DrebinNN(nn.Module):
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuray_train * 100:.2f}%.')
 
             self.model.eval()
-            avg_acc_val = []
+            avg_f1_val = []
             with torch.no_grad():
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
-
                     logits = self.model(x_val)
-                    acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
-                    acc_val /= x_val.size()[0]
-                    avg_acc_val.append(acc_val)
-                avg_acc_val = np.mean(avg_acc_val)
+                    # acc_val = (logits.argmax(dim=-1) == y_val).sum().item()
+                    # acc_val /= x_val.size()[0]
+                    y_pred = logits.argmax(dim=-1)
+                    f1_val = f1_score(y_val.cpu().numpy(), y_pred.cpu().numpy(), average='macro')
+                    avg_f1_val.append(f1_val)
+                avg_f1_val = np.mean(avg_f1_val)
 
-                if avg_acc_val >= best_avg_acc:
-                    best_avg_acc = avg_acc_val
+                if avg_f1_val >= best_avg_f1:
+                    best_avg_f1 = avg_f1_val
                     best_epoch = i
                     torch.save(self.model.state_dict(), self.model_save_path)
                     logger.info(f'Model saved at path: {self.model_save_path}')
 
                 logger.info(
-                    f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
+                    f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         self.eval()
@@ -272,7 +274,7 @@ class RandomSmooth4Drebin(RandomSmooth):
             epochs=100, learning_rate=0.001, penaty_factor=0.01, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
         optimizer = torch.optim.Adam(self.clf_model.parameters(), lr=learning_rate)
-        best_avg_acc = 0.
+        best_avg_f1 = 0.
         best_epoch = 0
         for i in range(epochs):
             self.clf_model.train()
@@ -298,24 +300,24 @@ class RandomSmooth4Drebin(RandomSmooth):
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}%.')
 
             self.clf_model.eval()
-            avg_acc_val = []
+            avg_f1_val = []
             with torch.no_grad():
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
                     y_votes = self.sample_funcs(x_val, n_sampling)
                     y_pred = y_votes.argmax(dim=-1)
-                    acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
-                    avg_acc_val.append(acc_val)
-            avg_acc_val = np.mean(avg_acc_val)
+                    f1_val = f1_score(y_val.cpu().numpy(), y_pred.cpu().numpy(), average='macro')
+                    avg_f1_val.append(f1_val)
+            avg_f1_val = np.mean(avg_f1_val)
 
-            if avg_acc_val >= best_avg_acc:
-                best_avg_acc = avg_acc_val
+            if avg_f1_val >= best_avg_f1:
+                best_avg_f1 = avg_f1_val
                 best_epoch = i
                 torch.save(self.clf_model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
+                f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float = 0.05):
         self.eval()
@@ -444,7 +446,7 @@ class SparsitySmooth4Drebin(SparsitySmooth):
             epochs=1000, learning_rate=0.001, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
         optimizer = torch.optim.Adam(self.clf_model.parameters(), lr=learning_rate)
-        best_avg_acc = 0.
+        best_avg_f1 = 0.
         for i in range(epochs):
             self.clf_model.train()
             losses, accuracies = [], []
@@ -469,25 +471,25 @@ class SparsitySmooth4Drebin(SparsitySmooth):
                         f'Mini batch: {i * nbatches + i_batch + 1}/{epochs * nbatches} | Training loss (batch level): {losses[-1]:.4f} | Train accuracy: {accuracy_train * 100:.2f}%.')
 
             self.clf_model.eval()
-            avg_acc_val = []
+            avg_f1_val = []
             with torch.no_grad():
                 for x_val, y_val in validation_x_y:
                     x_val, y_val = x_val.to(device), y_val.to(device)
 
                     y_votes = self.sample_funcs(x_val, n_sampling)
                     y_pred = y_votes.argmax(dim=-1)
-                    acc_val = (y_pred == y_val).sum().item() / float(x_val.size()[0])
-                    avg_acc_val.append(acc_val)
-            avg_acc_val = np.mean(avg_acc_val)
+                    f1_val = f1_score(y_val.cpu().numpy(), y_pred.cpu().numpy(), average='macro')
+                    avg_f1_val.append(f1_val)
+            avg_f1_val = np.mean(avg_f1_val)
 
-            if avg_acc_val >= best_avg_acc:
-                best_avg_acc = avg_acc_val
+            if avg_f1_val >= best_avg_f1:
+                best_avg_f1 = avg_f1_val
                 best_epoch = i
                 torch.save(self.clf_model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_acc_val * 100:.2f}% | The best validation accuracy: {best_avg_acc * 100:.2f}% at epoch: {best_epoch}.')
+                f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float):
         self.eval()
@@ -645,7 +647,7 @@ class HashSmooth4Drebin(HashSmooth):
             epochs=1000, learning_rate=0.001, n_sampling=100, device='cpu', verbose=False):
         nbatches = len(train_x_y)
         optimizer = torch.optim.Adam(self.clf_model.parameters(), lr=learning_rate)
-        best_f1_acc = 0.
+        best_avg_f1 = 0.
         for i in range(epochs):
             self.clf_model.train()
             losses, accuracies = [], []
@@ -682,14 +684,14 @@ class HashSmooth4Drebin(HashSmooth):
                     avg_f1_val.append(f1_val)
             avg_f1_val = np.mean(avg_f1_val)
 
-            if avg_f1_val >= best_f1_acc:
-                best_f1_acc = avg_f1_val
+            if avg_f1_val >= best_avg_f1:
+                best_avg_f1 = avg_f1_val
                 best_epoch = i
                 torch.save(self.clf_model.state_dict(), self.model_save_path)
                 logger.info(f'Model saved at path: {self.model_save_path}')
 
             logger.info(
-                f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_f1_acc * 100:.2f}% at epoch: {best_epoch}.')
+                f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float):
         self.eval()
