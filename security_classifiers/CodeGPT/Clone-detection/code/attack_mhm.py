@@ -283,7 +283,7 @@ if __name__ == "__main__":
         orig_prob, orig_label = model.get_results([example], args.eval_batch_size)
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
-
+        example_start_time = time.time()
         identifiers = list(substitutes.keys())
         if len(identifiers) == 0:
             total_cnt += 1
@@ -292,7 +292,6 @@ if __name__ == "__main__":
             _res = {'succ': None, 'tokens': first_code, 'raw_tokens': first_code}
         else:
             total_cnt += 1
-            example_start_time = time.time()
             _res = attacker.mcmc_random(example, substitutes, tokenizer, code_pair,
                                         _label=ground_truth, _n_candi=30,
                                         _max_iter=100, _prob_threshold=1)

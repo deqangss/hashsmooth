@@ -267,7 +267,7 @@ if __name__ == "__main__":
         orig_prob, orig_label = model.get_results([example], args.eval_batch_size)
         orig_prob = orig_prob[0]
         orig_label = orig_label[0]
-        
+        start_time = time.time()
         if orig_label != ground_truth:
             _res = {'succ': None, 'tokens': code_pair[2], 'raw_tokens': code_pair[2]}
         else:
