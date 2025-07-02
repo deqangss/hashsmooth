@@ -805,13 +805,13 @@ def main():
     # Evaluation
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
-        output_dir = os.path.join(args.output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        output_dir = os.path.join(args.output_dir, 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
         result=evaluate(args, model, tokenizer,pool=pool)
         
     if args.do_test and args.local_rank in [-1, 0]:
-        output_dir = os.path.join(args.output_dir, 'model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
+        output_dir = os.path.join(args.output_dir, 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random)))
         model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
         test(args, model, tokenizer,pool=pool,best_threshold=0.5)
