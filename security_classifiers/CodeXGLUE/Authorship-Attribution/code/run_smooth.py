@@ -106,7 +106,7 @@ def convert_examples_to_features(code, label, tokenizer,args):
     return InputFeatures(source_tokens,source_ids,0,label)
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, args, file_path=None):
+    def __init__(self, tokenizer, args, file_path=None,block_size=None,pool=None):
         self.examples = []
         # To-Do: 这里需要根据code authorship的数据集重新做.
         file_type = file_path.split('/')[-1].split('.')[0]
