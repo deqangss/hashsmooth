@@ -609,7 +609,7 @@ class HashSmooth(HashSmoothBase):
         self.transform_method = transform_method
 
     def transform(self, x):
-        return self.transform_method.transform(x)
+        return self.transform_method.transform(x)[:, :self.input_dim]
 
     def calc_radius(self, probas, second_probas, k_hashcode=None, max_radius=None, n_grid=100):
         return self._calc_radius(probas, second_probas, k_hashcode, max_radius, n_grid)
