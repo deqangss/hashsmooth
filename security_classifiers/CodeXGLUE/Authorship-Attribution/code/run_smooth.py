@@ -508,7 +508,6 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
             preds = np.array(preds).reshape([args.n_sampling, bs]).transpose([1, 0])
             preds_selection = np.eye(args.number_labels)[preds.astype(int)].sum(axis=-2)
             top2 = preds_selection.argsort(axis=-1)[:, ::-1][:, :2]
-            y_preds.append(top2[:, 0])
 
             logits = []
             for sample_idx in range(args.n_estimation):
