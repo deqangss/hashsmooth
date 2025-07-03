@@ -568,7 +568,7 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
             n_runnerup = preds_estimation[range(top2.shape[0]), top2[:, 1].astype(int)]
             prob_overlined = upper_confidence_interval(n_runnerup, args.n_estimation, args.alpha)
 
-            radius = np.zeros_like(label, dtype=object)
+            radius = np.zeros_like(label.cpu().numpy(), dtype=object)
             abstain_indicator = prob_underlined <= prob_overlined
             radius[abstain_indicator] = model.ABSTAIN
             incorrect_indicator = (top2[:, 0] != label.cpu().numpy())
