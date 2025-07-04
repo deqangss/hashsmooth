@@ -231,13 +231,12 @@ class RandomDelSmooth(object):
                                                                   value=self.transform_method.pad_value)
         return retain_specific_tokens(x_transform, x, tokenizer)
 
+    def calc_radius(self, p_lower):
+        return self.transform_method.calc_radius(p_lower)
+
     @staticmethod
     def lc_bound(k, n, alpha):
         return proportion_confint(k, n, alpha=2 * alpha, method="beta")[0]
-
-    @staticmethod
-    def calc_radius(self, p_lower):
-        return self.transform_method.calc_radius(p_lower)
 
 class RandomDelSmooth4LLM(nn.Module, RandomDelSmooth):
     def __init__(self, encoder, config, tokenizer,
