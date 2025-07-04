@@ -260,7 +260,6 @@ class RandomDelSmooth(object):
     def lc_bound(k, n, alpha):
         return proportion_confint(k, n, alpha=2 * alpha, method="beta")[0]
 
-    @staticmethod
     def calc_radius(self, p_lower):
         return self.transform_method.calc_radius(p_lower)
 
