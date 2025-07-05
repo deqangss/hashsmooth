@@ -87,10 +87,10 @@ def _main():
     test_x, test_y = test_x_y
     mal_test_y = test_y[test_y == 1]
     mal_test_x = test_x[test_y == 1]
+    input_dim = test_x.shape[1]
     if args.smooth == 'hash':
         mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x)
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
-    input_dim = test_x.shape[1]
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
         classifier.model.to(device)
@@ -128,6 +128,7 @@ def _main():
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
                                        max_k=args.K,
+                                       input_dim=input_dim,
                                        default_mode=True,
                                        model_save_dir=os.path.join(args.save_path,
                                                                    'hash_{}_model'.format(args.model))
