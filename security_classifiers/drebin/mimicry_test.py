@@ -79,6 +79,7 @@ def _main():
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     _1, _2, test_x_y = dataset.load()
     test_x, test_y = test_x_y
+    input_dim = test_x.shape[1]
     if args.smooth == 'hash':
         test_x = dataset.preprocess_hash_dummy_feature(test_x)
 
@@ -89,7 +90,6 @@ def _main():
 
     mal_count = len(mal_test_y)
     ben_count = len(ben_test_x)
-    input_dim = test_x.shape[1]
     if mal_count <= 0 and ben_count <= 0:
         return
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
@@ -132,6 +132,7 @@ def _main():
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
                                        max_k=args.K,
+                                       input_dim=input_dim,
                                        default_mode=True,
                                        model_save_dir=os.path.join(args.save_path,
                                                                    'hash_{}_model'.format(args.model))

@@ -1,7 +1,7 @@
 import numpy as np
 import gmpy2
-# from tqdm.autonotebook import tqdm
-import tqdm
+from tqdm.autonotebook import tqdm
+# import tqdm
 from statsmodels.stats.proportion import proportion_confint
 from itertools import product
 from collections import defaultdict

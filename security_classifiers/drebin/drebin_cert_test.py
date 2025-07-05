@@ -121,6 +121,7 @@ def _main():
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
                                        max_k=args.K,
+                                       input_dim=input_dim,
                                        default_mode=True,
                                        model_save_dir=os.path.join(args.save_path,
                                                                    'hash_{}_model'.format(args.model))
