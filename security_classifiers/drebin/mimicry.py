@@ -3,6 +3,8 @@
 """
 import torch
 import numpy as np
+import torch.nn.functional as F
+from model import RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 
 EXP_OVER_FLOW = 1e-120
 
@@ -49,6 +51,11 @@ class Mimicry(object):
             return []
         if len(self.ben_x) <= 0:
             return x
+        if isinstance(model, HashSmooth4Drebin) and self.injection_x is not None and x.shape[-1] > \
+                self.injection_x.shape[-1]:
+            dim_remain = x.shape[-1] - self.injection_x.shape[-1]
+            self.injection_x = F.pad(self.injection_x, (0, dim_remain)) if self.injection_x is not None else None
+            self.removal_x = F.pad(self.removal_x, (0, dim_remain)) if self.removal_x is not None else None
         trials = trials if trials < len(self.ben_x) else len(self.ben_x)
         success_flag = np.array([])
         with torch.no_grad():

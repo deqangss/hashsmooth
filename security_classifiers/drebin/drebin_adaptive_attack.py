@@ -13,7 +13,7 @@ import torch.nn.functional as F
 # from tools import utils
 # logger = utils.logging.getLogger("pgdl1-attack-core")
 # logger.addHandler(utils.ErrorHandler)
-
+from model import RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 
 EXP_OVER_FLOW = 1e-30
 
@@ -64,6 +64,13 @@ class PGDl1(object):
         """
         if x is None or x.shape[0] <= 0:
             return []
+        if isinstance(model, HashSmooth4Drebin) and self.injection_x is not None and x.shape[-1] > self.injection_x.shape[-1]:
+            dim_remain = x.shape[-1] - self.injection_x.shape[-1]
+            self.injection_x = F.pad(self.injection_x, (0, dim_remain)) if self.injection_x is not None else None
+            self.removal_x = F.pad(self.removal_x, (0, dim_remain)) if self.removal_x is not None else None
+            self.omega_add = F.pad(self.omega_add, (0, dim_remain)) if self.omega_add is not None else None
+            self.omega_rmv = F.pad(self.omega_rmv, (0, dim_remain)) if self.omega_rmv is not None else None
+
         adv_x = x
         worst_x = x.detach().clone()
         # self.padding_mask = torch.sum(adv_x, dim=-1, keepdim=True) > 1  # we set a graph contains two apis at least
