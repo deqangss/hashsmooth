@@ -61,6 +61,7 @@ class Mimicry(object):
         with torch.no_grad():
             torch.manual_seed(seed)
             x_mod_list = []
+            y_pred_batch = model.predict(x)
             for _i, _x in enumerate(x):
                 indices = torch.randperm(len(self.ben_x))[:trials]
                 trial_vectors = self.ben_x[indices]
@@ -85,10 +86,17 @@ class Mimicry(object):
                 # check the attack effectiveness
                 use_flag = attack_flag
 
-                if not use_flag[ben_id_sel]:
+                if  y_pred_batch[_i] != label[_i]:
                     success_flag = np.append(success_flag, [False])
+                    rtn_adv_x = _x
+                elif not use_flag[ben_id_sel]:
+                    success_flag = np.append(success_flag, [False])
+                    rtn_adv_x = modified_x[ben_id_sel]
                 else:
                     success_flag = np.append(success_flag, [True])
+                    distance = torch.abs(torch.sum(modified_x[use_flag] - _x, dim=-1))
+                    min_dist_id = torch.argmin(distance)
+                    rtn_adv_x = modified_x[use_flag][min_dist_id]
 
-                x_mod_list.append(modified_x[ben_id_sel])
+                x_mod_list.append(rtn_adv_x)
             return success_flag, torch.vstack(x_mod_list)

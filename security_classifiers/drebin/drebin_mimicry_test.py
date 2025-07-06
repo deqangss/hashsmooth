@@ -25,7 +25,7 @@ from dataset import Dataset
 from mimicry import Mimicry
 
 atta_argparse = argparse.ArgumentParser(description='arguments for mimicry attack')
-atta_argparse.add_argument('--trials', type=int, default=5,
+atta_argparse.add_argument('--trials', type=int, default=10,
                            help='number of benign samples for perturbing one malicious file.')
 atta_argparse.add_argument('--n_ben', type=int, default=5000,
                            help='number of benign samples.')
@@ -194,12 +194,11 @@ def _main():
         # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
         logger.info('Abstain ratio: {}.'.format(abstain_ratio))
         logger.info(
-            "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack with {} steps.".format(
+            "Model of {}_{} incorported with {} achieves the accuracy {:.4f}% under adversarial attack.".format(
                 args.model,
                 args.K,
                 args.smooth,
-                adv_accuracy * 100,
-                args.steps
+                adv_accuracy * 100
             ))
 
     # save
