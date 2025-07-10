@@ -45,7 +45,7 @@ sys.path.append('../../../python_parser')
 sys.path.append('../../../../hashsmooth')
 sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
-from python_parser.parser_folder import remove_comments_and_docstrings
+# from python_parser.parser_folder import remove_comments_and_docstrings
 
 # try:
 #     from torch.utils.tensorboard import SummaryWriter
@@ -119,7 +119,7 @@ class TextDataset(Dataset):
 
         print('\n cached_features_file: ',cache_file_path)
         try:
-            self.examples = torch.load(cache_file_path)
+            self.examples = torch.load(cache_file_path)[-3:]
             with open(code_pairs_file_path, 'rb') as f:
                 code_files = pickle.load(f)
             
@@ -681,7 +681,8 @@ def main():
                         help="confidence interval.")
 
     
-    pool = multiprocessing.Pool(cpu_cont)
+    # pool = multiprocessing.Pool(cpu_cont)
+    pool = None
     args = parser.parse_args()
 
     # Setup distant debugging if needed

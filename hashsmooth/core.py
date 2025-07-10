@@ -62,7 +62,7 @@ class HashSmoothBase(object):
         """
         batch_size = len(probas)
         threshold = (probas - second_probas) / 2.
-        bound_mesh, radii_mesh = self._get_radius_grid(probas, None, k_hashcode, max_radius, n_grid)
+        bound_mesh, radii_mesh = self._get_radius_grid(probas, second_probas,None, k_hashcode, max_radius, n_grid)
         # select the radius corresponding to the estimated bound smaller than the threshold
         if len(bound_mesh.shape) == 2:
             pos_sel = np.diag(np.apply_along_axis(np.searchsorted, 1, bound_mesh, threshold))
@@ -72,7 +72,7 @@ class HashSmoothBase(object):
             raise NotImplementedError
         return radii
 
-    def _get_radius_grid(self, probas: np.ndarray, regions=None, k_hashcode=None, max_radius=None, n_grid=None):
+    def _get_radius_grid(self, probas: np.ndarray, second_probas: np.ndarray, regions=None, k_hashcode=None, max_radius=None, n_grid=None):
         """
         obtain all bounds regarding the radius from 1 to the maximum radius
         :param probas: batch of probabilities
@@ -85,8 +85,10 @@ class HashSmoothBase(object):
         n_grid = self.n_grid if self.n_grid is not None else n_grid
 
         max_proba = np.max(probas)
+        min_proba = np.min(second_probas)
         # get maximum radius for each sub-group of features
-        max_radius = self._get_max_radius(max_proba, k_hashcode,
+        max_radius = self._get_max_radius(max_proba, min_proba,
+                                          k_hashcode,
                                           min_radius=0.,
                                           max_radius=max_radius,
                                           n_grid=n_grid
@@ -116,7 +118,7 @@ class HashSmoothBase(object):
                 bounds4radii[(idx_range, *idx)] = sum(_radii)
         return radii4bounds, bounds4radii
 
-    def _get_max_radius(self, max_proba, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
+    def _get_max_radius(self, max_proba, min_second_probas, k_hashcode, min_radius=0., max_radius=0.01, n_grid=100) -> float:
         """
         Search the maximum radius
         :param min_proba: the minimum probability to estimate the radius
@@ -132,14 +134,14 @@ class HashSmoothBase(object):
             radius = radii_steps[curr_idx]
             _regions = self._calc_regions(k_hashcode, radius)
             _bound = self._calc_bound(_regions, max_proba)
-            if _bound <= (max_proba - 0.5) / 2.0:
+            if _bound <= (max_proba - min_second_probas) / 2.0:
                 if lower_idx == curr_idx:
                     break
                 lower_idx = curr_idx
             else:
                 upper_idx = curr_idx
         if 0 <= (radius - max_radius) <= max_radius / n_grid:
-            return self._get_max_radius(max_proba, k_hashcode, max_radius, 2 * max_radius, n_grid)
+            return self._get_max_radius(max_proba, min_second_probas, k_hashcode, max_radius, 2 * max_radius, n_grid)
         else:
             return radius
 
