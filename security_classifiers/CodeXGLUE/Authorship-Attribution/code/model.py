@@ -126,8 +126,7 @@ class RandomSmooth(object):
     def lc_bound(k, n, alpha):
         return proportion_confint(k, n, alpha=2 * alpha, method="beta")[0]
 
-    @staticmethod
-    def calc_radius(scores_of_true, size, keep):
+    def calc_radius(self, scores_of_true, size, keep):
         count = scores_of_true.shape[0]
         done = torch.zeros(count, dtype=torch.uint8)
         radii = torch.zeros(count, dtype=torch.long)
