@@ -93,6 +93,8 @@ class HashSmoothBase(object):
                                           max_radius=max_radius,
                                           n_grid=n_grid
                                           )
+        if max_radius <= 0:
+            warnings.warn("The maximum radius should be greater than 0.")
         regions = {}
         radii_splitting = []
         radii_splitting.append(

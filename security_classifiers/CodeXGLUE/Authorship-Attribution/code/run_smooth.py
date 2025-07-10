@@ -119,7 +119,7 @@ class TextDataset(Dataset):
 
         print('\n cached_features_file: ',cache_file_path)
         try:
-            self.examples = torch.load(cache_file_path)[-3:]
+            self.examples = torch.load(cache_file_path)
             with open(code_pairs_file_path, 'rb') as f:
                 code_files = pickle.load(f)
             
