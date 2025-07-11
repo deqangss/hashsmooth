@@ -85,7 +85,7 @@ class HashSmoothBase(object):
         n_grid = self.n_grid if self.n_grid is not None else n_grid
 
         max_proba = np.max(probas)
-        min_proba = np.min(second_probas)
+        min_proba = np.min(second_probas) if second_probas is not None else 0.5
         # get maximum radius for each sub-group of features
         max_radius = self._get_max_radius(max_proba, min_proba,
                                           k_hashcode,
