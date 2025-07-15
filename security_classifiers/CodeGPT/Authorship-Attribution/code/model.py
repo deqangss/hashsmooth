@@ -31,7 +31,8 @@ class RobertaClassificationHead(nn.Module):
 
     def forward(self, x, **kwargs):
         # x = x.reshape(-1,x.size(-1)*2)
-        x = x.reshape(-1, x.size(-1))
+        # x = x.reshape(-1, x.size(-1))
+        x = x[:, 0, :]
         x = self.dropout(x)
         x = self.dense(x)
         x = torch.tanh(x)
@@ -53,8 +54,8 @@ class Model(nn.Module):
     def forward(self, input_ids=None,labels=None): 
         input_ids=input_ids.view(-1,self.args.block_size)
         outputs = self.encoder(input_ids= input_ids,attention_mask=input_ids.ne(self.tokenizer.pad_token_id))[0] # 2B * L * D
-        sequence_lengths = torch.ne(input_ids, self.tokenizer.pad_token_id).sum(-1) - 1
-        outputs=outputs[range(input_ids.size(0)),sequence_lengths,:] # 2B * D
+        # sequence_lengths = torch.ne(input_ids, self.tokenizer.pad_token_id).sum(-1) - 1
+        # outputs=outputs[range(input_ids.size(0)),sequence_lengths,:] # 2B * D
         logits=self.classifier(outputs) # 2B * D
         prob=F.softmax(logits) # B * 2
         if labels is not None:
