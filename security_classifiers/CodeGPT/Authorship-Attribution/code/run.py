@@ -41,6 +41,8 @@ from torch.utils.data.distributed import DistributedSampler
 # except:
 #     from tensorboardX import SummaryWriter
 
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
 sys.path.append('../../')
 sys.path.append('../../../')
 sys.path.append('../../../../')
