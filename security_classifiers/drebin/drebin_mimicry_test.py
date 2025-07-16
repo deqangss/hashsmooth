@@ -92,7 +92,7 @@ def _main():
     ben_count = len(ben_test_x)
     if mal_count <= 0 and ben_count <= 0:
         return
-    test_mal_producer = dataset.get_dataloader(*(mal_test_x[:1000], mal_test_y[:1000]))
+    test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
     test_ben_producer = dataset.get_dataloader(*(ben_test_x, ben_test_y))
     # test
     if args.model == 'svm':
@@ -190,7 +190,7 @@ def _main():
         logger.warning("All prediction is abstained.\n")
     else:
         abstain_ratio = np.sum(abstain_flag) / float(len(adv_prediction))
-        adv_accuracy = (mal_test_y[:1000][~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
+        adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / float(
             len(adv_prediction)) + abstain_ratio
         # adv_accuracy = (mal_test_y[~abstain_flag] == adv_prediction[~abstain_flag]).sum() / np.sum(~abstain_flag)
         logger.info('Abstain ratio: {}.'.format(abstain_ratio))
