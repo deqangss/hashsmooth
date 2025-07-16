@@ -173,6 +173,7 @@ def _main():
             f"The attack effectiveness under mimicry attack is {np.sum(_flag) / float(len(_flag)) * 100}%.")
         x_mod_list.append(x_mod)
         adv_y_pred = classifier.predict(x_mod).cpu().numpy()
+        print(adv_y_pred)
         adv_prediction.append(adv_y_pred)
     success_flag = np.concatenate(success_flag_list)
     logger.info(f"The mean accuracy on perturbed malware is {(1. - np.sum(success_flag) / float(mal_count)) * 100}%.")
