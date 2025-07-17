@@ -761,24 +761,24 @@ class HashSmooth4Drebin(HashSmooth):
     def sample_funcs(self, x: torch.Tensor, n):
         votes = torch.zeros((x.shape[0], self.num_of_classes), dtype=torch.long, device=x.device)
         with torch.no_grad():
-            if x.shape[0] > 1:
-                for i in range(n):
-                    x_train_mask = self.transform(x)
-                    logits = self.clf_model(x_train_mask)
-                    pred_batch = self.get_output(logits).to(torch.int64)
-                    votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
-            else:
-                batch_size = 64
-                for idx in range(n // batch_size + 1):
-                    current_batch_size = min(batch_size, n)
-                    n -= current_batch_size
-                    if current_batch_size <= 0:
-                        break
-                    mask_x = self.transform(torch.tile(x, (current_batch_size, 1)))
-                    logits = self.clf_model(mask_x)
-                    pred_batch = self.get_output(logits).to(torch.int64)
-                    votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0,
-                                       keepdim=True)
+            # if x.shape[0] > 1:
+            for i in range(n):
+                x_train_mask = self.transform(x)
+                logits = self.clf_model(x_train_mask)
+                pred_batch = self.get_output(logits).to(torch.int64)
+                votes += torch.nn.functional.one_hot(pred_batch, self.num_of_classes)
+            # else:
+            #     batch_size = 64
+            #     for idx in range(n // batch_size + 1):
+            #         current_batch_size = min(batch_size, n)
+            #         n -= current_batch_size
+            #         if current_batch_size <= 0:
+            #             break
+            #         mask_x = self.transform(torch.tile(x, (current_batch_size, 1)))
+            #         logits = self.clf_model(mask_x)
+            #         pred_batch = self.get_output(logits).to(torch.int64)
+            #         votes += torch.sum(torch.nn.functional.one_hot(pred_batch, self.num_of_classes), dim=0,
+            #                            keepdim=True)
         return votes
 
     def get_output(self, logits: torch.Tensor):
