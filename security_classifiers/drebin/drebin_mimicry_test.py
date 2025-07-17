@@ -6,6 +6,7 @@ import sys
 import argparse
 
 import torch
+import random
 import numpy as np
 import functools
 import torch
@@ -64,6 +65,14 @@ atta_argparse.add_argument('--model_name', type=str, default='xxxxxxxx-xxxxxx', 
 logger = drebin_utils.logging.getLogger("mimicry-attack")
 logger.addHandler(drebin_utils.ErrorHandler)
 
+def set_seed(seed=42):
+    random.seed(seed)
+    os.environ['PYHTONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+
 def _main():
     args = atta_argparse.parse_args()
     assert args.save_path != '', "Expect a saving path."
@@ -75,6 +84,8 @@ def _main():
         device = torch.device('cuda:0')
     else:
         device = torch.device('cpu')
+
+    set_seed(args.seed)
 
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     _1, _2, test_x_y = dataset.load()
