@@ -153,8 +153,7 @@ def _main():
     else:
         raise ValueError
 
-
-
+    classifier.load_model()
     logger.info("Load model parameters from {}.".format(classifier.model_save_path))
     classifier.eval()
     ben_feature_vectors = []
