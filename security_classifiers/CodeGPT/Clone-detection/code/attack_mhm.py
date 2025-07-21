@@ -197,7 +197,7 @@ if __name__ == "__main__":
         checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
         model.get_results = partial(model.get_results, alpha=args.alpha)
     elif args.smooth == 'randdel':
-        input_transformer = RandomDeleter(p_del=1. - (float(args.k_random) / tokenizer.model_max_length),
+        input_transformer = RandomDeleter(p_del=1. - (float(args.k_random) / args.block_size),
                                           mask_id=tokenizer.pad_token_id,
                                           reuse_noise=True,
                                           seed=args.seed)
@@ -205,7 +205,7 @@ if __name__ == "__main__":
         checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
         model.get_results = partial(model.get_results, alpha=args.alpha)
     elif args.smooth == 'hash':
-        input_transformer = EditLSHTransformerTorch(tokenizer.max_len_single_sentence,  # where are 2 tokens?
+        input_transformer = EditLSHTransformerTorch(args.block_size,  # where are 2 tokens?
                                                     args.k_random,
                                                     args.kmer,
                                                     l_chucksize=1,
