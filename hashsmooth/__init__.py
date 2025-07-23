@@ -6,4 +6,4 @@ from hashsmooth.lsh_np import LSHTransformer, \
     HammingLSHTransformer
 from hashsmooth import core
 from hashsmooth.lsh_torch import EditLSHTransformerTorch
-from hashsmooth.lsh_torch import JaccardLSHTransformerTorch
+from hashsmooth.lsh_torch import JaccardLSHTransformerTorch, HammingLSHTransformerTorch

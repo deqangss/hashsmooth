@@ -25,7 +25,7 @@ sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
 
 from randomsmooth.random_tran import RandomTransformer
-from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch
+from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch, HammingLSHTransformerTorch
 from model import DrebinNN, DrebinSVM, RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 from dataset import Dataset
 
@@ -80,11 +80,11 @@ def _main():
     dataset = Dataset(args.dataset_dir, args.dataset_name, args.batch_size)
     train_x_y, val_x_y, test_x_y = dataset.load()
     input_dim = train_x_y[0].shape[1]
-    if args.smooth == 'hash':
-        train_x= dataset.preprocess_hash_dummy_feature(train_x_y[0])
-        val_x = dataset.preprocess_hash_dummy_feature(val_x_y[0])
-        test_x = dataset.preprocess_hash_dummy_feature(test_x_y[0])
-        train_x_y, val_x_y, test_x_y = (train_x, train_x_y[1]), (val_x, val_x_y[1]), (test_x, test_x_y[1])
+    # if args.smooth == 'hash':
+    #     train_x= dataset.preprocess_hash_dummy_feature(train_x_y[0])
+    #     val_x = dataset.preprocess_hash_dummy_feature(val_x_y[0])
+    #     test_x = dataset.preprocess_hash_dummy_feature(test_x_y[0])
+    #     train_x_y, val_x_y, test_x_y = (train_x, train_x_y[1]), (val_x, val_x_y[1]), (test_x, test_x_y[1])
     train_x_y_producer = dataset.get_dataloader(*train_x_y)
     val_x_y_producer = dataset.get_dataloader(*val_x_y)
     test_x_y_producer = dataset.get_dataloader(*test_x_y)
@@ -122,10 +122,17 @@ def _main():
         train_model = functools.partial(classifier.fit, n_sampling=args.n_sampling)
         predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
     elif args.smooth == 'hash':
-        input_transformer = JaccardLSHTransformerTorch(sub_k=args.K,  # initialize this value afterwards
+        # input_transformer = JaccardLSHTransformerTorch(sub_k=args.K,  # initialize this value afterwards
+        #                                                null_value=0.0,
+        #                                                seed=args.seed,
+        #                                                )
+        input_transformer = HammingLSHTransformerTorch(dimension=input_dim,
+                                                       sub_k=args.K,
                                                        null_value=0.0,
                                                        seed=args.seed,
+                                                       device=device
                                                        )
+
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
                                        max_k=args.K,

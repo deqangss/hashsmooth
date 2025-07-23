@@ -330,7 +330,7 @@ class HammingLSHTransformerTorch(LSHTransformerTorch):
         assert len(hash_codes.shape) == 2
         batch_size_ = hash_codes.shape[0]
         input_rtn = torch.ones((batch_size_, self.dimension), dtype=torch.int, device=self.device) * self.null_value
-        input_rtn[np.array(range(batch_size_))[:, np.newaxis], permutations] = hash_codes
+        input_rtn[np.array(range(batch_size_))[:, np.newaxis], permutations] = hash_codes.to(input_rtn.dtype)
         return input_rtn
 
 
