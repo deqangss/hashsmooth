@@ -536,8 +536,7 @@ class SparsitySmooth4Drebin(SparsitySmooth):
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
         prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
         n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
-        # prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
-        prob_overlined = 0.5  # 2 classes
+        prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
 
         radius_ad = np.zeros_like(c_pred, dtype=object)
         radius_rd = np.zeros_like(c_pred, dtype=object)
@@ -564,8 +563,8 @@ class SparsitySmooth4Drebin(SparsitySmooth):
             max_ra_loup = (grid_lower >= grid_upper)[:, :, 0].argmin(1)
             max_rd_loup = (grid_lower >= grid_upper)[:, 0, :].argmin(1)
 
-            radius_ad[~total_abstain_indicator] = max_ra_base
-            radius_rd[~total_abstain_indicator] = max_rd_base
+            radius_ad[~total_abstain_indicator] = max_ra_loup
+            radius_rd[~total_abstain_indicator] = max_rd_loup
 
         return radius_ad, radius_rd, total_abstain_indicator
 
@@ -736,8 +735,7 @@ class HashSmooth4Drebin(HashSmooth):
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
         prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
         n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
-        # prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
-        prob_overlined = 0.5
+        prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
 
         # given the estimated probability, we calculate the radius
         radii = np.zeros_like(c_pred, dtype=object)
@@ -753,7 +751,7 @@ class HashSmooth4Drebin(HashSmooth):
         total_abstain_indicator = abstain_indicator | incorrect_indicator
         if np.any(~total_abstain_indicator):
             radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
-                                                               0.5,
+                                                               prob_overlined[~total_abstain_indicator],
                                                                k_hashcode=self.k_hashcode,
                                                                max_radius=0.1,
                                                                n_grid=1000
