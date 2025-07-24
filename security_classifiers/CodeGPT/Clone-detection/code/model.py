@@ -94,7 +94,7 @@ class Model(nn.Module):
       
         
 def retain_specific_tokens(inputs_ids_mask, inputs_ids, tokenizer):
-    assert inputs_ids_mask.shape == inputs_ids.shape
+    assert inputs_ids_mask.shape == inputs_ids.shape, "{} vs. {}".foramt(inputs_ids_mask.shape, inputs_ids.shape)
     boolean_var = torch.zeros_like(inputs_ids, device=inputs_ids.device, dtype=torch.bool)
     for spec_id in tokenizer.all_special_ids:
         boolean_var |= (inputs_ids == spec_id)

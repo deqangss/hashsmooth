@@ -222,7 +222,7 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
-    model.load_state_dict(torch.load(output_dir))
+    model.load_state_dict(torch.load(output_dir), strict=False)
     model.to(args.device)
     print("MODEL LOADED!")
     cpu_cont = 16
