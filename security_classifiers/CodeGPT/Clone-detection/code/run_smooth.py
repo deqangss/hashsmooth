@@ -769,8 +769,7 @@ def main():
                         help="confidence interval.")
 
     
-    # pool = multiprocessing.Pool(cpu_cont)
-    pool = None
+    pool = multiprocessing.Pool(cpu_cont)
     args = parser.parse_args()
 
     # Setup distant debugging if needed
