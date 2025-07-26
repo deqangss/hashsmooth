@@ -300,15 +300,25 @@ if __name__ == "__main__":
         print("Example time cost: ", round(example_end_time, 2), "min")
         print("ALL examples time cost: ", round((time.time() - all_start_time) / 60, 2), "min")
         print("Query times in this attack: ", model.query - query_times)
-        replace_info = ''
-        if _res["replace_info"] is not None:
-            for key in _res["replace_info"].keys():
-                replace_info += key + ':' + _res["replace_info"][key] + ','
+
+        if _res['succ'] is None:
+            pass
+        if _res['succ'] == True:
+            print ("EXAMPLE "+str(index)+" SUCCEEDED!")
+            n_succ += 1
+
+        else:
+            print ("EXAMPLE "+str(index)+" FAILED.")
 
         if _res['succ'] == True:
             success_attack += 1
-            recoder.writemhm(index, "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), code_pair[2], _res['tokens'],
-                         _res["prog_length"], " ".join(_res['tokens']), ground_truth, orig_label, _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"], _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"], model.query - query_times, "0")
+            recoder.writemhm(index,
+                             "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "),
+                             code_pair[2], _res['tokens'],
+                             _res["prog_length"], " ".join(_res['tokens']), ground_truth, orig_label,
+                             _res["new_pred"], _res["is_success"], _res["old_uid"], _res["score_info"],
+                             _res["nb_changed_var"], _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"],
+                             model.query - query_times, "0")
         elif _res['succ'] == False:
             recoder.writemhm(index,
                              "CODE1: " + code_pair[2].replace("\n", " ") + " ||CODE2: " + code_pair[3].replace("\n",
@@ -319,8 +329,11 @@ if __name__ == "__main__":
                              _res["nb_changed_pos"], _res["replace_info"], _res["attack_type"],
                              model.query - query_times, "0")
         else:
-            recoder.writemhm(index,  "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "), code_pair[2], _res['tokens'],
-                          None, " ".join(_res['tokens']), ground_truth, orig_label, None, 0, None, None, None, None, None, None, model.query - query_times, None)
+            recoder.writemhm(index,
+                             "CODE1: "+ code_pair[2].replace("\n", " ")+" ||CODE2: "+ code_pair[3].replace("\n", " "),
+                             code_pair[2], _res['tokens'],
+                             None, " ".join(_res['tokens']),
+                             ground_truth, orig_label, None, 0, None, None, None, None, None, None, model.query - query_times, None)
         query_times = model.query
         print("Success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
     print("Final success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
