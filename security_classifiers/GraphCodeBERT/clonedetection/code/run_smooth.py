@@ -703,9 +703,10 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
             preds_estimation = np.eye(2)[preds.astype(int)].sum(axis=-2)
 
             n_targeted = preds_estimation[range(len(c_pred)), c_pred]
-            prob_underlined = lower_confidence_interval(n_targeted, args.n_estimation, args.alpha)
+            prob_underlined = lower_confidence_interval(n_targeted, args.n_estimation, args.alpha, n_classes=1)
             n_runnerup = preds_estimation[range(len(c_pred)), 1 - c_pred]
             prob_overlined = upper_confidence_interval(n_runnerup, args.n_estimation, args.alpha)
+            prob_overlined[:] = 0.5
 
             radius = np.zeros_like(c_pred, dtype=object)
             abstain_indicator = prob_underlined <= prob_overlined

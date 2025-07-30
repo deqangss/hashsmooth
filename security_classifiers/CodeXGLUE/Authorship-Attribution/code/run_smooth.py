@@ -542,7 +542,9 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
                         args.k_random)
                 elif args.smooth == 'randdel':
                     radius[~total_abstain_indicator] = model.calc_radius(
-                        np.array(prob_underlined[~total_abstain_indicator])[..., None])
+                        np.array(prob_underlined[~total_abstain_indicator])[..., None],
+                        np.array(prob_overlined[~total_abstain_indicator])[..., None]
+                    )
                 elif args.smooth == 'hash':
                     radius[~total_abstain_indicator] = model.calc_radius(prob_underlined[~total_abstain_indicator],
                                                                          prob_overlined[~total_abstain_indicator],
@@ -818,7 +820,7 @@ def main():
     if args.do_certify:
         checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
         output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
-        model.load_state_dict(torch.load(output_dir))
+        model.load_state_dict(torch.load(output_dir), strict=False)
         model.to(args.device)
         result = certify(args, model, tokenizer)
         logger.info("***** Certify results *****")

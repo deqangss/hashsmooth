@@ -586,7 +586,9 @@ def certify(args, model, tokenizer, prefix="",pool=None,threshold=0.5):
                         args.k_random)
                 elif args.smooth == 'randdel':
                     radius[~total_abstain_indicator] = model.calc_radius(
-                        np.array(prob_underlined[~total_abstain_indicator])[..., None])
+                        np.array(prob_underlined[~total_abstain_indicator])[..., None],
+                        np.array(prob_overlined[~total_abstain_indicator])[..., None]
+                    )
                 elif args.smooth == 'hash':
                     radius[~total_abstain_indicator] = model.calc_radius(prob_underlined[~total_abstain_indicator],
                                                                          prob_overlined[~total_abstain_indicator],
