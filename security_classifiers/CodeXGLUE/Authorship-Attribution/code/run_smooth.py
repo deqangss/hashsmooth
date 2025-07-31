@@ -437,6 +437,15 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0):
     count2 = preds_onehot[range(y_preds.shape[0]), top2[:, 1]].astype(int)
     abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > args.alpha
 
+    # temporal usage:
+    checkpoint_prefix = 'checkpoint-best-f1'
+    output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_dir = os.path.join(output_dir, '{}-{}-abstain.npy'.format(args.smooth, int(args.k_random)))
+    np.save(output_dir, abstain_flag)
+    return
+
     from sklearn.metrics import recall_score, accuracy_score
     acc = accuracy_score(y_trues, y_preds)
     recall = recall_score(y_trues, y_preds, average='macro')
