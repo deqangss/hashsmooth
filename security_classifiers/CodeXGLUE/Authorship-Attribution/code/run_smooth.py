@@ -819,7 +819,7 @@ def main():
     if args.do_certify:
         checkpoint_prefix = 'checkpoint-best-f1/model_{}_{}.bin'.format(args.smooth, int(args.k_random))
         output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))
-        model.load_state_dict(torch.load(output_dir), strict=False)
+        model.load_state_dict(torch.load(output_dir))
         model.to(args.device)
         result = certify(args, model, tokenizer)
         logger.info("***** Certify results *****")
