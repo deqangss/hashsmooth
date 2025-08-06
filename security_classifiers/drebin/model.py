@@ -355,9 +355,10 @@ class RandomSmooth4Drebin(RandomSmooth):
 
             c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
             n_targeted = counts_estimation[range(len(c_pred)), c_pred]
-            prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
-            n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
-            prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
+            prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha, n_classes=1)
+            # n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
+            # prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha, n_classes=1)
+            prob_overlined = np.ones_like(prob_underlined) * 0.5
 
             radius = np.zeros_like(c_pred, dtype=object)
             abstain_indicator = prob_underlined <= prob_overlined
@@ -500,7 +501,7 @@ class SparsitySmooth4Drebin(SparsitySmooth):
         count2 = (y_votes[range(x.shape[0]), top2[:, 1]]).cpu().numpy()
 
         pred = top2[:, 0]
-        prob_underlined = lower_confidence_interval(count1, n_sampling, alpha)
+        prob_underlined = lower_confidence_interval(count1, n_sampling, alpha, n_classes=1)
         if self.default_mode:
             abstain_indicator = prob_underlined < 0.5
         else:
@@ -534,9 +535,12 @@ class SparsitySmooth4Drebin(SparsitySmooth):
 
         c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
-        prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
-        n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
-        prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
+        prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha, n_classes=1)
+        if self.default_mode:
+            prob_overlined = np.ones_like(prob_underlined) * 0.5
+        else:
+            n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
+            prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
 
         radius_ad = np.zeros_like(c_pred, dtype=object)
         radius_rd = np.zeros_like(c_pred, dtype=object)
@@ -702,8 +706,11 @@ class HashSmooth4Drebin(HashSmooth):
         count2 = (y_votes[range(x.shape[0]), top2[:, 1]]).cpu().numpy()
 
         pred = top2[:, 0]
-        prob_underlined = lower_confidence_interval(count1, n_sampling, alpha)
-        prob_upperlined = upper_confidence_interval(count2, n_sampling, alpha)
+        prob_underlined = lower_confidence_interval(count1, n_sampling, alpha, n_classes=1)
+        if self.default_mode:
+            prob_upperlined = np.ones_like(prob_underlined) * 0.5
+        else:
+            prob_upperlined = upper_confidence_interval(count2, n_sampling, alpha)
         abstain_indicator = prob_underlined <= prob_upperlined
         # abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
         pred[abstain_indicator] = RandomSmooth.ABSTAIN
@@ -733,9 +740,12 @@ class HashSmooth4Drebin(HashSmooth):
 
         c_pred = counts_selection.argmax(dim=-1).cpu().numpy()
         n_targeted = counts_estimation[range(len(c_pred)), c_pred]
-        prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha)
-        n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
-        prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
+        prob_underlined = lower_confidence_interval(n_targeted.cpu().numpy(), n_estimation, alpha, n_classes=1)
+        if self.default_mode:
+            prob_overlined = np.ones_like(prob_underlined) * 0.5
+        else:
+            n_runnerup = counts_estimation[range(len(c_pred)), 1 - c_pred]
+            prob_overlined = upper_confidence_interval(n_runnerup.cpu().numpy(), n_estimation, alpha)
 
         # given the estimated probability, we calculate the radius
         radii = np.zeros_like(c_pred, dtype=object)

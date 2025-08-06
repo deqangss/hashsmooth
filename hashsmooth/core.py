@@ -61,7 +61,10 @@ class HashSmoothBase(object):
         :param second_probas: getting thresholds for computing radii (i.e., probas are greater than second probas item-wisely)
         """
         batch_size = len(probas)
-        threshold = (probas - second_probas) / 2.
+        if np.all((second_probas - 0.5)<= 1e-8): # binary classification
+            threshold = probas - second_probas
+        else:
+            threshold = (probas - second_probas) / 2.
         bound_mesh, radii_mesh = self._get_radius_grid(probas, second_probas,None, k_hashcode, max_radius, n_grid)
         # select the radius corresponding to the estimated bound smaller than the threshold
         if len(bound_mesh.shape) == 2:
