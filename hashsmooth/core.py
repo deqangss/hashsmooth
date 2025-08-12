@@ -134,12 +134,16 @@ class HashSmoothBase(object):
         """
         radii_steps = np.linspace(min_radius, max_radius, n_grid + 1)
         radius, lower_idx, upper_idx = 0., 0, n_grid
+        if np.all((min_second_probas - 0.5)<= 1e-8): # binary classification
+            threshold_ = max_proba - min_second_probas
+        else:
+            threshold_ = (max_proba - min_second_probas) / 2.0
         while lower_idx < upper_idx:
             curr_idx = lower_idx + (upper_idx - lower_idx) // 2
             radius = radii_steps[curr_idx]
             _regions = self._calc_regions(k_hashcode, radius)
             _bound = self._calc_bound(_regions, max_proba)
-            if _bound <= (max_proba - min_second_probas) / 2.0:
+            if _bound <= threshold_:
                 if lower_idx == curr_idx:
                     break
                 lower_idx = curr_idx
