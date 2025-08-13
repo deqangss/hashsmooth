@@ -92,7 +92,7 @@ def _main():
     test_x, test_y = test_x_y
     input_dim = test_x.shape[1]
     if args.smooth == 'hash':
-        test_x = dataset.preprocess_hash_dummy_feature(test_x)
+        test_x = dataset.preprocess_hash_dummy_feature(test_x, args.K)
 
     mal_test_y = test_y[test_y == 1]
     mal_test_x = test_x[test_y == 1]

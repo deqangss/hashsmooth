@@ -82,7 +82,7 @@ def _main():
     mal_test_x = test_x[test_y == 1]
     input_dim = mal_test_x.shape[1]
     if args.smooth == 'hash':
-        mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x)
+        mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x, args.K)
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))

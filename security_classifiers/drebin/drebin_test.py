@@ -81,9 +81,9 @@ def _main():
     train_x_y, val_x_y, test_x_y = dataset.load()
     input_dim = train_x_y[0].shape[1]
     if args.smooth == 'hash':
-        train_x= dataset.preprocess_hash_dummy_feature(train_x_y[0])
-        val_x = dataset.preprocess_hash_dummy_feature(val_x_y[0])
-        test_x = dataset.preprocess_hash_dummy_feature(test_x_y[0])
+        train_x= dataset.preprocess_hash_dummy_feature(train_x_y[0], args.K)
+        val_x = dataset.preprocess_hash_dummy_feature(val_x_y[0], args.K)
+        test_x = dataset.preprocess_hash_dummy_feature(test_x_y[0], args.K)
         train_x_y, val_x_y, test_x_y = (train_x, train_x_y[1]), (val_x, val_x_y[1]), (test_x, test_x_y[1])
     train_x_y_producer = dataset.get_dataloader(*train_x_y)
     val_x_y_producer = dataset.get_dataloader(*val_x_y)
