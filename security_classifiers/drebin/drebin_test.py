@@ -92,7 +92,7 @@ def _main():
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
         classifier.model.to(device)
         train_model = classifier.fit
-        predict = classifier.predict
+        predict = classifier.predict_
     elif args.model == 'dnn':
         classifier = DrebinNN(input_dim, 2, args.batch_size, os.path.join(args.save_path, 'dnn_model'))
         classifier.model.to(device)

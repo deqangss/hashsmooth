@@ -93,10 +93,14 @@ class DrebinSVM(nn.Module):
                     f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
+        x_preds, _1 = self.predict_(x)
+        return x_preds
+
+    def predict_(self, x: torch.Tensor) -> tuple[Any, None]:
         self.eval()
         logits = self.model(x)
         x_preds = (logits.data > 0.).view(-1).to(torch.int)
-        return x_preds
+        return x_preds, None
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.model_save_path))
