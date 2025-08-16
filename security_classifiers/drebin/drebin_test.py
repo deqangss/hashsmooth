@@ -97,7 +97,7 @@ def _main():
         classifier = DrebinNN(input_dim, 2, args.batch_size, os.path.join(args.save_path, 'dnn_model'))
         classifier.model.to(device)
         train_model = classifier.fit
-        predict = classifier.predict
+        predict = classifier.predict_
     else:
         raise ValueError("Choose either 'drebin_svm' or 'drebin_nn'.\n")
 
@@ -111,7 +111,7 @@ def _main():
                                          model_save_dir=os.path.join(args.save_path,
                                                                      'random_{}_model'.format(args.model)))
         train_model = functools.partial(classifier.fit, n_sampling=args.n_sampling)
-        predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
+        predict = functools.partial(classifier.predict_, n_sampling=args.n_sampling, alpha=args.alpha)
     elif args.smooth == 'sparsity':
         classifier = SparsitySmooth4Drebin(classifier, num_of_classes=2,
                                          pf_minus=args.pf_minus,
@@ -120,7 +120,7 @@ def _main():
                                          model_save_dir=os.path.join(args.save_path,
                                                                      'sparsity_{}_model'.format(args.model)))
         train_model = functools.partial(classifier.fit, n_sampling=args.n_sampling)
-        predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
+        predict = functools.partial(classifier.predict_, n_sampling=args.n_sampling, alpha=args.alpha)
     elif args.smooth == 'hash':
         input_transformer = JaccardLSHTransformerTorch(sub_k=args.K,  # initialize this value afterwards
                                                        null_value=0.0,
@@ -142,7 +142,7 @@ def _main():
                                                                    'hash_{}_model'.format(args.model))
                                        )
         train_model = functools.partial(classifier.fit, n_sampling=args.n_sampling)
-        predict = functools.partial(classifier.predict, n_sampling=args.n_sampling, alpha=args.alpha)
+        predict = functools.partial(classifier.predict_, n_sampling=args.n_sampling, alpha=args.alpha)
     else:
         raise ValueError
 
