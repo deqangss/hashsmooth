@@ -1,6 +1,8 @@
 import os
 import sys
 import math
+from typing import Tuple, Any
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -186,10 +188,14 @@ class DrebinNN(nn.Module):
                     f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
+        x_preds, _ = self.predict_(x)
+        return x_preds
+
+    def predict_(self, x: torch.Tensor) -> tuple[Any, None]:
         self.eval()
         logits = self.model(x)
         x_preds = logits.argmax(dim=-1).to(torch.int)
-        return x_preds
+        return x_preds, None
 
     def load_model(self):
         self.model.load_state_dict(torch.load(self.model_save_path))
@@ -320,6 +326,11 @@ class RandomSmooth4Drebin(RandomSmooth):
                 f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float = 0.05):
+        pred, abstain_flag = self.predict_(x, n_sampling, alpha)
+        pred[abstain_flag] = self.ABSTAIN
+        return pred
+
+    def predict_(self, x: torch.Tensor, n_sampling: int, alpha: float = 0.05):
         self.eval()
         y_votes = self.sample_funcs(x, n_sampling)
 
@@ -329,8 +340,7 @@ class RandomSmooth4Drebin(RandomSmooth):
 
         pred = top2[:, 0]
         abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
-        pred[abstain_flag] = self.ABSTAIN
-        return pred
+        return pred, abstain_flag
 
     def get_confidence(self, x: torch.Tensor, n_sampling: int):
         y_votes = self.sample_funcs(x, n_sampling)
@@ -493,6 +503,11 @@ class SparsitySmooth4Drebin(SparsitySmooth):
                 f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float):
+        pred, abstain_indicator = self.predict_(x, n_sampling, alpha)
+        pred[abstain_indicator] = RandomSmooth.ABSTAIN
+        return pred
+
+    def predict_(self, x: torch.Tensor, n_sampling: int, alpha: float):
         self.eval()
         y_votes = self.sample_funcs(x, n_sampling)
 
@@ -508,8 +523,7 @@ class SparsitySmooth4Drebin(SparsitySmooth):
             prob_upperlined = upper_confidence_interval(count2, n_sampling, alpha)
             abstain_indicator = prob_underlined <= prob_upperlined
         # abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
-        pred[abstain_indicator] = RandomSmooth.ABSTAIN
-        return pred
+        return pred, abstain_indicator
 
     def load_model(self):
         self.clf_model.load_state_dict(torch.load(self.model_save_path))
@@ -698,6 +712,11 @@ class HashSmooth4Drebin(HashSmooth):
                 f'Validation accuracy: {avg_f1_val * 100:.2f}% | The best validation accuracy: {best_avg_f1 * 100:.2f}% at epoch: {best_epoch}.')
 
     def predict(self, x: torch.Tensor, n_sampling: int, alpha: float):
+        pred, abstain_indicator = self.predict_(x, n_sampling, alpha)
+        pred[abstain_indicator] = self.ABSTAIN
+        return pred
+
+    def predict_(self, x: torch.Tensor, n_sampling: int, alpha: float):
         self.eval()
         y_votes = self.sample_funcs(x, n_sampling)
 
@@ -712,9 +731,7 @@ class HashSmooth4Drebin(HashSmooth):
         else:
             prob_upperlined = upper_confidence_interval(count2, n_sampling, alpha)
         abstain_indicator = prob_underlined <= prob_upperlined
-        # abstain_flag = binom_test(count1, count1 + count2, prop=0.5) > alpha
-        pred[abstain_indicator] = RandomSmooth.ABSTAIN
-        return pred
+        return pred, abstain_indicator
 
     def load_model(self):
         self.clf_model.load_state_dict(torch.load(self.model_save_path))
