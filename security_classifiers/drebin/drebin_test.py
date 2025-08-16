@@ -168,7 +168,7 @@ def _main():
     MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
     logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
 
-    outlier_indicator = y_abstain == -1
+    outlier_indicator = y_abstain == True
     y_true = test_x_y[1][~outlier_indicator]
     y_pred = y_prediction[~outlier_indicator]
     accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(y_true, y_pred)
