@@ -158,6 +158,12 @@ def _main():
         y_prediction.append(y_pred)
     y_prediction = np.concatenate(y_prediction)
     assert len(y_prediction) == len(test_x_y[1])
+    accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(test_x_y[1], y_prediction)
+    logger.info(
+        "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100,
+                                                                                        b_accuracy * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
 
     outlier_indicator = y_prediction[:] == -1
     y_true = test_x_y[1][~outlier_indicator]
