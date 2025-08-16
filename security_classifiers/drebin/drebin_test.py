@@ -151,12 +151,16 @@ def _main():
 
     # test
     y_prediction = []
+    y_abstain = []
     classifier.load_model()
     for idx, (test_x_batch, test_y_batch) in enumerate(test_x_y_producer):
         test_x_batch = test_x_batch.to(device)
-        y_pred = predict(test_x_batch).cpu().numpy()
+        y_pred = predict(test_x_batch[0]).cpu().numpy()
+        y_abs = predict(test_x_batch[1])
         y_prediction.append(y_pred)
+        y_abstain.append(y_abs)
     y_prediction = np.concatenate(y_prediction)
+    y_abstain = np.concatenate(y_abstain)
     assert len(y_prediction) == len(test_x_y[1])
     accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(test_x_y[1], y_prediction)
     logger.info(
@@ -165,7 +169,7 @@ def _main():
     MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
     logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
 
-    outlier_indicator = y_prediction[:] == -1
+    outlier_indicator = y_abstain == -1
     y_true = test_x_y[1][~outlier_indicator]
     y_pred = y_prediction[~outlier_indicator]
     accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(y_true, y_pred)
