@@ -155,10 +155,9 @@ def _main():
     classifier.load_model()
     for idx, (test_x_batch, test_y_batch) in enumerate(test_x_y_producer):
         test_x_batch = test_x_batch.to(device)
-        y_pred = predict(test_x_batch[0]).cpu().numpy()
-        y_abs = predict(test_x_batch[1])
-        y_prediction.append(y_pred)
-        y_abstain.append(y_abs)
+        y_pred_ = predict(test_x_batch)
+        y_prediction.append(y_pred_[0].cpu().detach().numpy())
+        y_abstain.append(y_pred_[1])
     y_prediction = np.concatenate(y_prediction)
     y_abstain = np.concatenate(y_abstain)
     assert len(y_prediction) == len(test_x_y[1])
