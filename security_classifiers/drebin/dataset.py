@@ -34,7 +34,7 @@ class Dataset(torch.utils.data.Dataset):
         self.dataset_path = os.path.join(self.dataset_dir, self.dataset_name)
         assert os.path.exists(self.dataset_path)
         self.batch_size = batch_size
-        self.max_num_of_features = 10000 # very slow
+        self.max_num_of_features = 160 # 10000 very slow
 
     def load(self):
         # Here we just load the preprocessed data, while the data preprocessing shall be conducted by following the
@@ -67,7 +67,7 @@ class Dataset(torch.utils.data.Dataset):
     def preprocess_hash_dummy_feature(self, x_numpy: np.ndarray, k: int = 5):
         assert x_numpy.ndim == 2
         r, c = x_numpy.shape
-        self.max_num_of_features = int(k * 10)
+        # self.max_num_of_features = int(k * 10)
         x_numpy_pad = np.pad(x_numpy, ((0, 0), (0, self.max_num_of_features)), mode='constant', constant_values=0)
         nonzero_number = np.count_nonzero(x_numpy, axis=-1)
         for i in range(r):
