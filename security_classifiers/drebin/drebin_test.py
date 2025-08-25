@@ -161,45 +161,46 @@ def _main():
     y_prediction = np.concatenate(y_prediction)
     y_abstain = np.concatenate(y_abstain)
     assert len(y_prediction) == len(test_x_y[1])
-    accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(test_x_y[1], y_prediction)
+    accuracy, b_accuracy, fnr, fpr, f1, precision, recall_score = measurement(test_x_y[1], y_prediction)
     logger.info(
         "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100,
                                                                                         b_accuracy * 100))
-    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
-    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%, precision is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100, precision * 100))
 
     outlier_indicator = y_abstain == True
     y_true = test_x_y[1][~outlier_indicator]
     y_pred = y_prediction[~outlier_indicator]
-    accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(y_true, y_pred)
+    accuracy, b_accuracy, fnr, fpr, f1, precision, recall_score = measurement(y_true, y_pred)
     logger.info('Filter out outlier: {}.'.format(np.sum(outlier_indicator)))
     logger.info(
         "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100,
                                                                                         b_accuracy * 100))
-    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
-    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%, precision is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100, precision * 100))
 
     y_prediction[outlier_indicator] = 1  # treat as malware
-    accuracy, b_accuracy, fnr, fpr, f1, recall_score = measurement(test_x_y[1], y_prediction)
+    accuracy, b_accuracy, fnr, fpr, f1, precision, recall_score = measurement(test_x_y[1], y_prediction)
     logger.info('Set outlier as malware prediction:')
     logger.info(
         "Model of {} achieves the accuracy: {:.4f}%, balanced accuracy: {:.4f}%".format(args.model, accuracy * 100,
                                                                                         b_accuracy * 100))
-    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%"
-    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100))
+    MSG = "False Negative Rate (FNR) is {:.5f}%, False Positive Rate (FPR) is {:.5f}%, F1 score is {:.5f}%, recall score is {:.5f}%, precision is {:.5f}%"
+    logger.info(MSG.format(fnr * 100, fpr * 100, f1 * 100, recall_score * 100, precision * 100))
 
 
 def measurement(_y_true, _y_pred):
-    from sklearn.metrics import f1_score, accuracy_score, recall_score, confusion_matrix, balanced_accuracy_score
+    from sklearn.metrics import f1_score, accuracy_score, recall_score, confusion_matrix, balanced_accuracy_score, precision_score
     accuracy = accuracy_score(_y_true, _y_pred)
     b_accuracy = balanced_accuracy_score(_y_true, _y_pred)
     tn, fp, fn, tp = confusion_matrix(_y_true, _y_pred).ravel()
     fpr = fp / float(tn + fp)
     fnr = fn / float(tp + fn)
+    precision = precision_score(_y_true, _y_pred, average='macro')
     f1 = f1_score(_y_true, _y_pred, average='macro')
 
     recall_score = recall_score(_y_true, _y_pred)
-    return accuracy, b_accuracy, fnr, fpr, f1, recall_score
+    return accuracy, b_accuracy, fnr, fpr, f1, precision, recall_score
 
 
 
