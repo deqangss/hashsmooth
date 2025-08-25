@@ -161,7 +161,8 @@ def _main():
     y_prediction = np.concatenate(y_prediction)
     if len(y_abstain) == 0:
         y_abstain = np.zeros_like(y_prediction)
-    y_abstain = np.concatenate(y_abstain)
+    else:
+        y_abstain = np.concatenate(y_abstain)
     assert len(y_prediction) == len(test_x_y[1])
     accuracy, b_accuracy, fnr, fpr, f1, precision, recall_score = measurement(test_x_y[1], y_prediction)
     logger.info(
