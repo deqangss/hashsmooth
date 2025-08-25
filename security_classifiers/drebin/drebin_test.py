@@ -159,7 +159,7 @@ def _main():
         y_prediction.append(y_pred_[0].cpu().detach().numpy())
         y_abstain.append(y_pred_[1])
     y_prediction = np.concatenate(y_prediction)
-    if y_abstain[0] == None:
+    if (not isinstance(y_abstain[0], np.ndarray)) and (y_abstain[0] == None):
         y_abstain = np.zeros_like(y_prediction)
     else:
         y_abstain = np.concatenate(y_abstain)
