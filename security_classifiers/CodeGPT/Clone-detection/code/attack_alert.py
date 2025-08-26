@@ -325,6 +325,8 @@ def main():
                           attack_type, model.query - query_times, example_end_time)
         query_times = model.query
         print("Success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
+        with open(args.output_dir + '/adv-ga.pickle', 'wb') as fw:
+            pickle.dump((features, new_features, status), fw)
     print("Final success rate: {}/{} = {}".format(success_attack, total_cnt, 1.0 * success_attack / total_cnt))
 
 if __name__ == '__main__':
