@@ -585,8 +585,8 @@ class SparsitySmooth4Drebin(SparsitySmooth):
             max_ra_loup = (grid_lower >= grid_upper)[:, :, 0].argmin(1)
             max_rd_loup = (grid_lower >= grid_upper)[:, 0, :].argmin(1)
 
-            radius_ad[~total_abstain_indicator] = max_ra_base
-            radius_rd[~total_abstain_indicator] = max_rd_base
+            radius_ad[~total_abstain_indicator] = max_ra_loup
+            radius_rd[~total_abstain_indicator] = max_rd_loup
 
         return radius_ad, radius_rd, total_abstain_indicator
 
