@@ -308,8 +308,8 @@ def main():
             for key in replaced_words.keys():
                 replace_info += key + ':' + replaced_words[key] + ','
 
-        features.append(feature)
-        new_features.append(new_feature)
+        features.append(feature.tolist())
+        new_features.append(new_feature.tolist())
         status.append(is_success)
 
         if is_success == 1:
