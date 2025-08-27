@@ -5,6 +5,7 @@
 # @File    : attack.py
 '''For attacking CodeBERT models'''
 import json
+import re
 import sys
 import os
 import os
@@ -145,6 +146,9 @@ def main():
     parser.add_argument("--alpha", default=0.05, type=float,
                         help="confidence interval.")
 
+    parser.add_argument("--recoder_dir", default=None, type=str, required=False,
+                        help="The recoder file of previous attack results.")
+
     args = parser.parse_args()
 
     device = torch.device("cuda")
@@ -268,8 +272,27 @@ def main():
     features = []
     new_features = []
     status = []
+
+    # trying it
+    if args.recoder_dir is not None:
+        fn = os.path.basename(args.recoder_dir)
+        res = re.search(r'(?P<MODEL>[a-zA-Z]*)\_(?P<SMOOTH>[a-zA-Z]*)[0-9]*\_(?P<ATTACK>[a-zA-Z]*)\_adv\.csv', fn)
+        if res is None:
+            print("No such file: ", fn)
+        with open(args.recoder_dir, 'r') as fr:
+            adv_csv_obj = csv.DictReader(fr)
+        adv_csv_res = [r for r in adv_csv_obj]
+
     for index, example in enumerate(eval_dataset):
         print("Index: ", index)
+        if index < len(adv_csv_res):
+            status_prev = int(adv_csv_obj[index]['Is Success'])
+        else:
+            status_prev = 0
+
+        if status_prev != 1:
+            continue
+
         example_start_time = time.time()
         code_pair = source_codes[index]
         logits, preds = model.get_results([example], args.eval_batch_size)
