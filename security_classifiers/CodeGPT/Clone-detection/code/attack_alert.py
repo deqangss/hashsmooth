@@ -240,7 +240,8 @@ def main():
 
     # Load Dataset
     ## Load Dataset
-    pool = multiprocessing.Pool(cpu_cont)
+    # pool = multiprocessing.Pool(cpu_cont)
+    pool = None
     eval_dataset = TextDataset(tokenizer, args, args.eval_data_file, pool = pool)
     ## Load code pairs
     source_codes = get_code_pairs(args.eval_data_file)
@@ -274,19 +275,21 @@ def main():
     status = []
 
     # trying it
-    if args.recoder_dir is not None:
+    if args.recoder_dir is not None and os.path.exists(args.recoder_dir):
         fn = os.path.basename(args.recoder_dir)
         res = re.search(r'(?P<MODEL>[a-zA-Z]*)\_(?P<SMOOTH>[a-zA-Z]*)[0-9]*\_(?P<ATTACK>[a-zA-Z]*)\_adv\.csv', fn)
         if res is None:
             print("No such file: ", fn)
         with open(args.recoder_dir, 'r') as fr:
             adv_csv_obj = csv.DictReader(fr)
-        adv_csv_res = [r for r in adv_csv_obj]
+            adv_csv_res = [r for r in adv_csv_obj]
+    else:
+        adv_csv_res = []
 
     for index, example in enumerate(eval_dataset):
         print("Index: ", index)
         if index < len(adv_csv_res):
-            status_prev = int(adv_csv_obj[index]['Is Success'])
+            status_prev = int(adv_csv_res[index]['Is Success'])
         else:
             status_prev = 0
 
