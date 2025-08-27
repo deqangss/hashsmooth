@@ -293,7 +293,7 @@ def main():
         else:
             status_prev = 0
 
-        if status_prev != 1:
+        if status_prev != 1 and status_prev != 0:
             continue
 
         example_start_time = time.time()
