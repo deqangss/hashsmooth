@@ -780,12 +780,11 @@ class HashSmooth4Drebin(HashSmooth):
                                                             abstain_indicator[incorrect_indicator_true]
             radii[incorrect_indicator] = self.ABSTAIN - 1
         total_abstain_indicator = abstain_indicator | incorrect_indicator
-        print(prob_underlined[~total_abstain_indicator])
         if np.any(~total_abstain_indicator):
             radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
                                                                prob_overlined[~total_abstain_indicator],
                                                                k_hashcode=self.k_hashcode,
-                                                               max_radius=0.1,
+                                                               max_radius=0.2,
                                                                n_grid=1000
                                                               )
         return radii, total_abstain_indicator

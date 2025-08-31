@@ -149,7 +149,7 @@ class HashSmoothBase(object):
                 lower_idx = curr_idx
             else:
                 upper_idx = curr_idx
-        if 0 <= (radius - max_radius) <= max_radius / n_grid:
+        if -2 * (max_radius / n_grid) <= (radius - max_radius) <= 2 * max_radius / n_grid:
             return self._get_max_radius(max_proba, min_second_probas, k_hashcode, max_radius, 2 * max_radius, n_grid)
         else:
             return radius
