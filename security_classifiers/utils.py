@@ -718,26 +718,30 @@ def set_seed(seed=42):
 class Recorder():
     def __init__(self, file_path: str) -> None:
         self.file_path = file_path
-        self.f = open(file_path, 'w')
-        self.writer = csv.writer(self.f)
-        self.writer.writerow(["Index",
-                              "Original Code",
-                              "example",
-                              "new_example",
-                              "Program Length",
-                              "Adversarial Code",
-                              "True Label",
-                              "Original Prediction",
-                              "Adv Prediction",
-                              "Is Success",
-                              "Extracted Names",
-                              "Importance Score",
-                              "No. Changed Names",
-                              "No. Changed Tokens",
-                              "Replaced Names",
-                              "Attack Type",
-                              "Query Times",
-                              "Time Cost"])
+        if os.path.exists(self.file_path):
+            self.f = open(file_path, 'a')
+            self.writer = csv.writer(self.f)
+        else:
+            self.f = open(file_path, 'w')
+            self.writer = csv.writer(self.f)
+            self.writer.writerow(["Index",
+                                  "Original Code",
+                                  "example",
+                                  "new_example",
+                                  "Program Length",
+                                  "Adversarial Code",
+                                  "True Label",
+                                  "Original Prediction",
+                                  "Adv Prediction",
+                                  "Is Success",
+                                  "Extracted Names",
+                                  "Importance Score",
+                                  "No. Changed Names",
+                                  "No. Changed Tokens",
+                                  "Replaced Names",
+                                  "Attack Type",
+                                  "Query Times",
+                                  "Time Cost"])
     
     def write(self, index, code, example, new_example, prog_length, adv_code, true_label, orig_label, temp_label, is_success, variable_names, score_info, nb_changed_var, nb_changed_pos, replace_info, attack_type, query_times, time_cost):
         self.writer.writerow([index,

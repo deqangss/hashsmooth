@@ -303,7 +303,16 @@ def main():
     features = []
     new_features = []
     status = []
+
+    # handel already attacked files
+    indices = []
+    with open(args.csv_store_path, 'r') as fr:
+        adv_csv_obj = csv.DictReader(fr)
+        for row in adv_csv_obj:
+            indices.append(int(row['Index']))
     for index, example in enumerate(eval_dataset):
+        if index in indices:
+            continue
         example_start_time = time.time()
         code = source_codes[index]
         subs = substs[index]
