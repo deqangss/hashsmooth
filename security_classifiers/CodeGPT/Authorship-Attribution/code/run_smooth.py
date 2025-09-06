@@ -833,10 +833,10 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        checkpoint_prefix = 'checkpoint-best-f1/model.bin'
-        output_dir = os.path.join("./saved_models/", '{}'.format(checkpoint_prefix))
-        model.load_state_dict(torch.load(output_dir), strict=False)
-        model.to(args.device)
+        # checkpoint_prefix = 'checkpoint-best-f1/model.bin'
+        # output_dir = os.path.join("./saved_models/", '{}'.format(checkpoint_prefix))
+        # model.load_state_dict(torch.load(output_dir), strict=False)
+        # model.to(args.device)
         train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False,pool=pool)
 
         if args.local_rank == 0:
