@@ -26,7 +26,7 @@ sys.path.append('../../../../randomsmooth')
 sys.path.append('../../../../torchware')
 
 from randomsmooth.random_tran import RandomTransformer
-from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch
+from hashsmooth import JaccardLSHTransformer, JaccardLSHTransformerTorch, HammingLSHTransformerTorch
 from model import DrebinNN, DrebinSVM, RandomSmooth4Drebin, HashSmooth4Drebin, SparsitySmooth4Drebin
 from dataset import Dataset
 
@@ -81,8 +81,8 @@ def _main():
     mal_test_y = test_y[test_y == 1]
     mal_test_x = test_x[test_y == 1]
     input_dim = mal_test_x.shape[1]
-    if args.smooth == 'hash':
-        mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x, args.K)
+    # if args.smooth == 'hash':
+    #     mal_test_x = dataset.preprocess_hash_dummy_feature(mal_test_x, args.K)
     test_mal_producer = dataset.get_dataloader(*(mal_test_x, mal_test_y))
     if args.model == 'svm':
         classifier = DrebinSVM(input_dim, 1, args.batch_size, os.path.join(args.save_path, 'svm_model'))
@@ -114,9 +114,15 @@ def _main():
                                                n_estimation=args.n_estimation,
                                                alpha=args.alpha)
     elif args.smooth == 'hash':
-        input_transformer = JaccardLSHTransformerTorch(sub_k=args.K,  # initialize this value afterwards
+        # input_transformer = JaccardLSHTransformerTorch(sub_k=args.K,  # initialize this value afterwards
+        #                                                null_value=0.0,
+        #                                                seed=args.seed,
+        #                                                )
+        input_transformer = HammingLSHTransformerTorch(dimension=input_dim,
+                                                       sub_k=args.K,
                                                        null_value=0.0,
                                                        seed=args.seed,
+                                                       device=device
                                                        )
         classifier = HashSmooth4Drebin(classifier, num_of_classes=2,
                                        hash_method=input_transformer,
