@@ -784,7 +784,7 @@ class HashSmooth4Drebin(HashSmooth):
             radii[~total_abstain_indicator] = self.calc_radius(prob_underlined[~total_abstain_indicator],
                                                                prob_overlined[~total_abstain_indicator],
                                                                k_hashcode=self.k_hashcode,
-                                                               max_radius=0.2,
+                                                               max_radius=0.02,
                                                                n_grid=1000
                                                               )
         return radii, total_abstain_indicator

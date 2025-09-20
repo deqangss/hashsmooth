@@ -138,8 +138,8 @@ class HashSmoothBase(object):
             threshold_ = max_proba - min_second_probas
         else:
             threshold_ = (max_proba - min_second_probas) / 2.0
-        while lower_idx < upper_idx:
-            curr_idx = lower_idx + (upper_idx - lower_idx) // 2
+        while lower_idx <= upper_idx:
+            curr_idx = lower_idx + (upper_idx - lower_idx + 1) // 2
             radius = radii_steps[curr_idx]
             _regions = self._calc_regions(k_hashcode, radius)
             _bound = self._calc_bound(_regions, max_proba)
@@ -148,8 +148,10 @@ class HashSmoothBase(object):
                     break
                 lower_idx = curr_idx
             else:
+                if upper_idx == curr_idx:
+                    break
                 upper_idx = curr_idx
-        if -1.5 * (max_radius / n_grid) <= (radius - max_radius) <= 1.5 * max_radius / n_grid:
+        if -1 * max_radius / n_grid < (radius - max_radius) < max_radius / n_grid:
             return self._get_max_radius(max_proba, min_second_probas, k_hashcode, max_radius, 2 * max_radius, n_grid)
         else:
             return radius
