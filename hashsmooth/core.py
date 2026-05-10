@@ -134,7 +134,7 @@ class HashSmoothBase(object):
         """
         radii_steps = np.linspace(min_radius, max_radius, n_grid + 1)
         radius, lower_idx, upper_idx = 0., 0, n_grid
-        if np.all((min_second_probas - 0.5)<= 1e-8): # binary classification
+        if np.all(np.abs(min_second_probas - 0.5)<= 1e-8): # binary classification
             threshold_ = max_proba - min_second_probas
         else:
             threshold_ = (max_proba - min_second_probas) / 2.0

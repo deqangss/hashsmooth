@@ -78,7 +78,8 @@ Within each code directory, there is ```scripts_***.sh``` file telling instructi
 However, the data preprocessing step cannot be avoided, which means we need to download the apps and then conduct the experiments. We believe this is necessary because we attempt to generate the realistic attacks.
 
 ### Code analysis tasks
-The datasets are from [the previous study](https://arxiv.org/pdf/2201.08698). We use their datasets that can be downloaded from this [Google Drive](https://drive.google.com/file/d/1kOH1iKvy1PpovgDd5Ji3yoPB2Yty1XXV/view?usp=sharing). After decompressing this file, the folder structure is as follows.
+The datasets are from [the previous study](https://arxiv.org/pdf/2201.08698). We use their datasets that can be downloaded from this [Baidu Drive](
+https://pan.baidu.com/s/19abfEewihl2Y-KwbW25shw?pwd=p847) with the extraction code p847. After decompressing this file, the folder structure is as follows.
 
 ```
 .
