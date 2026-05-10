@@ -1,6 +1,6 @@
 # HashSmooth
 
-This is the code repository for the paper [HashSmooth: Probabilistic Robustness Certificates Against Adversarial Examples in Security Classification](https://anonymous.url)
+This is the code repository for the paper [A Unified Framework of Randomized Smoothing via Hashing: Probabilistic Robustness Certificates for Security Classifiers](https://anonymous.url)
 
 # Descriptions
 
