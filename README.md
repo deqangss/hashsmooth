@@ -109,6 +109,6 @@ https://pan.baidu.com/s/19abfEewihl2Y-KwbW25shw?pwd=p847) with the extraction co
 
 Please see the file named ```requirements.txt```, which lists the necessary packages.
 
-# [!WARNING] ⚠️ **WARNING**
+# ⚠️ **WARNING**
 
 > This is an ongoing repository.
